@@ -247,7 +247,7 @@ class LeadsMasterController extends Controller
                 'required',
                 'string',
                 'max:20',
-                'regex:/^62\d{9,12}$/',
+                'regex:/^62\d{9,14}$/',
                 'unique:leads_master,mobile_phone',
             ],
             'email' => [
@@ -350,7 +350,7 @@ class LeadsMasterController extends Controller
                 'required',
                 'string',
                 'max:20',
-                'regex:/^62\d{9,12}$/',
+                'regex:/^62\d{9,14}$/',
                 'unique:leads_master,mobile_phone',
             ],
             'email' => [
@@ -427,7 +427,7 @@ class LeadsMasterController extends Controller
                 'required',
                 'string',
                 'max:20',
-                'regex:/^62\d{9,12}$/',
+                'regex:/^62\d{9,14}$/',
                 Rule::unique('leads_master', 'mobile_phone')->ignore($lead->id),
             ],
             'email' => [

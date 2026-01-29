@@ -382,7 +382,7 @@ class PanenPoinController extends Controller
             $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             
             // Ambil semua canvasser
-            $canvassers = User::where('role', 'cvsr')->get();
+            $canvassers = User::whereIn('role', ['cvsr', 'PH'])->get();
             
             $totalProcessed = 0;
             $totalUpdated = 0;
