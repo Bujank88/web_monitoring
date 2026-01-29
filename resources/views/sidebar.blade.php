@@ -141,7 +141,7 @@
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
                             <a href="{{ route('logbook.index') }}"
-                            class="nav-link {{ request()->routeIs('logbook.index') ? 'active' : '' }}">
+                            class="nav-link {{ request()->routeIs('logbook.index') ? 'active' : '' }}" style="padding-left: 20px;">
                                 <i class="nav-icon fa-solid fa-book" style="color:rgb(90,90,250);"></i>
                                 <p>Logbook Monthly</p>
                             </a>
@@ -149,7 +149,7 @@
 
                         <li class="nav-item">
                             <a href="{{ route('logbook-daily.index') }}"
-                            class="nav-link {{ request()->routeIs('logbook-daily.index') ? 'active' : '' }}">
+                            class="nav-link {{ request()->routeIs('logbook-daily.index') ? 'active' : '' }}" style="padding-left: 20px;">
                                 <i class="nav-icon fa-solid fa-book" style="color:rgb(250, 125, 90);"></i>
                                 <p>Logbook Daily</p>
                             </a>
