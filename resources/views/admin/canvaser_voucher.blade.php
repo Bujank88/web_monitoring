@@ -610,7 +610,18 @@
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
                 { data: 'total_insentif', name: 'total_insentif', className: 'text-center' }
             ],
-            order: [[1, 'asc']]
+            order: [[1, 'asc']],
+            rowCallback: function(row, data, index) {
+                // Highlight row in red if insentif is 0
+                var insentifCell = $('td', row).eq(5);
+                if (data.total_insentif == 0 || data.total_insentif == '0' || data.total_insentif == 'Rp 0') {
+                    
+                    insentifCell.css({
+                        'background': 'linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%)',
+                        'color': '#c62828'
+                    });
+                }
+            }
         });
 
         // Handle Save Image Button
