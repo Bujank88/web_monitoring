@@ -891,7 +891,7 @@ class BackController extends Controller
                 'rb.payment_method_name',
                 'rb.paid_date'
             )
-            ->whereIn('dv.voucher_code', $canvasserCodes)
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -910,7 +910,7 @@ class BackController extends Controller
             'EXTRA9' => 'Akbar Zikron',
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Majph',
+            'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky'
         ];
         
@@ -1128,7 +1128,7 @@ class BackController extends Controller
             'EXTRA9' => 'Akbar Zikron',
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Majph',
+            'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
         ];
 
@@ -1143,7 +1143,7 @@ class BackController extends Controller
                 'rb.tgl_transaksi',
                 'rb.paid_date'
             )
-            ->whereIn('dv.voucher_code', $canvasserCodes)
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -1206,7 +1206,7 @@ class BackController extends Controller
             'EXTRA9' => 'Akbar Zikron',
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Majph',
+            'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
         ];
 
@@ -1219,7 +1219,7 @@ class BackController extends Controller
                 DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as total_topup'),
                 'rb.paid_date'
             )
-            ->whereIn('dv.voucher_code', $canvasserCodes)
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -1290,7 +1290,7 @@ class BackController extends Controller
             'EXTRA9' => 'Akbar Zikron',
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Majph',
+            'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
         ];
 
@@ -1302,7 +1302,7 @@ class BackController extends Controller
                 'rb.email_client',
                 DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as total_topup')
             )
-            ->whereIn('dv.voucher_code', $canvasserCodes)
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
