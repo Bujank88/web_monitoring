@@ -177,17 +177,15 @@ class LogbookDailyController extends Controller
                     ? number_format($row->realisasi_topup, 0, ',', '.')
                     : '-';
             })
-            //  ->addColumn('action', function ($row) {
-            //     return '
-            //     <button 
-            //         class="btn btn-sm btn-primary btn-edit"
-            //         data-id="'.$row->id.'"
-            //         data-komitmen="'.$row->komitmen.'"
-            //         data-plan="'.$row->plan_min_topup.'"
-            //         data-status="'.$row->status.'"
-            //     >
-            //         Edit
-            //     </button>
+             ->addColumn('action', function ($row) {
+                return '
+                <button 
+                    class="btn btn-sm btn-success btn-realisasi"
+                    data-id="'.$row->id.'"
+                >
+                    Realisasi Logbook
+                </button>';
+            })
                 
             //     <button 
             //         class="btn btn-sm btn-warning btn-day"
