@@ -9,17 +9,121 @@ use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
 use App\Http\Controllers\LeadsMasterController;
+use App\Models\Presensi;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule::call(function () {
-//     app(FrontController::class)->refreshSummarySimpatiTiktok();
-// })->everyMinute()->name('refreshSummarySimpatiTiktok');
-// Schedule::call(function () {
-//     app(FrontController::class)->refreshSummaryPadiUmkm();
-// })->everyMinute()->name('refreshSummaryPadiUmkm');
+// ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
+Schedule::call(function () {
+    $failedPresensi = Presensi::query()
+        ->where(function ($query) {
+            $query->where('is_sent_clock_in', false)->whereNotNull('jam_datang')
+                  ->orWhere('is_sent_clock_out', false)->whereNotNull('jam_pulang')
+                  ->orWhere('is_sent_izin', false)->where('status_datang', '!=', 'Hadir');
+        })
+        ->limit(50)
+        ->get();
+
+    foreach ($failedPresensi as $presensi) {
+        try {
+            $waBot = env('WA_BOT_URL');
+            $botPhone = env('WA_BOT_PHONE');
+
+            if (!$waBot || !$botPhone) continue;
+
+            $phone = preg_replace('/^0/', '62', $botPhone);
+            if (!str_starts_with($phone, '62')) {
+                $phone = '62' . $phone;
+            }
+
+            $pending = $presensi->getPendingNotifications();
+
+            foreach ($pending as $action) {
+                $postData = [
+                    'phone' => $phone,
+                    'nama_cvsr' => $presensi->user->name,
+                    'action' => $action,
+                ];
+
+                if ($action === 'clockIn') {
+                    $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
+                    $postData['jam'] = $presensi->jam_datang;
+                    $postData['status'] = $presensi->status_datang;
+                    $postData['latitude'] = $presensi->latitude_datang;
+                    $postData['longitude'] = $presensi->longitude_datang;
+                    
+                    if ($presensi->user->role === 'cvsr') {
+                        $assignedLocation = \App\Models\LocationPresensiCvsr::where('user_id', $presensi->user->id)->first();
+                        if ($assignedLocation) {
+                            $distance = \App\Models\LocationPresensiCvsr::calculateDistance(
+                                $presensi->latitude_datang, $presensi->longitude_datang,
+                                $assignedLocation->latitude, $assignedLocation->longitude
+                            );
+                            $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
+                            $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
+                            $postData['lokasi_penugasan_nama'] = $assignedLocation->keterangan;
+                            $postData['distance'] = round($distance);
+                        }
+                    }
+                    
+                    if ($presensi->foto_datang && Storage::disk('public')->exists($presensi->foto_datang)) {
+                        $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($presensi->foto_datang));
+                        $postData['foto_mime'] = Storage::disk('public')->mimeType($presensi->foto_datang);
+                    }
+                } elseif ($action === 'clockOut') {
+                    $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
+                    $postData['jam'] = $presensi->jam_pulang;
+                    $postData['status'] = $presensi->status_pulang;
+                    $postData['latitude'] = $presensi->latitude_pulang;
+                    $postData['longitude'] = $presensi->longitude_pulang;
+                    
+                    if ($presensi->user->role === 'cvsr') {
+                        $assignedLocation = \App\Models\LocationPresensiCvsr::where('user_id', $presensi->user->id)->first();
+                        if ($assignedLocation) {
+                            $distance = \App\Models\LocationPresensiCvsr::calculateDistance(
+                                $presensi->latitude_pulang, $presensi->longitude_pulang,
+                                $assignedLocation->latitude, $assignedLocation->longitude
+                            );
+                            $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
+                            $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
+                            $postData['lokasi_penugasan_nama'] = $assignedLocation->keterangan;
+                            $postData['distance'] = round($distance);
+                        }
+                    }
+                    
+                    if ($presensi->foto_pulang && Storage::disk('public')->exists($presensi->foto_pulang)) {
+                        $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($presensi->foto_pulang));
+                        $postData['foto_mime'] = Storage::disk('public')->mimeType($presensi->foto_pulang);
+                    }
+                } elseif ($action === 'izin') {
+                    $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
+                    $postData['tipe_izin'] = $presensi->status_datang;
+                    $postData['keterangan'] = $presensi->keterangan;
+                }
+
+                $response = Http::timeout(30)->post($waBot . '/api/send-wa-presensi', $postData);
+
+                if ($response->successful()) {
+                    // Update status jadi true
+                    if ($action === 'clockIn') {
+                        $presensi->update(['is_sent_clock_in' => true]);
+                    } elseif ($action === 'clockOut') {
+                        $presensi->update(['is_sent_clock_out' => true]);
+                    } elseif ($action === 'izin') {
+                        $presensi->update(['is_sent_izin' => true]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('Retry send presensi notification error: ' . $e->getMessage());
+        }
+    }
+})->everyMinute()->name('retrySendPresensiNotifications');
 
 Schedule::call(function () {
     app(PanenPoinController::class)->refreshSummaryPanenPoin();
@@ -45,23 +149,3 @@ Schedule::call(function () {
 Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
 })->everyTwoMinutes()->name('refreshDetailLeadsSummary');
-
-// Schedule::call(function () {
-//     app(GetDataController::class)->getDataCreatorPartner();
-// })->everyMinute()->name('getDataCreatorPartner');
-
-// Schedule::call(function () {
-//     app(GetDataController::class)->getDataPadiUmkm();
-// })->everyMinute()->name('getDataPadiUmkm');
-
-// Schedule::call(function () {
-//     app(GetDataController::class)->getDataReferralChampionAm();
-// })->everyMinute()->name('getDataReferralChampionAm');
-
-// Schedule::call(function () {
-//     app(GetDataController::class)->getDataSimpatiTiktok();
-// })->everyMinute()->name('getDataSimpatiTiktok');
-
-// Schedule::call(function () {
-//     app(GetDataController::class)->getDataSultamRacing();
-// })->everyMinute()->name('getDataSultamRacing');

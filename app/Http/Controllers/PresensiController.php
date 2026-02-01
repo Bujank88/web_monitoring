@@ -118,8 +118,8 @@ class PresensiController extends Controller
 
         $presensi->save();
 
-        // Send notification to WA Bot
-        $this->sendWANotification($user, $presensi, 'clockIn');
+        // Langsung send WA notif, jika gagal set false
+        $this->sendPresensiWANotif($presensi, 'clockIn');
 
         return response()->json([
             'success' => true,
@@ -184,8 +184,8 @@ class PresensiController extends Controller
 
         $presensi->save();
 
-        // Send notification to WA Bot
-        $this->sendWANotification($user, $presensi, 'clockOut');
+        // Langsung send WA notif, jika gagal set false
+        $this->sendPresensiWANotif($presensi, 'clockOut');
 
         return response()->json([
             'success' => true,
@@ -236,8 +236,8 @@ class PresensiController extends Controller
         $presensi->keterangan = $request->keterangan;
         $presensi->save();
 
-        // Send notification to WA Bot
-        $this->sendWANotification($user, $presensi, 'izin');
+        // Langsung send WA notif, jika gagal set false
+        $this->sendPresensiWANotif($presensi, 'izin');
 
         return response()->json([
             'success' => true,
@@ -277,48 +277,41 @@ class PresensiController extends Controller
     }
 
     /**
-     * Send WA Bot Notification untuk Presensi
-     * Kirim notifikasi ke WA Bot endpoint dedicated untuk presensi dengan foto
+     * Send WA Notif untuk Presensi - langsung send & update status
+     * Jika berhasil → set is_sent_* = true
+     * Jika gagal → set is_sent_* = false
      */
-    private function sendWANotification($user, $presensi, $action = 'clockIn')
+    private function sendPresensiWANotif($presensi, $action = 'clockIn')
     {
         try {
             $waBot = env('WA_BOT_URL');
             $botPhone = env('WA_BOT_PHONE');
 
             if (!$waBot || !$botPhone) {
-                \Log::warning('WA Bot configuration missing for presensi notification');
+                \Log::warning('WA Bot configuration missing');
+                $this->markSendFailed($presensi, $action);
                 return;
             }
 
-            // Format phone dengan prefix 62
             $phone = preg_replace('/^0/', '62', $botPhone);
             if (!str_starts_with($phone, '62')) {
                 $phone = '62' . $phone;
             }
 
-            // Siapkan data sesuai action
+            $user = $presensi->user;
             $postData = [
                 'phone' => $phone,
                 'nama_cvsr' => $user->name,
                 'action' => $action,
             ];
 
-            $fotoPath = null;
-            $assignedLocation = null;
-            $distance = 0;
-
             if ($action === 'clockIn') {
                 $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
-                $postData['jam'] = is_object($presensi->jam_datang) 
-                    ? $presensi->jam_datang->format('H:i') 
-                    : $presensi->jam_datang;
+                $postData['jam'] = $presensi->jam_datang;
                 $postData['status'] = $presensi->status_datang;
                 $postData['latitude'] = $presensi->latitude_datang;
                 $postData['longitude'] = $presensi->longitude_datang;
-                $fotoPath = $presensi->foto_datang;
                 
-                // Ambil lokasi penugasan jika CVSR
                 if ($user->role === 'cvsr') {
                     $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
                     if ($assignedLocation) {
@@ -330,22 +323,22 @@ class PresensiController extends Controller
                         );
                         $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
                         $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
-                        $postData['lokasi_penugasan_nama'] = $assignedLocation->nama_lokasi ?? 'Lokasi Penugasan';
+                        $postData['lokasi_penugasan_nama'] = $assignedLocation->keterangan;
+                        $postData['distance'] = round($distance);
                     }
                 }
-                $postData['distance'] = round($distance);
                 
+                if ($presensi->foto_datang && Storage::disk('public')->exists($presensi->foto_datang)) {
+                    $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($presensi->foto_datang));
+                    $postData['foto_mime'] = Storage::disk('public')->mimeType($presensi->foto_datang);
+                }
             } elseif ($action === 'clockOut') {
                 $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
-                $postData['jam'] = is_object($presensi->jam_pulang) 
-                    ? $presensi->jam_pulang->format('H:i') 
-                    : $presensi->jam_pulang;
+                $postData['jam'] = $presensi->jam_pulang;
                 $postData['status'] = $presensi->status_pulang;
                 $postData['latitude'] = $presensi->latitude_pulang;
                 $postData['longitude'] = $presensi->longitude_pulang;
-                $fotoPath = $presensi->foto_pulang;
                 
-                // Ambil lokasi penugasan jika CVSR
                 if ($user->role === 'cvsr') {
                     $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
                     if ($assignedLocation) {
@@ -357,31 +350,66 @@ class PresensiController extends Controller
                         );
                         $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
                         $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
-                        $postData['lokasi_penugasan_nama'] = $assignedLocation->nama_lokasi ?? 'Lokasi Penugasan';
+                        $postData['lokasi_penugasan_nama'] = $assignedLocation->keterangan;
+                        $postData['distance'] = round($distance);
                     }
                 }
-                $postData['distance'] = round($distance);
                 
+                if ($presensi->foto_pulang && Storage::disk('public')->exists($presensi->foto_pulang)) {
+                    $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($presensi->foto_pulang));
+                    $postData['foto_mime'] = Storage::disk('public')->mimeType($presensi->foto_pulang);
+                }
             } elseif ($action === 'izin') {
                 $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
-                $postData['tipe_izin'] = $presensi->status_datang; // Izin atau Sakit
-                $postData['keterangan'] = $presensi->keterangan ?? '-';
+                $postData['tipe_izin'] = $presensi->status_datang;
+                $postData['keterangan'] = $presensi->keterangan;
             }
 
-            // Jika ada foto (clock in/out), konversi ke base64
-            if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
-                $fotoContent = Storage::disk('public')->get($fotoPath);
-                $postData['foto_base64'] = base64_encode($fotoContent);
-                $postData['foto_mime'] = 'image/png';
-            }
-
-            // Send ke endpoint presensi WA Bot
             $response = Http::timeout(30)->post($waBot . '/api/send-wa-presensi', $postData);
 
-            \Log::info('WA Bot presensi notification sent', ['response' => $response->json()]);
+            if ($response->successful()) {
+                $this->markSendSuccess($presensi, $action);
+                \Log::info('WA notif sent successfully', ['action' => $action, 'presensi_id' => $presensi->id]);
+            } else {
+                $this->markSendFailed($presensi, $action);
+                \Log::warning('WA notif failed', ['action' => $action, 'status' => $response->status()]);
+            }
         } catch (\Exception $e) {
-            \Log::error('Failed to send WA Bot presensi notification: ' . $e->getMessage());
+            \Log::error('Error sending WA notif: ' . $e->getMessage());
+            $this->markSendFailed($presensi, $action);
         }
+    }
+
+    /**
+     * Mark send sebagai berhasil (set true)
+     */
+    private function markSendSuccess($presensi, $action)
+    {
+        $updateData = [];
+        if ($action === 'clockIn') {
+            $updateData['is_sent_clock_in'] = true;
+        } elseif ($action === 'clockOut') {
+            $updateData['is_sent_clock_out'] = true;
+        } elseif ($action === 'izin') {
+            $updateData['is_sent_izin'] = true;
+        }
+        $presensi->update($updateData);
+    }
+
+    /**
+     * Mark send sebagai gagal (set false)
+     */
+    private function markSendFailed($presensi, $action)
+    {
+        $updateData = [];
+        if ($action === 'clockIn') {
+            $updateData['is_sent_clock_in'] = false;
+        } elseif ($action === 'clockOut') {
+            $updateData['is_sent_clock_out'] = false;
+        } elseif ($action === 'izin') {
+            $updateData['is_sent_izin'] = false;
+        }
+        $presensi->update($updateData);
     }
 
     /**

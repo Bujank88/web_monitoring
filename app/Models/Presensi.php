@@ -27,6 +27,10 @@ class Presensi extends Model
         'keterangan',
         'jam_kerja_awal',
         'jam_kerja_akhir',
+        'is_sent_clock_in',
+        'is_sent_clock_out',
+        'is_sent_izin',
+        'last_send_attempt',
     ];
 
     protected $casts = [
@@ -35,6 +39,9 @@ class Presensi extends Model
         'jam_pulang' => 'datetime:H:i:s',
         'jam_kerja_awal' => 'datetime:H:i:s',
         'jam_kerja_akhir' => 'datetime:H:i:s',
+        'is_sent_clock_in' => 'boolean',
+        'is_sent_clock_out' => 'boolean',
+        'is_sent_izin' => 'boolean',
     ];
 
     /**
@@ -135,5 +142,27 @@ class Presensi extends Model
         $menit = $durasi % 60;
 
         return "{$jam}h {$menit}m";
+    }
+
+    /**
+     * Check apakah ada notifikasi yang belum terkirim (false atau null)
+     */
+    public function getPendingNotifications()
+    {
+        $pending = [];
+
+        if ($this->jam_datang && ($this->is_sent_clock_in === false || $this->is_sent_clock_in === null)) {
+            $pending[] = 'clockIn';
+        }
+
+        if ($this->jam_pulang && ($this->is_sent_clock_out === false || $this->is_sent_clock_out === null)) {
+            $pending[] = 'clockOut';
+        }
+
+        if (in_array($this->status_datang, ['Izin', 'Sakit']) && ($this->is_sent_izin === false || $this->is_sent_izin === null)) {
+            $pending[] = 'izin';
+        }
+
+        return $pending;
     }
 }
