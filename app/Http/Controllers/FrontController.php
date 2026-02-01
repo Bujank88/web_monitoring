@@ -26,7 +26,6 @@ class FrontController extends Controller
             } else {
             return redirect('/admin/home');
             }
-            return view('user.index');
         }
         // return view('errors.503');
         return view('auth.login');
