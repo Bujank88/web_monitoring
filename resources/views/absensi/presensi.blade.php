@@ -306,6 +306,53 @@
         .presensi-container { padding: 1.5rem; }
         .button-group { grid-template-columns: 1fr 1fr; }
     }
+    
+    /* Loading State */
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+    }
+    .loading-overlay.active {
+        display: flex;
+    }
+    .loading-content {
+        background: white;
+        border-radius: 15px;
+        padding: 2.5rem;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1.5rem;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+    }
+    .loading-subtext {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
 </style>
 @endsection
 
@@ -382,6 +429,15 @@
                 </span>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner"></div>
+        <div class="loading-text">Memproses Presensi...</div>
+        <div class="loading-subtext">Mohon tunggu, sedang menyimpan data dan mengirim notifikasi</div>
     </div>
 </div>
 
@@ -598,18 +654,24 @@
                         ? '{{ route("presensi.clock_in") }}' 
                         : '{{ route("presensi.clock_out") }}';
                     
+                    // Show loading state
+                    document.getElementById('loadingOverlay').classList.add('active');
+                    closePreviewModal();
+                    
                     const response = await fetch(url, {
                         method: 'POST',
                         body: formData
                     });
                     
                     const data = await response.json();
-                    closePreviewModal();
                     
                     if (data.success) {
-                        swal('Berhasil!', data.message, 'success');
+                        // Keep loading state visible and refresh page
                         setTimeout(() => location.reload(), 1500);
                     } else {
+                        // Hide loading state and show error
+                        document.getElementById('loadingOverlay').classList.remove('active');
+                        
                         // Check jika error adalah distance error
                         if (data.distance !== undefined && data.max_distance !== undefined) {
                             showDistanceErrorModal(data.distance, data.max_distance, data.assigned_location);
@@ -620,6 +682,8 @@
                         }
                     }
                 } catch (error) {
+                    // Hide loading state and show error
+                    document.getElementById('loadingOverlay').classList.remove('active');
                     swal('Error', error.message, 'error');
                 }
             }, 'image/jpeg', 0.9);
@@ -669,6 +733,10 @@
         const formData = new FormData(e.target);
         
         try {
+            // Show loading state
+            document.getElementById('loadingOverlay').classList.add('active');
+            closeIzinModal();
+            
             const response = await fetch('{{ route("presensi.izin") }}', {
                 method: 'POST',
                 body: formData
@@ -677,13 +745,16 @@
             const data = await response.json();
             
             if (data.success) {
-                swal('Berhasil!', data.message, 'success');
-                closeIzinModal();
+                // Keep loading state visible and refresh page
                 setTimeout(() => location.reload(), 1500);
             } else {
+                // Hide loading state and show error
+                document.getElementById('loadingOverlay').classList.remove('active');
                 swal('Error', data.message, 'error');
             }
         } catch (error) {
+            // Hide loading state and show error
+            document.getElementById('loadingOverlay').classList.remove('active');
             swal('Error', error.message, 'error');
         }
     });

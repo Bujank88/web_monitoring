@@ -376,7 +376,7 @@ class PresensiController extends Controller
             }
 
             // Send ke endpoint presensi WA Bot
-            $response = Http::timeout(10)->post($waBot . '/api/send-wa-presensi', $postData);
+            $response = Http::timeout(30)->post($waBot . '/api/send-wa-presensi', $postData);
 
             \Log::info('WA Bot presensi notification sent', ['response' => $response->json()]);
         } catch (\Exception $e) {
