@@ -41,6 +41,11 @@ async function sendWAMessage(phone, message) {
     jid = jid + '@s.whatsapp.net';
   }
   
+  // Validasi JID format
+  if (!jid.includes('@')) {
+    throw new Error(`Invalid JID format: ${jid}`);
+  }
+  
   console.log(`[WA-API] Sending to ${jid}: ${message.substring(0, 50)}...`);
   await globalSock.sendMessage(jid, { text: message });
   
@@ -55,6 +60,8 @@ async function findGroupByName(groupName) {
   
   try {
     const groups = await globalSock.groupFetchAllParticipating();
+    console.log(`[GROUP-FINDER] Available groups: ${Object.values(groups).map(g => g.subject).join(', ')}`);
+    
     for (const group of Object.values(groups)) {
       if (group.subject && group.subject.toLowerCase().includes(groupName.toLowerCase())) {
         console.log(`[GROUP-FINDER] Found group: ${group.subject} (${group.id})`);
@@ -69,30 +76,42 @@ async function findGroupByName(groupName) {
   }
 }
 
-// ---- Helper kirim ke grup =====
-async function sendWAMessageToGroup(groupName, message, mediaBuffer = null, mediaMimeType = null) {
+// ---- Helper kirim ke grup dengan support Group ID =====
+async function sendWAMessageToGroup(groupNameOrId, message, mediaBuffer = null, mediaMimeType = null) {
   if (!globalSock) {
     throw new Error('WhatsApp not connected');
   }
   
-  const group = await findGroupByName(groupName);
-  if (!group) {
-    throw new Error(`Group "${groupName}" not found`);
+  let groupId = null;
+  let groupSubject = null;
+  
+  // Jika input berupa JID format (berakhir dengan @g.us), gunakan langsung
+  if (groupNameOrId.includes('@g.us')) {
+    groupId = groupNameOrId;
+    console.log(`[GROUP-SEND] Using direct group ID: ${groupId}`);
+  } else {
+    // Cari berdasarkan nama
+    const group = await findGroupByName(groupNameOrId);
+    if (!group) {
+      throw new Error(`Group "${groupNameOrId}" not found`);
+    }
+    groupId = group.id;
+    groupSubject = group.subject;
   }
   
-  console.log(`[GROUP-SEND] Sending to group ${group.subject} (${group.id})`);
+  console.log(`[GROUP-SEND] Sending to group ${groupSubject || groupId}`);
   
   if (mediaBuffer && mediaMimeType) {
-    await globalSock.sendMessage(group.id, {
+    await globalSock.sendMessage(groupId, {
       image: mediaBuffer,
       caption: message,
       mimetype: mediaMimeType
     });
   } else {
-    await globalSock.sendMessage(group.id, { text: message });
+    await globalSock.sendMessage(groupId, { text: message });
   }
   
-  return { success: true, groupId: group.id, groupName: group.subject, message: 'Message sent to group' };
+  return { success: true, groupId, groupSubject, message: 'Message sent to group' };
 }
 
 // ===== HTTP API Endpoints =====
@@ -101,6 +120,7 @@ app.get('/', (req, res) => {
     message: 'WhatsApp Bot API is running',
     endpoints: {
       health: '/api/health',
+      groups: '/api/groups',
       sendWA: 'POST /api/send-wa',
       sendWAPresensi: 'POST /api/send-wa-presensi'
     }
@@ -113,6 +133,35 @@ app.get('/api/health', (req, res) => {
     wa_connected: globalSock ? true : false,
     timestamp: new Date().toISOString()
   });
+});
+
+app.get('/api/groups', async (req, res) => {
+  try {
+    if (!globalSock) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'WhatsApp not connected. Please scan QR code first.' 
+      });
+    }
+    
+    const groups = await globalSock.groupFetchAllParticipating();
+    const groupList = Object.values(groups).map(g => ({
+      id: g.id,
+      subject: g.subject,
+      participantsCount: g.participants ? g.participants.length : 0
+    }));
+    
+    res.json({ 
+      success: true, 
+      groups: groupList,
+      total: groupList.length
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 });
 
 app.post('/api/send-wa', async (req, res) => {
@@ -213,13 +262,6 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       message += `📅 Tanggal: ${tanggal}\n`;
       message += `🕐 Pukul: ${jam} WIB\n`;
       message += `📍 Status: ${status}\n`;
-      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
-      if (lokasi_penugasan_nama) {
-        message += `🏢 Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
-      }
-      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
-        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
-      }
       if (distance !== undefined) {
         message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
@@ -228,13 +270,6 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       message += `📅 Tanggal: ${tanggal}\n`;
       message += `🕐 Pukul: ${jam} WIB\n`;
       message += `📍 Status: ${status}\n`;
-      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
-      if (lokasi_penugasan_nama) {
-        message += `🏢 Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
-      }
-      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
-        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
-      }
       if (distance !== undefined) {
         message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
@@ -259,9 +294,18 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       jid = jid + '@s.whatsapp.net';
     }
     
+    // Validasi JID
+    if (!jid || !jid.includes('@')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid phone format: ${phone}. Expected format: 62XXXXXXXXXX or 0XXXXXXXXXX` 
+      });
+    }
+    
     console.log(`[PRESENSI-API] Processing ${action} for ${jid}`);
     
     const sentTo = [];
+    let hasError = false;
     
     // Kirim ke personal number
     try {
@@ -287,36 +331,54 @@ app.post('/api/send-wa-presensi', async (req, res) => {
         console.log(`[PRESENSI-API] Sending text message to personal ${jid}`);
         await globalSock.sendMessage(jid, { text: message });
       }
-      sentTo.push({ type: 'personal', target: jid });
+      sentTo.push({ type: 'personal', target: jid, status: 'sent' });
     } catch (personalError) {
-      console.error('[PRESENSI-API] Error sending to personal:', personalError);
+      console.error('[PRESENSI-API] Error sending to personal:', personalError.message);
+      hasError = true;
+      sentTo.push({ type: 'personal', target: jid, status: 'failed', error: personalError.message });
     }
     
     // Kirim ke grup "All MyAds canvasser Team"
     try {
-      const groupName = 'All MyAds canvasser Team';
+      // Prioritas: gunakan GROUP_ID jika tersedia, fallback ke GROUP_NAME
+      const groupId = process.env.WA_GROUP_ID;
+      const groupName = process.env.WA_GROUP_NAME || 'All MyAds Canvasser Team';
+      const groupTarget = groupId || groupName;
+      
       if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
         try {
           const buffer = Buffer.from(foto_base64, 'base64');
           const mediaType = foto_mime || 'image/png';
           
           console.log(`[PRESENSI-API] Sending photo with caption to group`);
-          await sendWAMessageToGroup(groupName, message, buffer, mediaType);
+          await sendWAMessageToGroup(groupTarget, message, buffer, mediaType);
         } catch (groupPhotoError) {
-          console.error('[PRESENSI-API] Error sending photo to group:', groupPhotoError);
+          console.error('[PRESENSI-API] Error sending photo to group:', groupPhotoError.message);
           // Fallback: kirim text ke grup
           console.log(`[PRESENSI-API] Fallback: sending text message to group`);
-          await sendWAMessageToGroup(groupName, message);
+          await sendWAMessageToGroup(groupTarget, message);
         }
       } else {
         // Untuk izin atau jika tidak ada foto, kirim text message ke grup
         console.log(`[PRESENSI-API] Sending text message to group`);
-        await sendWAMessageToGroup(groupName, message);
+        await sendWAMessageToGroup(groupTarget, message);
       }
-      sentTo.push({ type: 'group', target: groupName });
+      sentTo.push({ type: 'group', target: groupTarget, status: 'sent' });
     } catch (groupError) {
-      console.error('[PRESENSI-API] Error sending to group:', groupError);
+      console.error('[PRESENSI-API] Error sending to group:', groupError.message);
       // Tidak fatal - personal sudah terkirim, grup optional
+      const groupId = process.env.WA_GROUP_ID;
+      const groupName = process.env.WA_GROUP_NAME || 'All MyAds canvasser Team';
+      sentTo.push({ type: 'group', target: groupId || groupName, status: 'failed', error: groupError.message });
+    }
+    
+    // Return error hanya jika personal gagal
+    if (hasError) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to send personal notification',
+        sentTo
+      });
     }
     
     res.json({ 
@@ -339,7 +401,9 @@ const PORT = process.env.WA_BOT_PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ HTTP API Server running on http://localhost:${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📍 List groups: http://localhost:${PORT}/api/groups`);
   console.log(`📍 Send WA: POST http://localhost:${PORT}/api/send-wa`);
+  console.log(`📍 Send WA Presensi: POST http://localhost:${PORT}/api/send-wa-presensi`);
 });
 
 // ===== WA Boot =====

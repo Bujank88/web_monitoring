@@ -1,6 +1,7 @@
 @extends('master')
 @section('title') Kelola Lokasi Presensi CVSR @endsection
 @section('css')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css" />
@@ -289,7 +290,8 @@
                             <th>Email</th>
                             <th>No. HP</th>
                             <th>Lokasi</th>
-                            <th>Status</th>
+                            <th>Status Lokasi</th>
+                            <th>Perlu Cek Lokasi</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -322,8 +324,22 @@
                                 </td>
                                 <td>
                                     @if ($cvsr->locationPresensi)
+                                        @if ($cvsr->locationPresensi->is_location_needed)
+                                            <span class="status-badge set">✓ Aktif</span>
+                                        @else
+                                            <span class="status-badge not-set">✗ Nonaktif</span>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($cvsr->locationPresensi)
                                         <button class="btn-action btn-edit" onclick="openEditModal({{ $cvsr->id }}, '{{ $cvsr->name }}', {{ $cvsr->locationPresensi->latitude }}, {{ $cvsr->locationPresensi->longitude }}, '{{ $cvsr->locationPresensi->keterangan }}')">
                                             ✏️ Edit
+                                        </button>
+                                        <button class="btn-action" style="background: #17a2b8; color: white;" onclick="toggleLocationNeeded({{ $cvsr->id }}, {{ $cvsr->locationPresensi->is_location_needed ? 'true' : 'false' }})">
+                                            {{ $cvsr->locationPresensi->is_location_needed ? '🔒 Nonaktifkan' : '🔓 Aktifkan' }}
                                         </button>
                                         <button class="btn-action btn-delete" onclick="deleteLocation({{ $cvsr->id }})">
                                             🗑️ Hapus
@@ -337,7 +353,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     <i class="fas fa-users" style="font-size: 2rem; opacity: 0.3;"></i><br>
                                     Tidak ada CVSR terdaftar
                                 </td>
@@ -410,6 +426,7 @@
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder@1.13.0/dist/Control.Geocoder.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
 <script>
     let mapInstance = null;
     let markerInstance = null;
@@ -558,7 +575,7 @@
         const isEditMode = document.getElementById('isEditMode').value === 'true';
 
         if (!latitude || !longitude) {
-            alert('Latitude dan Longitude harus diisi!');
+            swal('Peringatan!', 'Latitude dan Longitude harus diisi!', 'warning');
             return;
         }
 
@@ -586,41 +603,96 @@
             const data = await response.json();
 
             if (data.success) {
-                alert('Lokasi berhasil disimpan!');
-                closeLocationModal();
-                location.reload();
+                swal('Sukses!', 'Lokasi berhasil disimpan!', 'success').then(() => {
+                    closeLocationModal();
+                    location.reload();
+                });
             } else {
-                alert('Error: ' + data.message);
+                swal('Error!', 'Gagal menyimpan lokasi: ' + data.message, 'error');
             }
         } catch (error) {
-            alert('Error: ' + error.message);
+            swal('Error!', 'Error: ' + error.message, 'error');
         }
     }
 
     // Delete Location
     async function deleteLocation(cvsrId) {
-        if (!confirm('Apakah Anda yakin ingin menghapus lokasi ini?')) {
-            return;
-        }
+        swal({
+            title: 'Yakin ingin menghapus?',
+            text: 'Lokasi presensi CVSR akan dihapus dan tidak bisa dikembalikan.',
+            icon: 'warning',
+            buttons: true,
+            dangerMode: true,
+        }).then(async (willDelete) => {
+            if (willDelete) {
+                try {
+                    const response = await fetch(
+                        `{{ route('location-presensi.destroy', ['id' => 'ID']) }}`.replace('ID', cvsrId),
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            }
+                        }
+                    );
 
-        try {
-            const response = await fetch(
-                `{{ route('location-presensi.destroy', ['id' => 'ID']) }}`.replace('ID', cvsrId),
-                {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    const data = await response.json();
+
+                    if (data.success) {
+                        swal('Sukses!', 'Lokasi berhasil dihapus!', 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        swal('Error!', 'Gagal menghapus lokasi: ' + data.message, 'error');
                     }
+                } catch (error) {
+                    swal('Error!', 'Error: ' + error.message, 'error');
                 }
-            );
+            }
+        });
+    }
 
-            const data = await response.json();
+    // Toggle Location Needed
+    async function toggleLocationNeeded(cvsrId, currentStatus) {
+        const actionText = currentStatus ? 'Nonaktifkan' : 'Aktifkan';
+        const messageText = currentStatus 
+            ? 'Setelah dinonaktifkan, CVSR tidak perlu cek lokasi saat presensi.' 
+            : 'Setelah diaktifkan, CVSR harus berada dalam jangkauan lokasi saat presensi.';
 
-            if (data.success) {
-                alert('Lokasi berhasil dihapus!');
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
+        swal({
+            title: actionText + ' pengecekan lokasi?',
+            text: messageText,
+            icon: 'info',
+            buttons: true,
+        }).then(async (willChange) => {
+            if (willChange) {
+                try {
+                    const response = await fetch(
+                        `{{ route('location-presensi.toggle-location-needed', ['id' => 'ID']) }}`.replace('ID', cvsrId),
+                        {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        swal('Sukses!', data.message, 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        swal('Error!', 'Gagal mengubah status: ' + data.message, 'error');
+                    }
+                } catch (error) {
+                    swal('Error!', 'Error: ' + error.message, 'error');
+                }
+            }
+        });
+    }
             }
         } catch (error) {
             alert('Error: ' + error.message);

@@ -13,11 +13,13 @@ class LocationPresensiCvsr extends Model
         'latitude',
         'longitude',
         'keterangan',
+        'is_location_needed',
     ];
     
     protected $casts = [
         'latitude' => 'float',
         'longitude' => 'float',
+        'is_location_needed' => 'boolean',
     ];
     
     /**

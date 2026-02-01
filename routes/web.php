@@ -245,4 +245,5 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('location-presensi')->nam
     Route::post('/', [LocationPresensiController::class, 'store'])->name('store');
     Route::put('/{id}', [LocationPresensiController::class, 'update'])->name('update');
     Route::delete('/{id}', [LocationPresensiController::class, 'destroy'])->name('destroy');
+    Route::patch('/{id}/toggle-location-needed', [LocationPresensiController::class, 'toggleLocationNeeded'])->name('toggle-location-needed');
 });

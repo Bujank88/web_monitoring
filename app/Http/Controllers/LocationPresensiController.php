@@ -127,4 +127,34 @@ class LocationPresensiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Toggle location requirement status
+     */
+    public function toggleLocationNeeded($id)
+    {
+        if (Auth::user()->role !== 'Admin') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $location = LocationPresensiCvsr::where('user_id', $id)->firstOrFail();
+            $newStatus = !$location->is_location_needed;
+            
+            $location->update(['is_location_needed' => $newStatus]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $newStatus 
+                    ? 'Pengecekan lokasi diaktifkan' 
+                    : 'Pengecekan lokasi dinonaktifkan',
+                'is_location_needed' => $newStatus
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah status lokasi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

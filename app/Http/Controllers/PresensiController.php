@@ -66,7 +66,7 @@ class PresensiController extends Controller
         if ($user->role === 'cvsr') {
             $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
             
-            if ($assignedLocation) {
+            if ($assignedLocation && $assignedLocation->is_location_needed) {
                 $distance = LocationPresensiCvsr::calculateDistance(
                     $request->latitude,
                     $request->longitude,
@@ -84,6 +84,8 @@ class PresensiController extends Controller
                         'assigned_location' => $assignedLocation
                     ], 422);
                 }
+            } elseif ($assignedLocation && !$assignedLocation->is_location_needed) {
+                // Location check disabled, skip validation
             } else {
                 return response()->json([
                     'success' => false,
