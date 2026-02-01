@@ -270,48 +270,51 @@ class PresensiController extends Controller
     }
 
     /**
-     * Send WA Bot Notification
-     * Kirim notifikasi ke WA Bot dengan foto, nama, lokasi, status presensi
+     * Send WA Bot Notification untuk Presensi
+     * Kirim notifikasi ke WA Bot endpoint dedicated untuk presensi
      */
     private function sendWANotification($user, $presensi, $action = 'clockIn')
     {
         try {
-            $waBot = config('services.wa_bot.url');
-            $phone = config('services.wa_bot.phone');
+            $waBot = env('WA_BOT_URL');
+            $botPhone = env('WA_BOT_PHONE');
 
-            if (!$waBot || !$phone) {
-                \Log::warning('WA Bot configuration missing');
+            if (!$waBot || !$botPhone) {
+                \Log::warning('WA Bot configuration missing for presensi notification');
                 return;
             }
 
-            // Buat message sesuai action
-            $message = '';
-            $fotoPath = '';
-
-            if ($action === 'clockIn') {
-                $message = "*🕐 CLOCK IN - " . $user->name . "*\n";
-                $message .= "Jam: " . $presensi->jam_datang . "\n";
-                $message .= "Status: " . $presensi->status_datang . "\n";
-                $message .= "Lokasi: " . round($presensi->latitude_datang, 6) . ", " . round($presensi->longitude_datang, 6) . "\n";
-                $fotoPath = $presensi->foto_datang;
-            } elseif ($action === 'clockOut') {
-                $message = "*🕒 CLOCK OUT - " . $user->name . "*\n";
-                $message .= "Jam: " . $presensi->jam_pulang . "\n";
-                $message .= "Status: " . $presensi->status_pulang . "\n";
-                $message .= "Lokasi: " . round($presensi->latitude_pulang, 6) . ", " . round($presensi->longitude_pulang, 6) . "\n";
-                $fotoPath = $presensi->foto_pulang;
+            // Format phone dengan prefix 62
+            $phone = preg_replace('/^0/', '62', $botPhone);
+            if (!str_starts_with($phone, '62')) {
+                $phone = '62' . $phone;
             }
 
-            // Send ke WA Bot
-            $response = Http::timeout(10)->post($waBot . '/api/send-wa', [
+            // Siapkan data sesuai action
+            $postData = [
                 'phone' => $phone,
-                'message' => $message,
-                'nama_akun' => $user->name,
-            ]);
+                'nama_cvsr' => $user->name,
+                'action' => $action,
+            ];
 
-            \Log::info('WA Bot notification sent', ['response' => $response->json()]);
+            if ($action === 'clockIn') {
+                $postData['jam'] = $presensi->jam_datang;
+                $postData['status'] = $presensi->status_datang;
+                $postData['latitude'] = round($presensi->latitude_datang, 6);
+                $postData['longitude'] = round($presensi->longitude_datang, 6);
+            } elseif ($action === 'clockOut') {
+                $postData['jam'] = $presensi->jam_pulang;
+                $postData['status'] = $presensi->status_pulang;
+                $postData['latitude'] = round($presensi->latitude_pulang, 6);
+                $postData['longitude'] = round($presensi->longitude_pulang, 6);
+            }
+
+            // Send ke endpoint presensi WA Bot
+            $response = Http::timeout(10)->post($waBot . '/api/send-wa-presensi', $postData);
+
+            \Log::info('WA Bot presensi notification sent', ['response' => $response->json()]);
         } catch (\Exception $e) {
-            \Log::error('Failed to send WA Bot notification: ' . $e->getMessage());
+            \Log::error('Failed to send WA Bot presensi notification: ' . $e->getMessage());
         }
     }
 
