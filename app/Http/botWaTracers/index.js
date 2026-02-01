@@ -47,6 +47,54 @@ async function sendWAMessage(phone, message) {
   return { success: true, jid, message: 'Message sent' };
 }
 
+// ---- Helper cari grup berdasarkan nama =====
+async function findGroupByName(groupName) {
+  if (!globalSock) {
+    throw new Error('WhatsApp not connected');
+  }
+  
+  try {
+    const groups = await globalSock.groupFetchAllParticipating();
+    for (const group of Object.values(groups)) {
+      if (group.subject && group.subject.toLowerCase().includes(groupName.toLowerCase())) {
+        console.log(`[GROUP-FINDER] Found group: ${group.subject} (${group.id})`);
+        return group;
+      }
+    }
+    console.log(`[GROUP-FINDER] Group "${groupName}" not found`);
+    return null;
+  } catch (error) {
+    console.error('[GROUP-FINDER] Error finding group:', error);
+    return null;
+  }
+}
+
+// ---- Helper kirim ke grup =====
+async function sendWAMessageToGroup(groupName, message, mediaBuffer = null, mediaMimeType = null) {
+  if (!globalSock) {
+    throw new Error('WhatsApp not connected');
+  }
+  
+  const group = await findGroupByName(groupName);
+  if (!group) {
+    throw new Error(`Group "${groupName}" not found`);
+  }
+  
+  console.log(`[GROUP-SEND] Sending to group ${group.subject} (${group.id})`);
+  
+  if (mediaBuffer && mediaMimeType) {
+    await globalSock.sendMessage(group.id, {
+      image: mediaBuffer,
+      caption: message,
+      mimetype: mediaMimeType
+    });
+  } else {
+    await globalSock.sendMessage(group.id, { text: message });
+  }
+  
+  return { success: true, groupId: group.id, groupName: group.subject, message: 'Message sent to group' };
+}
+
 // ===== HTTP API Endpoints =====
 app.get('/', (req, res) => {
   res.json({ 
@@ -161,42 +209,43 @@ app.post('/api/send-wa-presensi', async (req, res) => {
     let message = '';
     
     if (action === 'clockIn') {
-      message = `*Clock In - ${nama_cvsr}*\n\n`;
-      message += `Tanggal: ${tanggal}\n`;
-      message += `Pukul: ${jam} WIB\n`;
-      message += `Status: ${status}\n`;
-      message += `Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      message = `*🕐 Clock In - ${nama_cvsr}*\n\n`;
+      message += `📅 Tanggal: ${tanggal}\n`;
+      message += `🕐 Pukul: ${jam} WIB\n`;
+      message += `📍 Status: ${status}\n`;
+      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
       if (lokasi_penugasan_nama) {
-        message += `Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
+        message += `🏢 Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
       }
       if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
-        message += `Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
       }
       if (distance !== undefined) {
-        message += `Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
+        message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
     } else if (action === 'clockOut') {
-      message = `*Clock Out - ${nama_cvsr}*\n\n`;
-      message += `Tanggal: ${tanggal}\n`;
-      message += `Pukul: ${jam} WIB\n`;
-      message += `Status: ${status}\n`;
-      message += `Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      message = `*🕒 Clock Out - ${nama_cvsr}*\n\n`;
+      message += `📅 Tanggal: ${tanggal}\n`;
+      message += `🕐 Pukul: ${jam} WIB\n`;
+      message += `📍 Status: ${status}\n`;
+      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
       if (lokasi_penugasan_nama) {
-        message += `Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
+        message += `🏢 Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
       }
       if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
-        message += `Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
       }
       if (distance !== undefined) {
-        message += `Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
+        message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
     } else if (action === 'izin') {
-      message = `*${tipe_izin} - ${nama_cvsr}*\n\n`;
-      message += `Tanggal: ${tanggal}\n`;
-      message += `Keterangan: ${keterangan || '-'}`;
+      const emojiIzin = tipe_izin === 'Sakit' ? '🤒' : '📋';
+      message = `*${emojiIzin} ${tipe_izin} - ${nama_cvsr}*\n\n`;
+      message += `📅 Tanggal: ${tanggal}\n`;
+      message += `📝 Keterangan: ${keterangan || '-'}`;
     }
     
-    // Siapkan JID
+    // Siapkan JID untuk personal message
     let jid = phone;
     if (!jid.includes('@')) {
       jid = jid.replace(/\D/g, '');
@@ -212,33 +261,67 @@ app.post('/api/send-wa-presensi', async (req, res) => {
     
     console.log(`[PRESENSI-API] Processing ${action} for ${jid}`);
     
-    // Untuk clock in/out, kirim foto dengan caption
-    if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
-      try {
-        const buffer = Buffer.from(foto_base64, 'base64');
-        const mediaType = foto_mime || 'image/png';
-        
-        console.log(`[PRESENSI-API] Sending photo with caption to ${jid}`);
-        await globalSock.sendMessage(jid, {
-          image: buffer,
-          caption: message,
-          mimetype: mediaType
-        });
-      } catch (photoError) {
-        console.error('[PRESENSI-API] Error sending photo:', photoError);
-        // Fallback: kirim text jika foto gagal
-        console.log(`[PRESENSI-API] Fallback: sending text message to ${jid}`);
+    const sentTo = [];
+    
+    // Kirim ke personal number
+    try {
+      if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
+        try {
+          const buffer = Buffer.from(foto_base64, 'base64');
+          const mediaType = foto_mime || 'image/png';
+          
+          console.log(`[PRESENSI-API] Sending photo with caption to personal ${jid}`);
+          await globalSock.sendMessage(jid, {
+            image: buffer,
+            caption: message,
+            mimetype: mediaType
+          });
+        } catch (photoError) {
+          console.error('[PRESENSI-API] Error sending photo:', photoError);
+          // Fallback: kirim text jika foto gagal
+          console.log(`[PRESENSI-API] Fallback: sending text message to personal ${jid}`);
+          await globalSock.sendMessage(jid, { text: message });
+        }
+      } else {
+        // Untuk izin atau jika tidak ada foto, kirim text message
+        console.log(`[PRESENSI-API] Sending text message to personal ${jid}`);
         await globalSock.sendMessage(jid, { text: message });
       }
-    } else {
-      // Untuk izin atau jika tidak ada foto, kirim text message
-      console.log(`[PRESENSI-API] Sending text message to ${jid}`);
-      await globalSock.sendMessage(jid, { text: message });
+      sentTo.push({ type: 'personal', target: jid });
+    } catch (personalError) {
+      console.error('[PRESENSI-API] Error sending to personal:', personalError);
+    }
+    
+    // Kirim ke grup "All MyAds canvasser Team"
+    try {
+      const groupName = 'All MyAds canvasser Team';
+      if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
+        try {
+          const buffer = Buffer.from(foto_base64, 'base64');
+          const mediaType = foto_mime || 'image/png';
+          
+          console.log(`[PRESENSI-API] Sending photo with caption to group`);
+          await sendWAMessageToGroup(groupName, message, buffer, mediaType);
+        } catch (groupPhotoError) {
+          console.error('[PRESENSI-API] Error sending photo to group:', groupPhotoError);
+          // Fallback: kirim text ke grup
+          console.log(`[PRESENSI-API] Fallback: sending text message to group`);
+          await sendWAMessageToGroup(groupName, message);
+        }
+      } else {
+        // Untuk izin atau jika tidak ada foto, kirim text message ke grup
+        console.log(`[PRESENSI-API] Sending text message to group`);
+        await sendWAMessageToGroup(groupName, message);
+      }
+      sentTo.push({ type: 'group', target: groupName });
+    } catch (groupError) {
+      console.error('[PRESENSI-API] Error sending to group:', groupError);
+      // Tidak fatal - personal sudah terkirim, grup optional
     }
     
     res.json({ 
       success: true, 
-      jid, 
+      sentTo,
       message: `${action} notification sent` 
     });
     
