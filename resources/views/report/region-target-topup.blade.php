@@ -492,7 +492,19 @@
                                 </td>                                
                                 <td class="text-center">
                                     <span class="badge
-                                            {{ round((collect($data)->sum('topup') / collect($data)->sum('target')) * 100, 2) >= 90 ? 'bg-success' : (round((collect($data)->sum('topup') / collect($data)->sum('target')) * 100, 2) >= 70 ? 'bg-warning' : 'bg-danger') }}">
+                                            {{ 
+                                                collect($data)->sum('target') > 0
+                                                    ? (
+                                                        round((collect($data)->sum('topup') / collect($data)->sum('target')) * 100, 2) >= 90
+                                                            ? 'bg-success'
+                                                            : (
+                                                                round((collect($data)->sum('topup') / collect($data)->sum('target')) * 100, 2) >= 70
+                                                                    ? 'bg-warning'
+                                                                    : 'bg-danger'
+                                                            )
+                                                    )
+                                                    : ''
+                                            }}">
                                     {{
                                         collect($data)->sum('target') > 0
                                         ? round((collect($data)->sum('topup') / collect($data)->sum('target')) * 100, 2)

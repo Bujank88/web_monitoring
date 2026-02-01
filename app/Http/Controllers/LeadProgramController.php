@@ -486,18 +486,22 @@ class LeadProgramController extends Controller
                     ->distinct()
                     ->count('lb.leads_master_id');
 
-                // 5. Hitung New Akun dari data_registarsi yang disetujui dalam 1 bulan terakhir
+                // 5. Hitung New Akun dari data_registarsi yang disetujui di bulan berjalan
                 $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                    )
                     ->distinct()
                     ->count('dt.email');
 
                 // 6. Hitung semua Top Up untuk canvasser (dari leads_master yang cocok dengan email) - filter bulan berjalan
                 // SAMA seperti di getDailyTopupData() - ambil semua tanpa split by data_type
+                // Case-insensitive email matching
                 $topUpStats = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                     ->where('lm.user_id', $canvaser->id)
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->select(
@@ -508,19 +512,29 @@ class LeadProgramController extends Controller
 
                 // 7. Untuk keperluan breakdown/reporting saja, hitung split by data_type
                 // Tapi jika ada transaksi yang tidak ter-split, gunakan total topup bukan penjumlahan split
-                $topUpNewAkunStats = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+                // Top Up untuk New Akun - ambil dari email yang approval di bulan berjalan
+                // PENTING: Case-insensitive email matching dan hitung semua top-up SETELAH approval
+                $endOfMonthFormatted = $endOfMonth->format('Y-m-d');
+                $topUpNewAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->leftJoin('report_balance_top_up as rp', function($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                             ->whereRaw('DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, \'%Y-%m-%d\')'); // Top-up harus SETELAH approval
+                    })
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                     ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Leads') // Leads akan dianggap sebagai new akun
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                    ->where('dt.status', 'APPROVE') // Hanya yang approved
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startOfMonth, $endOfMonthFormatted]
+                    )
                     ->select(
-                        DB::raw("COUNT(rp.id) as top_up_count"),
+                        DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
                         DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_new_akun_rp")
                     )
                     ->first();
 
                 $topUpExistingAkunStats = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                     ->where('lm.user_id', $canvaser->id)
                     ->where('lm.data_type', 'Eksisting Akun')
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])    
@@ -757,6 +771,7 @@ class LeadProgramController extends Controller
             $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
             $currentMonth = $today->format('Y-m');
             $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $endOfMonth = Carbon::now()->endOfMonth();
             $result = [];
 
             foreach ($canvasers as $canvaser) {
@@ -768,11 +783,14 @@ class LeadProgramController extends Controller
                     ->distinct()
                     ->count('lb.leads_master_id');
 
-                // 2. New Akun (deal) - dari data_registarsi yang disetujui dalam 1 bulan terakhir
+                // 2. New Akun (deal) - dari data_registarsi yang disetujui di bulan berjalan
                 $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                    )
                     ->distinct()
                     ->count('dt.email');
 
@@ -803,10 +821,13 @@ class LeadProgramController extends Controller
 
                 // 6. ACV (Actual Achievement Value) - total topup dalam rupiah (new + existing) - filter bulan berjalan
                 $topUpNewAkunRp = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->join('report_balance_top_up as rp', 'dt.email', '=', 'rp.email_client')
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                    )
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
 
@@ -861,6 +882,7 @@ class LeadProgramController extends Controller
             $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
             $currentMonth = $today->format('Y-m');
             $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $endOfMonth = Carbon::now()->endOfMonth();
             // $result = [];
 
 
@@ -915,7 +937,10 @@ class LeadProgramController extends Controller
                     $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
                         ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                         ->where('lm.user_id', $userId)
-                        ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                        ->whereBetween(
+                            DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                            [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                        )
                         ->distinct()
                         ->count('dt.email');
                 }
@@ -947,23 +972,47 @@ class LeadProgramController extends Controller
                 $target = $targetData->target_amount ?? 0;
 
                 // 6. ACV
-                $topUpNewAkunRp = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
-                    ->join('report_balance_top_up as rp', 'dt.email', '=', 'rp.email_client')
-                    ->where('lm.regional', $region)
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
+                // $topUpNewAkunRp = DB::table('data_registarsi_status_approveorreject as dt')
+                //     ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
+                //     ->join('report_balance_top_up as rp', 'dt.email', '=', 'rp.email_client')
+                //     ->where('lm.regional', $region)
+                //     ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                //     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                //     ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
 
-                $topUpExistingAkunRp = DB::table('leads_master as lm')
-                    ->join('report_balance_top_up as rp', 'lm.email', '=', 'rp.email_client')
-                    ->where('lm.regional', $region)
-                    ->where('lm.data_type', 'Eksisting Akun')
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
+                // $topUpExistingAkunRp = DB::table('leads_master as lm')
+                //     ->join('report_balance_top_up as rp', 'lm.email', '=', 'rp.email_client')
+                //     ->where('lm.regional', $region)
+                //     ->where('lm.data_type', 'Eksisting Akun')
+                //     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                //     ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
+                $topupPerRegion = DB::connection('mysql')
+                    ->table(DB::raw("(
+                        SELECT
+                            CASE
+                                WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkkulu','Lampung','Bangka Belitung','Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
+                                WHEN data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
+                                WHEN data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
+                                WHEN data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
+                                WHEN data_province_name = 'Jawa Barat' THEN 'JABAR'
+                                WHEN data_province_name IN ('Jawa Tengah','Yogyakarta','DI Yogyakarta') THEN 'JATENG DIY'
+                                WHEN data_province_name = 'Jawa Timur' THEN 'JATIM'
+                                WHEN data_province_name IN ('Bali','NTB','NTT') THEN 'BALI NUSRA'
+                                WHEN data_province_name IN ('Kalimantan Tengah','Kalimantan Barat','Kalimantan Utara','Kalimantan Timur','Kalimantan Selatan') THEN 'KALIMANTAN'
+                                WHEN data_province_name IN ('Sulawesi Utara','Sulawesi Tengah','Gorontalo','Sulawesi Tenggara','Sulawesi Selatan','Maluku Utara') THEN 'SULAWESI'
+                                WHEN data_province_name IN ('Maluku','Papua Barat','Papua') THEN 'PAPUA MALUKU'
+                                ELSE 'UNKNOWN'
+                            END AS region,
+                            total_settlement_klien,
+                            tgl_transaksi
+                        FROM report_balance_top_up
+                    ) AS x"))
+                    ->whereBetween('tgl_transaksi', [$startOfMonth, $todayDate])
+                    ->whereRaw('UPPER(region) = ?', [strtoupper(trim($region))])
+                    ->sum('total_settlement_klien');
 
-                $acv = ($topUpNewAkunRp ?? 0) + ($topUpExistingAkunRp ?? 0);
-
+                // $acv = ($topUpNewAkunRp ?? 0) + ($topUpExistingAkunRp ?? 0);
+                $acv = ($topupPerRegion ?? 0);
                 $result[] = [
                     'region' => $region,
                     'pic' => $picName ?? '-',

@@ -13,6 +13,7 @@ use DataTables;
 use Validator;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class LogbookDailyController extends Controller
 {
@@ -20,7 +21,7 @@ class LogbookDailyController extends Controller
     {
         logUserLogin();
         return view('logbook.daily', [
-            'canvassers' => User::orderBy('name')->where('role', 'cvsr')->orWhere('role', 'PH')->get(),
+            'canvassers' => User::orderBy('name')->where('role', 'cvsr')->get(),
             'sources'    => LeadsSource::orderBy('name')->get(),
             'regionals'  => DB::table('regional_provinces')
                                 ->select('regional')
@@ -49,6 +50,7 @@ class LogbookDailyController extends Controller
                 $join->whereRaw('LOWER(manual_upload_topup.email) = LOWER(leads_master.email)');
             })
             ->select([
+                'logbook_daily.id as logbook_id',
                 'leads_master.id',
                 'users.name as user_name',
                 'leads_master.regional',
@@ -60,10 +62,12 @@ class LogbookDailyController extends Controller
                 'logbook_daily.komitmen',
                 'logbook_daily.plan_min_topup',
                 'logbook_daily.status',
-                'logbook_daily.realisasi_topup'
+                'logbook_daily.realisasi_topup',
+                'logbook_daily.realisasi_photo',
+                'logbook_daily.realisasi_discus',
+                'logbook_daily.realisasi_method',
             ])
             ->distinct()
-            // ->orderBy('leads_master.created_at', 'desc')
             ->orderBy('logbook_daily.realisasi_topup', 'desc');
 
 
@@ -93,10 +97,10 @@ class LogbookDailyController extends Controller
         //     $query->where('leads_master.email', 'like', '%' . $request->email . '%');
         // }
 
-        if ($request->start_date && $request->end_date) {
+        if ($request->start_date) {
             $query->whereBetween('logbook_daily.created_at', [
                 $request->start_date . ' 00:00:00',
-                $request->end_date   . ' 23:59:59',
+                $request->start_date   . ' 23:59:59',
             ]);
         }
 
@@ -177,17 +181,45 @@ class LogbookDailyController extends Controller
                     ? number_format($row->realisasi_topup, 0, ',', '.')
                     : '-';
             })
-            //  ->addColumn('action', function ($row) {
-            //     return '
-            //     <button 
-            //         class="btn btn-sm btn-primary btn-edit"
-            //         data-id="'.$row->id.'"
-            //         data-komitmen="'.$row->komitmen.'"
-            //         data-plan="'.$row->plan_min_topup.'"
-            //         data-status="'.$row->status.'"
-            //     >
-            //         Edit
-            //     </button>
+            ->addColumn('followup', function ($row) {
+                if (!empty($row->realisasi_photo)) {
+                    return '
+                        <span class="badge badge-success">
+                            <i class="fas fa-check-circle"></i> Done
+                        </span>';
+                }
+                else{
+                    return '
+                        <span class="badge badge-danger"> 
+                            <i class="fas fa-minus-circle"></i> Not Yet
+                        </span>';
+                }
+            })
+            ->addColumn('action', function ($row) {
+            // SUDAH REALISASI
+            if (!empty($row->realisasi_photo)) {
+                return '
+                    <button 
+                        class="btn btn-sm btn-info btn-view-realisasi"
+                        data-photo="'.$row->realisasi_photo.'"
+                        data-method="'.$row->realisasi_method.'"
+                        data-discus="'.$row->realisasi_discus.'"
+                    >
+                        Lihat
+                    </button>
+                ';
+            }
+
+            // BELUM REALISASI
+            return '
+                <button 
+                    class="btn btn-sm btn-success btn-realisasi"
+                    data-id="'.$row->logbook_id.'"
+                >
+                    Realisasi Logbook
+                </button>
+            ';
+        })
                 
             //     <button 
             //         class="btn btn-sm btn-warning btn-day"
@@ -196,7 +228,7 @@ class LogbookDailyController extends Controller
             //         Day
             //     </button>';
             // })
-            ->rawColumns(['action'])
+            ->rawColumns(['action', 'followup'])
             ->make(true);
         }
         public function refreshLogbookDaily()
@@ -283,10 +315,10 @@ class LogbookDailyController extends Controller
             }
 
             // 📅 Month filter
-            if ($request->start_date && $request->end_date) {
+            if ($request->start_date) {
                 $query->whereBetween('logbook_daily.created_at', [
                     $request->start_date . ' 00:00:00',
-                    $request->end_date . ' 23:59:59'
+                    $request->start_date . ' 23:59:59'
                 ]);
             }
 
@@ -311,5 +343,38 @@ class LogbookDailyController extends Controller
 
             return response()->json($data);
         }
+        public function realisasiLogbook(Request $request)
+        {
+            $request->validate([
+                'id'          => 'required|exists:logbook_daily,id',
+                'metode'      => 'required|in:offline,online',
+                'pembahasan'  => 'required|string',
+                'selfie'      => 'required|string', // base64
+            ]);
+            // === HANDLE SELFIE BASE64 ===
+            $image = $request->selfie;
 
+            // format: data:image/jpeg;base64,...
+            $image = str_replace('data:image/jpeg;base64,', '', $image);
+            $image = str_replace(' ', '+', $image);
+
+            $imageName = 'selfie_' . time() . '.jpg';
+            $path = 'selfie-logbook/' . $imageName;
+            
+
+            Storage::disk('public')->put($path, base64_decode($image));
+
+            // === UPDATE LOGBOOK ===
+            DB::table('logbook_daily')
+                ->where('id', $request->id)
+                ->update([
+                    'realisasi_method'        => $request->metode,
+                    'realisasi_discus'        => $request->pembahasan,
+                    'realisasi_photo'         => $path,
+                    'realisasi_at'  => Carbon::now(),
+                    'updated_at'    => Carbon::now(),
+                ]);
+
+            return redirect()->back()->with('success', 'Realisasi logbook berhasil disimpan');
+        }
 }

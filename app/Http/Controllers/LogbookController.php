@@ -23,7 +23,7 @@ class LogbookController extends Controller
     {
         logUserLogin();
         return view('logbook.index', [
-            'canvassers' => User::orderBy('name')->where('role', 'cvsr')->orWhere('role', 'PH')->get(),
+            'canvassers' => User::orderBy('name')->where('role', 'cvsr')->get(),
             'sources'    => LeadsSource::orderBy('name')->get(),
             'regionals'  => DB::table('regional_provinces')
                                 ->select('regional')
