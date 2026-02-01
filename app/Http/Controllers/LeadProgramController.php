@@ -448,9 +448,7 @@ class LeadProgramController extends Controller
             $totals = [
                 'leads' => 0,
                 'existing_akun' => 0,
-                'existing_akun_transaksi' => 0,
                 'new_akun' => 0,
-                'new_akun_transaksi' => 0,
                 'top_up_new_akun_count' => 0,
                 'top_up_existing_akun_count' => 0,
                 'top_up_new_akun_rp' => 0,
@@ -480,68 +478,54 @@ class LeadProgramController extends Controller
                     ->distinct()
                     ->count('lb.leads_master_id');
 
-                // 4. Hitung Existing Akun dari table logbook yang join dengan leads_master (SEMUA)
+                // 4. Hitung Existing Akun dari table logbook yang join dengan leads_master
                 $existingAkun = DB::table('logbook as lb')
                     ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
                     ->where('lm.user_id', $canvaser->id)
                     ->where('lm.data_type', 'Eksisting Akun')
                     ->distinct()
                     ->count('lb.leads_master_id');
-                
-                 // 5A. Hitung New Akun yang sudah ada TRANSAKSI (inner join dengan report_balance_top_up)
-                $newAkunWithTransaksi = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('report_balance_top_up as rp', function($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                    })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                    ->where('lm.user_id', $canvaser->id)
-                    ->where('dt.status', 'APPROVE')
-                    ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startOfMonth, $todayDate])
-                    ->select(DB::raw('COUNT(DISTINCT LOWER(dt.email)) as count'))
-                    ->first()
-                    ->count ?? 0;
 
-                // 5B. Hitung Existing Akun yang sudah ada TRANSAKSI (inner join dengan report_balance_top_up)
-                $existingAkunWithTransaksi = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                // 5. Hitung New Akun dari data_registarsi yang disetujui dalam 1 bulan terakhir
+                $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Eksisting Akun')
+                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') > DATE_SUB(CURDATE(), INTERVAL 1 MONTH)")
+                    ->distinct()
+                    ->count('dt.email');
+
+                // 6. Hitung semua Top Up untuk canvasser (dari leads_master yang cocok dengan email) - filter bulan berjalan
+                // SAMA seperti di getDailyTopupData() - ambil semua tanpa split by data_type
+                $topUpStats = DB::table('report_balance_top_up as rp')
+                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+                    ->where('lm.user_id', $canvaser->id)
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->select(DB::raw('COUNT(DISTINCT LOWER(lm.email)) as count'))
-                    ->first()
-                    ->count ?? 0;
-
-               
-
-                // 6. Hitung semua Top Up untuk canvasser - sudah ditangani di query 7 untuk new dan existing akun dengan transaksi
-                // Jadi query ini tidak lagi diperlukan (sudah dihitung di topUpNewAkunStats dan topUpExistingAkunStats)
+                    ->select(
+                        DB::raw("COUNT(rp.id) as top_up_count"),
+                        DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_top_up_rp")
+                    )
+                    ->first();
 
                 // 7. Untuk keperluan breakdown/reporting saja, hitung split by data_type
-                // Hitung total top up dari NEW AKUN yang sudah punya transaksi
-                $topUpNewAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('report_balance_top_up as rp', function($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                    })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                // Tapi jika ada transaksi yang tidak ter-split, gunakan total topup bukan penjumlahan split
+                $topUpNewAkunStats = DB::table('report_balance_top_up as rp')
+                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
-                    ->where('dt.status', 'APPROVE')
-                    ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startOfMonth, $todayDate])
+                    ->where('lm.data_type', 'Leads') // Leads akan dianggap sebagai new akun
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->select(
-                        DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                        DB::raw("COUNT(rp.id) as top_up_count"),
                         DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_new_akun_rp")
                     )
                     ->first();
 
-                // Hitung total top up dari EXISTING AKUN yang sudah punya transaksi
                 $topUpExistingAkunStats = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                     ->where('lm.user_id', $canvaser->id)
                     ->where('lm.data_type', 'Eksisting Akun')
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])    
                     ->select(
-                        DB::raw("COUNT(DISTINCT rp.id) as top_up_existing_akun_count"),
+                        DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
                         DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_existing_akun_rp")
                     )
                     ->first();
@@ -616,13 +600,23 @@ class LeadProgramController extends Controller
                     ->first();
                 $topUpPrevMonthRemaining = $prevMonthRemainingResult->mom ?? 0;
 
-                // Hitung total topup (new akun + existing akun) dari yang sudah punya transaksi
-                // PENTING: Gunakan hasil dari newAkunWithTransaksi dan existingAkunWithTransaksi
+                // Hitung total topup (new akun + existing akun) - gunakan data dari report_balance_top_up langsung
+                // PENTING: Gunakan topUpStats->total_top_up_rp yang mencakup SEMUA transaksi
+                // Jangan gunakan penjumlahan split karena ada kemungkinan transaksi terlewat
                 $topUpNewAkunRp = $topUpNewAkunStats->top_up_new_akun_rp ?? 0;
                 $topUpExistingAkunRp = $topUpExistingAkunStats->top_up_existing_akun_rp ?? 0;
+                $totalTopUpFromStats = $topUpStats->total_top_up_rp ?? 0;
                 
-                // Total adalah penjumlahan dari new akun dan existing akun yang sudah punya transaksi
-                $totalTopUp = $topUpNewAkunRp + $topUpExistingAkunRp;
+                // Jika split tidak mencakup semua (mungkin ada transaksi dengan data_type lain), gunakan total
+                $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
+                $totalTopUp = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
+                
+                // Jika split kurang dari total, tambahkan perbedaannya ke existing akun
+                if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
+                    $difference = $totalTopUpFromStats - $splitTotal;
+                    $topUpExistingAkunRp += $difference;
+                    $totalTopUp = $totalTopUpFromStats;
+                }
 
                 // Ambil target atau set 0 jika tidak ada
                 $target = $targetData->target ?? 0;
@@ -646,9 +640,7 @@ class LeadProgramController extends Controller
                     'canvaser_name' => $canvaser->name ?? '-',
                     'leads' => $totalLeads,
                     'existing_akun' => $existingAkun,
-                    'existing_akun_transaksi' => $existingAkunWithTransaksi,
                     'new_akun' => $newAkun,
-                    'new_akun_transaksi' => $newAkunWithTransaksi,
                     'top_up_new_akun_count' => $topUpNewAkunStats->top_up_count ?? 0,
                     'top_up_existing_akun_count' => $topUpExistingAkunStats->top_up_existing_akun_count ?? 0,
                     'top_up_new_akun_rp' => number_format($topUpNewAkunRp, 0, ',', '.'),
@@ -668,9 +660,7 @@ class LeadProgramController extends Controller
                 // Akumulasi totals
                 $totals['leads'] += $totalLeads;
                 $totals['existing_akun'] += $existingAkun;
-                $totals['existing_akun_transaksi'] += $existingAkunWithTransaksi;
                 $totals['new_akun'] += $newAkun;
-                $totals['new_akun_transaksi'] += $newAkunWithTransaksi;
                 $totals['top_up_new_akun_count'] += $topUpNewAkunStats->top_up_count ?? 0;
                 $totals['top_up_existing_akun_count'] += $topUpExistingAkunStats->top_up_existing_akun_count ?? 0;
                 $totals['top_up_new_akun_rp'] += $topUpNewAkunRp;
@@ -703,9 +693,7 @@ class LeadProgramController extends Controller
                     'canvaser_name' => 'TOTAL',
                     'leads' => $totals['leads'],
                     'existing_akun' => $totals['existing_akun'],
-                    'existing_akun_transaksi' => $totals['existing_akun_transaksi'],
                     'new_akun' => $totals['new_akun'],
-                    'new_akun_transaksi' => $totals['new_akun_transaksi'],
                     'top_up_new_akun_count' => $totals['top_up_new_akun_count'],
                     'top_up_existing_akun_count' => $totals['top_up_existing_akun_count'],
                     'top_up_new_akun_rp' => number_format($totals['top_up_new_akun_rp'], 0, ',', '.'),

@@ -14,6 +14,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
+use App\Http\Controllers\PresensiController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -221,4 +222,17 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('/calendar/download', [CalendarController::class, 'download']);
 
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
+});
+
+// Routes untuk Presensi CVSR
+Route::middleware(['auth', 'checkrole:cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
+    Route::get('/', [PresensiController::class, 'index'])->name('index');
+    Route::post('/clock-in', [PresensiController::class, 'clockIn'])->name('clock_in');
+    Route::post('/clock-out', [PresensiController::class, 'clockOut'])->name('clock_out');
+    Route::post('/izin', [PresensiController::class, 'izin'])->name('izin');
+});
+
+// Routes untuk Riwayat Presensi (Admin dan CVSR)
+Route::middleware(['auth', 'checkrole:Admin,cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
+    Route::get('/riwayat', [PresensiController::class, 'riwayat'])->name('riwayat');
 });

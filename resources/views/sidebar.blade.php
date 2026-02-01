@@ -280,6 +280,34 @@
                 </li>
 
                 @endif
+                {{-- ===== PRESENSI: Hanya untuk CVSR dan Admin ===== --}}
+                @if($isCanv || $isAdmin)
+                <li class="nav-header">PRESENSI</li>
+                <li class="nav-item {{ (request()->routeIs('presensi.*')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('presensi.*')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-user-check" style="color:rgb(76, 175, 80);"></i>
+                        <p>Presensi <i class="right fas fa-angle-left"></i></p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        @if($isCanv)
+                        <li class="nav-item">
+                            <a href="{{ route('presensi.index') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('presensi.index') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-clock" style="color:rgb(33, 150, 243); margin-left: 15px;"></i>
+                                <p>Presensi</p>
+                            </a>
+                        </li>
+                        @endif
+                        <li class="nav-item">
+                            <a href="{{ route('presensi.riwayat') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('presensi.riwayat') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-history" style="color:rgb(255, 152, 0); margin-left: 15px;"></i>
+                                <p>Riwayat Presensi</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @endif
                 @if($isAdmin || $isTreg || $isTsel ||$isCanv || $isPH)
                 <li class="nav-header">System Management</li>
                 @endif
@@ -300,7 +328,10 @@
                         <p>Log Login</p>
                     </a>
                 </li>
-                @endif                
+                @endif
+                
+            
+                
                 @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
