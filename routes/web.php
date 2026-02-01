@@ -235,4 +235,5 @@ Route::middleware(['auth', 'checkrole:cvsr'])->prefix('presensi')->name('presens
 // Routes untuk Riwayat Presensi (Admin dan CVSR)
 Route::middleware(['auth', 'checkrole:Admin,cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
     Route::get('/riwayat', [PresensiController::class, 'riwayat'])->name('riwayat');
+    Route::get('/foto/{filePath}', [PresensiController::class, 'getFoto'])->name('foto')->where('filePath', '.*');
 });

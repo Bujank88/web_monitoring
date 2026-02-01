@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Presensi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class PresensiController extends Controller
@@ -226,5 +227,32 @@ class PresensiController extends Controller
             ->paginate(20);
         
         return view('absensi.summary_presensi', compact('presensi', 'dateFrom', 'dateTo'));
+    }
+
+    /**
+     * Get Foto - Serve foto dari storage dengan authentication
+     */
+    public function getFoto($filePath)
+    {
+        $user = Auth::user();
+        
+        // Validasi path - hanya allow format user_id/tanggal/foto_*.png
+        if (!preg_match('/^\d+\/\d{4}-\d{2}-\d{2}\/foto_presensi_(masuk|keluar)\.png$/', $filePath)) {
+            abort(403, 'Invalid file path');
+        }
+
+        // Untuk CVSR, hanya bisa akses foto mereka sendiri
+        if ($user->role === 'cvsr') {
+            $userId = explode('/', $filePath)[0];
+            if ($userId != $user->id) {
+                abort(403, 'Unauthorized');
+            }
+        }
+
+        if (!Storage::disk('public')->exists($filePath)) {
+            abort(404, 'Foto tidak ditemukan');
+        }
+
+        return Storage::disk('public')->response($filePath);
     }
 }

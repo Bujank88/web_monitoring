@@ -320,8 +320,8 @@
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_datang)
-                                    <a href="#" onclick="openModalFoto('{{ asset('storage/' . $item->foto_datang) }}', event)">
-                                        <img src="{{ asset('storage/' . $item->foto_datang) }}" alt="Foto Masuk" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
+                                    <a href="#" onclick="openModalFoto('{{ route('presensi.foto', ['filePath' => $item->foto_datang]) }}', event)">
+                                        <img src="{{ route('presensi.foto', ['filePath' => $item->foto_datang]) }}" alt="Foto Masuk" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
                                     </a>
                                     @else
                                     -
@@ -336,8 +336,8 @@
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_pulang)
-                                    <a href="#" onclick="openModalFoto('{{ asset('storage/' . $item->foto_pulang) }}', event)">
-                                        <img src="{{ asset('storage/' . $item->foto_pulang) }}" alt="Foto Keluar" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
+                                    <a href="#" onclick="openModalFoto('{{ route('presensi.foto', ['filePath' => $item->foto_pulang]) }}', event)">
+                                        <img src="{{ route('presensi.foto', ['filePath' => $item->foto_pulang]) }}" alt="Foto Keluar" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
                                     </a>
                                     @else
                                     -
