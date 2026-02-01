@@ -15,6 +15,7 @@ use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
 use App\Http\Controllers\PresensiController;
+use App\Http\Controllers\LocationPresensiController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -236,4 +237,12 @@ Route::middleware(['auth', 'checkrole:cvsr'])->prefix('presensi')->name('presens
 Route::middleware(['auth', 'checkrole:Admin,cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
     Route::get('/riwayat', [PresensiController::class, 'riwayat'])->name('riwayat');
     Route::get('/foto/{filePath}', [PresensiController::class, 'getFoto'])->name('foto')->where('filePath', '.*');
+});
+
+// Routes untuk Kelola Lokasi Presensi CVSR (Hanya Admin)
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('location-presensi')->name('location-presensi.')->group(function () {
+    Route::get('/', [LocationPresensiController::class, 'index'])->name('index');
+    Route::post('/', [LocationPresensiController::class, 'store'])->name('store');
+    Route::put('/{id}', [LocationPresensiController::class, 'update'])->name('update');
+    Route::delete('/{id}', [LocationPresensiController::class, 'destroy'])->name('destroy');
 });

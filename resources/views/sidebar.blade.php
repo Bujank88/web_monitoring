@@ -283,8 +283,8 @@
                 {{-- ===== PRESENSI: Hanya untuk CVSR dan Admin ===== --}}
                 @if($isCanv || $isAdmin)
                 <li class="nav-header">PRESENSI</li>
-                <li class="nav-item {{ (request()->routeIs('presensi.*')) ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ (request()->routeIs('presensi.*')) ? 'active' : '' }}">
+                <li class="nav-item {{ (request()->routeIs('presensi.*') || request()->routeIs('location-presensi.*')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('presensi.*') || request()->routeIs('location-presensi.*')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-user-check" style="color:rgb(76, 175, 80);"></i>
                         <p>Presensi <i class="right fas fa-angle-left"></i></p>
                     </a>
@@ -305,6 +305,15 @@
                                 <p>Riwayat Presensi</p>
                             </a>
                         </li>
+                        @if($isAdmin)
+                        <li class="nav-item">
+                            <a href="{{ route('location-presensi.index') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('location-presensi.index') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-map-marker-alt" style="color:rgb(244, 67, 54); margin-left: 15px;"></i>
+                                <p>Kelola Lokasi Presensi</p>
+                            </a>
+                        </li>
+                        @endif
                     </ul>
                 </li>
                 @endif

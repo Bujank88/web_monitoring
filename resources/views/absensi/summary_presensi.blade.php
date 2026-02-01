@@ -85,7 +85,12 @@
         background: #f8f9fa;
         color: #333;
         font-weight: 600;
+        text-align: center !important;
         border-bottom: 2px solid #dee2e6;
+    }
+
+    table.dataTable tbody td {
+        text-align: center !important;
     }
 
     table.dataTable tbody tr:hover {
@@ -389,7 +394,7 @@
         $('#presensiTable').DataTable({
             "paging": true,
             "pageLength": 10,
-            "searching": true,
+            "searching": false,
             "ordering": true,
             "info": true,
             "language": {

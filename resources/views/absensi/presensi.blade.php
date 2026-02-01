@@ -2,6 +2,7 @@
 @section('title') Presensi CVSR @endsection
 @section('css')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     .content-wrapper {
         min-height: 80vh;
@@ -179,12 +180,66 @@
     .preview-section { margin-bottom: 1.5rem; }
     .preview-title { font-weight: 600; margin-bottom: 0.5rem; color: #333; }
     #videoPreview { width: 100%; border-radius: 10px; background: #000; max-height: 200px; }
-    #locationPreview { width: 100%; height: 200px; border-radius: 10px; border: 1px solid #ddd; margin-top: 0.5rem; }
-    .location-info { background: #f0f4ff; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem; color: #555; }
+    #locationPreview { width: 100%; height: 250px; border-radius: 10px; border: 2px solid #667eea; margin-top: 0.5rem; z-index: 1; }
+    .location-info { background: #f0f4ff; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.85rem; color: #555; }
+    
+    .location-marker-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+    
+    .marker-badge {
+        padding: 0.5rem;
+        border-radius: 5px;
+        text-align: center;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .marker-current {
+        background: #cfe9ff;
+        color: #004085;
+        border-left: 3px solid #0c5460;
+    }
+    
+    .marker-assigned {
+        background: #fff3cd;
+        color: #856404;
+        border-left: 3px solid #ff6b6b;
+    }
+    
+    .distance-info {
+        background: #e7f3ff;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+        border-left: 4px solid #667eea;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .distance-info.danger {
+        background: #f8d7da;
+        border-left-color: #dc3545;
+        color: #721c24;
+    }
+    
+    .distance-info.safe {
+        background: #d4edda;
+        border-left-color: #28a745;
+        color: #155724;
+    }
+    
+    .leaflet-container {
+        border-radius: 10px;
+    }
     
     @media (max-width: 480px) {
         .presensi-container { padding: 1.5rem; }
         .button-group { grid-template-columns: 1fr 1fr; }
+        .modal-content { max-width: 95%; }
     }
 </style>
 @endsection
@@ -318,9 +373,12 @@
 
 @section('js')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     let currentAction = null;
     let currentPosition = null;
+    let mapInstance = null;
+    const assignedLocation = @json($assignedLocation);
 
     function updateJam() {
         const now = new Date();
@@ -358,6 +416,21 @@
         }
     }
 
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Radius Bumi dalam meter
+        
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return Math.round(R * c);
+    }
+
     function getLocationForPreview() {
         if (!navigator.geolocation) {
             document.getElementById('locationInfo').innerHTML = 'Browser tidak mendukung Geolocation';
@@ -366,22 +439,85 @@
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                currentPosition = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                };
-                
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 
-                document.getElementById('locationInfo').innerHTML = `
-                    <strong>Latitude:</strong> ${lat.toFixed(6)}<br>
-                    <strong>Longitude:</strong> ${lng.toFixed(6)}<br>
-                    <strong>Akurasi:</strong> ${position.coords.accuracy.toFixed(0)} meter
-                `;
+                currentPosition = {
+                    latitude: lat,
+                    longitude: lng,
+                    accuracy: position.coords.accuracy
+                };
                 
-                const mapURL = `https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.01},${lat-0.01},${lng+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lng}`;
-                document.getElementById('locationPreview').innerHTML = `<iframe width="100%" height="200" frameborder="0" src="${mapURL}"></iframe>`;
+                // Initialize map
+                if (mapInstance) {
+                    mapInstance.remove();
+                }
+                
+                mapInstance = L.map('locationPreview').setView([lat, lng], 16);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(mapInstance);
+                
+                // Marker untuk lokasi saat ini
+                const currentMarker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: '#0c5460',
+                    color: '#004085',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(mapInstance).bindPopup('📍 Lokasi Anda Saat Ini');
+                
+                // Marker untuk lokasi yang ditugaskan (hanya saat clockIn)
+                if (assignedLocation && currentAction === 'clockIn') {
+                    const assignedMarker = L.circleMarker([assignedLocation.latitude, assignedLocation.longitude], {
+                        radius: 10,
+                        fillColor: '#ff6b6b',
+                        color: '#dc3545',
+                        weight: 3,
+                        opacity: 1,
+                        fillOpacity: 0.6,
+                        dashArray: '5, 5'
+                    }).addTo(mapInstance).bindPopup('🎯 Lokasi yang Ditugaskan');
+                    
+                    const distance = calculateDistance(lat, lng, assignedLocation.latitude, assignedLocation.longitude);
+                    const maxDistance = 150;
+                    const isWithinRange = distance <= maxDistance;
+                    
+                    let distanceHTML = `
+                        <div class="location-marker-info">
+                            <div class="marker-badge marker-current">
+                                📍 Lokasi Anda<br>
+                                ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                            </div>
+                            <div class="marker-badge marker-assigned">
+                                🎯 Target Lokasi<br>
+                                ${assignedLocation.latitude.toFixed(4)}, ${assignedLocation.longitude.toFixed(4)}
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (isWithinRange) {
+                        distanceHTML += `<div class="distance-info safe">✓ Jarak: ${distance} meter (Dalam jangkauan)</div>`;\n                    } else {
+                        distanceHTML += `<div class="distance-info danger">⚠️ Jarak: ${distance} meter (Diluar jangkauan 150m)</div>`;\n                    }
+                    
+                    document.getElementById('locationInfo').innerHTML = distanceHTML;
+                    
+                    let group = new L.featureGroup([currentMarker, assignedMarker]);
+                    mapInstance.fitBounds(group.getBounds().pad(0.1));
+                } else {
+                    document.getElementById('locationInfo').innerHTML = `
+                        <div class="location-marker-info">
+                            <div class="marker-badge marker-current">
+                                📍 Lokasi Anda<br>
+                                ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                            </div>
+                        </div>
+                    `;
+                    mapInstance.setView([lat, lng], 16);
+                }
             },
             (error) => {
                 document.getElementById('locationInfo').innerHTML = 'Gagal mendapatkan lokasi: ' + error.message;
@@ -393,6 +529,10 @@
         const video = document.getElementById('videoPreview');
         if (video.srcObject) {
             video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        if (mapInstance) {
+            mapInstance.remove();
+            mapInstance = null;
         }
         document.getElementById('modalPreview').classList.remove('active');
         currentAction = null;

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Presensi;
+use App\Models\LocationPresensiCvsr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 
 class PresensiController extends Controller
@@ -21,7 +23,13 @@ class PresensiController extends Controller
         // Ambil presensi hari ini
         $presensiHariIni = Presensi::forUserToday($user->id)->first();
         
-        return view('absensi.presensi', compact('presensiHariIni'));
+        // Ambil lokasi yang ditugaskan untuk CVSR
+        $assignedLocation = null;
+        if ($user->role === 'cvsr') {
+            $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
+        }
+        
+        return view('absensi.presensi', compact('presensiHariIni', 'assignedLocation'));
     }
 
     /**
@@ -54,6 +62,35 @@ class PresensiController extends Controller
             ]);
         }
 
+        // Validasi jarak untuk CVSR (hanya untuk clock in, bukan clock out)
+        if ($user->role === 'cvsr') {
+            $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
+            
+            if ($assignedLocation) {
+                $distance = LocationPresensiCvsr::calculateDistance(
+                    $request->latitude,
+                    $request->longitude,
+                    $assignedLocation->latitude,
+                    $assignedLocation->longitude
+                );
+
+                // Maksimal jarak 150 meter
+                if ($distance > 150) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Anda berada di luar area presensi yang ditentukan. Jarak: ' . round($distance) . ' meter. Maksimal jarak: 150 meter.',
+                        'distance' => round($distance),
+                        'max_distance' => 150
+                    ], 422);
+                }
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Admin belum menentukan lokasi presensi untuk Anda'
+                ], 422);
+            }
+        }
+
         if (!$presensi) {
             $presensi = new Presensi();
             $presensi->user_id = $user->id;
@@ -79,6 +116,9 @@ class PresensiController extends Controller
         }
 
         $presensi->save();
+
+        // Send notification to WA Bot
+        $this->sendWANotification($user, $presensi, 'clockIn');
 
         return response()->json([
             'success' => true,
@@ -227,6 +267,52 @@ class PresensiController extends Controller
             ->paginate(20);
         
         return view('absensi.summary_presensi', compact('presensi', 'dateFrom', 'dateTo'));
+    }
+
+    /**
+     * Send WA Bot Notification
+     * Kirim notifikasi ke WA Bot dengan foto, nama, lokasi, status presensi
+     */
+    private function sendWANotification($user, $presensi, $action = 'clockIn')
+    {
+        try {
+            $waBot = config('services.wa_bot.url');
+            $phone = config('services.wa_bot.phone');
+
+            if (!$waBot || !$phone) {
+                \Log::warning('WA Bot configuration missing');
+                return;
+            }
+
+            // Buat message sesuai action
+            $message = '';
+            $fotoPath = '';
+
+            if ($action === 'clockIn') {
+                $message = "*🕐 CLOCK IN - " . $user->name . "*\n";
+                $message .= "Jam: " . $presensi->jam_datang . "\n";
+                $message .= "Status: " . $presensi->status_datang . "\n";
+                $message .= "Lokasi: " . round($presensi->latitude_datang, 6) . ", " . round($presensi->longitude_datang, 6) . "\n";
+                $fotoPath = $presensi->foto_datang;
+            } elseif ($action === 'clockOut') {
+                $message = "*🕒 CLOCK OUT - " . $user->name . "*\n";
+                $message .= "Jam: " . $presensi->jam_pulang . "\n";
+                $message .= "Status: " . $presensi->status_pulang . "\n";
+                $message .= "Lokasi: " . round($presensi->latitude_pulang, 6) . ", " . round($presensi->longitude_pulang, 6) . "\n";
+                $fotoPath = $presensi->foto_pulang;
+            }
+
+            // Send ke WA Bot
+            $response = Http::timeout(10)->post($waBot . '/api/send-wa', [
+                'phone' => $phone,
+                'message' => $message,
+                'nama_akun' => $user->name,
+            ]);
+
+            \Log::info('WA Bot notification sent', ['response' => $response->json()]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to send WA Bot notification: ' . $e->getMessage());
+        }
     }
 
     /**
