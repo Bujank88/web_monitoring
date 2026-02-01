@@ -306,21 +306,22 @@
                                 <td>
                                     @if ($item->status_datang === 'Terlambat' && $item->jam_datang)
                                     @php
-                                    $jamKerjaAwal = \Carbon\Carbon::createFromFormat('H:i', '08:00');
-                                    $selisih = $item->jam_datang->diffInMinutes($jamKerjaAwal);
-                                    $jam = intdiv($selisih, 60);
-                                    $menit = $selisih % 60;
-                                    $durasiFormatted = ($jam > 0 ? $jam . ' jam ' : '') . ($menit > 0 ? $menit . ' menit' : '');
+                                    $jamKerjaAwal = \Carbon\Carbon::createFromFormat('H:i:s', '08:00:00');
+                                    $jamDatang = $item->jam_datang;
+                                    if (is_string($jamDatang)) {
+                                        $jamDatang = \Carbon\Carbon::createFromFormat('H:i:s', $jamDatang);
+                                    }
+                                    $selisih = $jamDatang->diffInMinutes($jamKerjaAwal);
                                     @endphp
-                                    <span class="durasi-terlambat">{{ trim($durasiFormatted) }}</span>
+                                    <span class="durasi-terlambat">{{ $selisih }} menit</span>
                                     @else
                                     -
                                     @endif
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_datang)
-                                    <a href="#" onclick="openModalFoto('{{ \Illuminate\Support\Facades\Storage::url($item->foto_datang) }}', event)">
-                                        <img src="{{ \Illuminate\Support\Facades\Storage::url($item->foto_datang) }}" alt="Foto Masuk" title="Klik untuk preview">
+                                    <a href="#" onclick="openModalFoto('{{ asset('storage/' . $item->foto_datang) }}', event)">
+                                        <img src="{{ asset('storage/' . $item->foto_datang) }}" alt="Foto Masuk" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
                                     </a>
                                     @else
                                     -
@@ -335,8 +336,8 @@
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_pulang)
-                                    <a href="#" onclick="openModalFoto('{{ \Illuminate\Support\Facades\Storage::url($item->foto_pulang) }}', event)">
-                                        <img src="{{ \Illuminate\Support\Facades\Storage::url($item->foto_pulang) }}" alt="Foto Keluar" title="Klik untuk preview">
+                                    <a href="#" onclick="openModalFoto('{{ asset('storage/' . $item->foto_pulang) }}', event)">
+                                        <img src="{{ asset('storage/' . $item->foto_pulang) }}" alt="Foto Keluar" title="Klik untuk preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2212%22 fill=%22%23999%22%3E❌%3C/text%3E%3C/svg%3E'">
                                     </a>
                                     @else
                                     -
