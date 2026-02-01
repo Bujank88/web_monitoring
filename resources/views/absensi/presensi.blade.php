@@ -380,15 +380,32 @@
     let mapInstance = null;
     const assignedLocation = @json($assignedLocation);
 
+    // Update jam secara realtime
     function updateJam() {
         const now = new Date();
         const jam = String(now.getHours()).padStart(2, '0');
         const menit = String(now.getMinutes()).padStart(2, '0');
         const detik = String(now.getSeconds()).padStart(2, '0');
-        document.getElementById('jamRealtime').textContent = `${jam}:${menit}:${detik}`;
+        const jamRealtimeElement = document.getElementById('jamRealtime');
+        if (jamRealtimeElement) {
+            jamRealtimeElement.textContent = `${jam}:${menit}:${detik}`;
+        }
     }
-    updateJam();
-    setInterval(updateJam, 1000);
+
+    // Pastikan DOM sudah siap sebelum menjalankan fungsi
+    document.addEventListener('DOMContentLoaded', function() {
+        updateJam();
+        setInterval(updateJam, 1000);
+    });
+    
+    // Fallback jika DOM sudah siap
+    if (document.readyState === 'loading') {
+        // DOM masih loading
+    } else {
+        // DOM sudah siap
+        updateJam();
+        setInterval(updateJam, 1000);
+    }
 
     async function prepareClockIn() {
         currentAction = 'clockIn';
