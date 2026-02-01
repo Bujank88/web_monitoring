@@ -80,7 +80,8 @@ class PresensiController extends Controller
                         'success' => false,
                         'message' => 'Anda berada di luar area presensi yang ditentukan. Jarak: ' . round($distance) . ' meter. Maksimal jarak: 150 meter.',
                         'distance' => round($distance),
-                        'max_distance' => 150
+                        'max_distance' => 150,
+                        'assigned_location' => $assignedLocation
                     ], 422);
                 }
             } else {

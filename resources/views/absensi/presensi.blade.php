@@ -182,6 +182,126 @@
     #locationPreview { width: 100%; height: 200px; border-radius: 10px; border: 1px solid #ddd; margin-top: 0.5rem; }
     .location-info { background: #f0f4ff; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; font-size: 0.9rem; color: #555; }
     
+    /* Modal Distance Error */
+    .modal-distance-error { display: none; }
+    .modal-distance-error.active { display: flex; }
+    .distance-error-content {
+        background: white;
+        border-radius: 15px;
+        padding: 2.5rem;
+        max-width: 450px;
+        width: 95%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .distance-error-icon {
+        width: 80px;
+        height: 80px;
+        background: #ff6b6b;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        color: white;
+        font-size: 2.5rem;
+    }
+    .distance-error-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 1.5rem;
+    }
+    .distance-info-box {
+        background: #f8f9fa;
+        border-left: 4px solid #ff6b6b;
+        padding: 1.2rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        text-align: left;
+    }
+    .distance-info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .distance-info-row:last-child { border-bottom: none; }
+    .distance-info-label { font-weight: 600; color: #666; font-size: 0.95rem; }
+    .distance-info-value { font-weight: 700; color: #333; font-size: 1rem; }
+    .distance-message {
+        color: #333;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    .distance-message strong { display: block; margin: 1rem 0 0.5rem; font-weight: 700; color: #ff6b6b; }
+    .distance-maps-link {
+        display: inline-block;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.8rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s;
+    }
+    .distance-maps-link:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3); }
+    .distance-error-buttons {
+        display: flex;
+        gap: 1rem;
+    }
+    .distance-error-buttons button {
+        flex: 1;
+        padding: 0.8rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.95rem;
+    }
+    .btn-error-ok { background: #ff6b6b; color: white; }
+    .btn-error-ok:hover { background: #ff5252; }
+    
+    /* Modal Location Not Set */
+    .modal-location-not-set { display: none; }
+    .modal-location-not-set.active { display: flex; }
+    .location-not-set-content {
+        background: white;
+        border-radius: 15px;
+        padding: 2.5rem;
+        max-width: 450px;
+        width: 95%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .location-not-set-icon {
+        width: 80px;
+        height: 80px;
+        background: #ffc107;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        color: white;
+        font-size: 2.5rem;
+    }
+    .location-not-set-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+    .location-not-set-message {
+        color: #666;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    
     @media (max-width: 480px) {
         .presensi-container { padding: 1.5rem; }
         .button-group { grid-template-columns: 1fr 1fr; }
@@ -288,6 +408,49 @@
     </div>
 </div>
 
+<!-- Modal Distance Error -->
+<div class="modal-custom modal-distance-error" id="modalDistanceError">
+    <div class="distance-error-content">
+        <div class="distance-error-icon">⚠️</div>
+        <div class="distance-error-title">Anda berada diluar Jangkauan!</div>
+        
+        <div class="distance-info-box">
+            <div class="distance-info-row">
+                <span class="distance-info-label">Jarak Saat Ini:</span>
+                <span class="distance-info-value" id="currentDistance">-</span>
+            </div>
+            <div class="distance-info-row">
+                <span class="distance-info-label">Jarak Maksimal:</span>
+                <span class="distance-info-value">150 Meter</span>
+            </div>
+        </div>
+        
+        <div class="distance-message">
+            <strong>Silahkan Mendekati lokasi penugasan anda!</strong>
+        </div>
+        
+        <a href="#" id="mapsLink" class="distance-maps-link" target="_blank">📍 Lihat Lokasi Penugasan</a>
+        
+        <div class="distance-error-buttons">
+            <button class="btn-error-ok" onclick="closeDistanceErrorModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Location Not Set -->
+<div class="modal-custom modal-location-not-set" id="modalLocationNotSet">
+    <div class="location-not-set-content">
+        <div class="location-not-set-icon">📍</div>
+        <div class="location-not-set-title">Lokasi Penugasan Belum Di Set</div>
+        <div class="location-not-set-message">
+            Admin belum menentukan lokasi presensi untuk Anda. Silakan hubungi Tim Admin untuk mengatur lokasi penugasan Anda.
+        </div>
+        <div class="distance-error-buttons">
+            <button class="btn-error-ok" onclick="closeLocationNotSetModal()">OK</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Izin -->
 <div class="modal-custom" id="modalIzin">
     <div class="modal-content">
@@ -321,6 +484,17 @@
 <script>
     let currentAction = null;
     let currentPosition = null;
+    let currentAssignedLocation = null;
+
+    // Format jarak dengan pemisah ribuan
+    function formatDistance(meters) {
+        return new Intl.NumberFormat('id-ID').format(meters) + ' Meter';
+    }
+
+    // Generate Google Maps URL untuk lokasi penugasan
+    function generateMapsUrl(lat, lng, locName = 'Lokasi Penugasan') {
+        return `https://www.google.com/maps/search/${lat},${lng}/@${lat},${lng},17z?entry=ttu`;
+    }
 
     function updateJam() {
         const now = new Date();
@@ -436,7 +610,14 @@
                         swal('Berhasil!', data.message, 'success');
                         setTimeout(() => location.reload(), 1500);
                     } else {
-                        swal('Error', data.message, 'error');
+                        // Check jika error adalah distance error
+                        if (data.distance !== undefined && data.max_distance !== undefined) {
+                            showDistanceErrorModal(data.distance, data.max_distance, data.assigned_location);
+                        } else if (data.message && data.message.includes('belum menentukan lokasi')) {
+                            showLocationNotSetModal();
+                        } else {
+                            swal('Error', data.message, 'error');
+                        }
                     }
                 } catch (error) {
                     swal('Error', error.message, 'error');
@@ -445,6 +626,33 @@
         } catch (error) {
             swal('Error', error.message, 'error');
         }
+    }
+
+    function showDistanceErrorModal(distance, maxDistance, assignedLocation) {
+        document.getElementById('currentDistance').textContent = formatDistance(distance);
+        
+        // Setup Google Maps link jika ada lokasi penugasan
+        if (assignedLocation && assignedLocation.latitude && assignedLocation.longitude) {
+            const mapsUrl = generateMapsUrl(assignedLocation.latitude, assignedLocation.longitude, assignedLocation.nama_lokasi);
+            document.getElementById('mapsLink').href = mapsUrl;
+            document.getElementById('mapsLink').style.display = 'inline-block';
+        } else {
+            document.getElementById('mapsLink').style.display = 'none';
+        }
+        
+        document.getElementById('modalDistanceError').classList.add('active');
+    }
+
+    function closeDistanceErrorModal() {
+        document.getElementById('modalDistanceError').classList.remove('active');
+    }
+
+    function showLocationNotSetModal() {
+        document.getElementById('modalLocationNotSet').classList.add('active');
+    }
+
+    function closeLocationNotSetModal() {
+        document.getElementById('modalLocationNotSet').classList.remove('active');
     }
 
     function openIzinModal() {
@@ -489,6 +697,18 @@
     document.getElementById('modalIzin').addEventListener('click', (e) => {
         if (e.target.id === 'modalIzin') {
             closeIzinModal();
+        }
+    });
+
+    document.getElementById('modalDistanceError').addEventListener('click', (e) => {
+        if (e.target.id === 'modalDistanceError') {
+            closeDistanceErrorModal();
+        }
+    });
+
+    document.getElementById('modalLocationNotSet').addEventListener('click', (e) => {
+        if (e.target.id === 'modalLocationNotSet') {
+            closeLocationNotSetModal();
         }
     });
 </script>
