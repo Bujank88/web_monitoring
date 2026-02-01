@@ -53,7 +53,8 @@ app.get('/', (req, res) => {
     message: 'WhatsApp Bot API is running',
     endpoints: {
       health: '/api/health',
-      sendWA: 'POST /api/send-wa'
+      sendWA: 'POST /api/send-wa',
+      sendWAPresensi: 'POST /api/send-wa-presensi'
     }
   });
 });
@@ -119,6 +120,130 @@ app.post('/api/send-wa', async (req, res) => {
     
   } catch (error) {
     console.error('[API] Error sending message:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// ===== ENDPOINT UNTUK PRESENSI (Clock In / Clock Out) =====
+app.post('/api/send-wa-presensi', async (req, res) => {
+  try {
+    const { 
+      phone, nama_cvsr, action, tanggal, jam, status, latitude, longitude, 
+      foto_base64, foto_mime, lokasi_penugasan_lat, lokasi_penugasan_lng, 
+      lokasi_penugasan_nama, distance, keterangan, tipe_izin
+    } = req.body;
+    
+    if (!phone) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'phone is required' 
+      });
+    }
+    
+    if (!nama_cvsr || !action) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'nama_cvsr and action (clockIn/clockOut/izin) are required' 
+      });
+    }
+    
+    if (!globalSock) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'WhatsApp not connected. Please scan QR code first.' 
+      });
+    }
+    
+    // Format message berdasarkan action
+    let message = '';
+    
+    if (action === 'clockIn') {
+      message = `*Clock In - ${nama_cvsr}*\n\n`;
+      message += `Tanggal: ${tanggal}\n`;
+      message += `Pukul: ${jam} WIB\n`;
+      message += `Status: ${status}\n`;
+      message += `Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      if (lokasi_penugasan_nama) {
+        message += `Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
+      }
+      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
+        message += `Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+      }
+      if (distance !== undefined) {
+        message += `Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
+      }
+    } else if (action === 'clockOut') {
+      message = `*Clock Out - ${nama_cvsr}*\n\n`;
+      message += `Tanggal: ${tanggal}\n`;
+      message += `Pukul: ${jam} WIB\n`;
+      message += `Status: ${status}\n`;
+      message += `Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      if (lokasi_penugasan_nama) {
+        message += `Lokasi Penugasan: ${lokasi_penugasan_nama}\n`;
+      }
+      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
+        message += `Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+      }
+      if (distance !== undefined) {
+        message += `Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
+      }
+    } else if (action === 'izin') {
+      message = `*${tipe_izin} - ${nama_cvsr}*\n\n`;
+      message += `Tanggal: ${tanggal}\n`;
+      message += `Keterangan: ${keterangan || '-'}`;
+    }
+    
+    // Siapkan JID
+    let jid = phone;
+    if (!jid.includes('@')) {
+      jid = jid.replace(/\D/g, '');
+      if (!jid.startsWith('62')) {
+        if (jid.startsWith('0')) {
+          jid = '62' + jid.substring(1);
+        } else if (jid.startsWith('8')) {
+          jid = '62' + jid;
+        }
+      }
+      jid = jid + '@s.whatsapp.net';
+    }
+    
+    console.log(`[PRESENSI-API] Processing ${action} for ${jid}`);
+    
+    // Untuk clock in/out, kirim foto dengan caption
+    if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
+      try {
+        const buffer = Buffer.from(foto_base64, 'base64');
+        const mediaType = foto_mime || 'image/png';
+        
+        console.log(`[PRESENSI-API] Sending photo with caption to ${jid}`);
+        await globalSock.sendMessage(jid, {
+          image: buffer,
+          caption: message,
+          mimetype: mediaType
+        });
+      } catch (photoError) {
+        console.error('[PRESENSI-API] Error sending photo:', photoError);
+        // Fallback: kirim text jika foto gagal
+        console.log(`[PRESENSI-API] Fallback: sending text message to ${jid}`);
+        await globalSock.sendMessage(jid, { text: message });
+      }
+    } else {
+      // Untuk izin atau jika tidak ada foto, kirim text message
+      console.log(`[PRESENSI-API] Sending text message to ${jid}`);
+      await globalSock.sendMessage(jid, { text: message });
+    }
+    
+    res.json({ 
+      success: true, 
+      jid, 
+      message: `${action} notification sent` 
+    });
+    
+  } catch (error) {
+    console.error('[PRESENSI-API] Error sending message:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 

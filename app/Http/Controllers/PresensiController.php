@@ -183,6 +183,9 @@ class PresensiController extends Controller
 
         $presensi->save();
 
+        // Send notification to WA Bot
+        $this->sendWANotification($user, $presensi, 'clockOut');
+
         return response()->json([
             'success' => true,
             'message' => 'Anda berhasil melakukan presensi. Status Tepat Waktu',
@@ -231,6 +234,9 @@ class PresensiController extends Controller
         $presensi->status_datang = $request->tipe_izin;
         $presensi->keterangan = $request->keterangan;
         $presensi->save();
+
+        // Send notification to WA Bot
+        $this->sendWANotification($user, $presensi, 'izin');
 
         return response()->json([
             'success' => true,
@@ -298,21 +304,66 @@ class PresensiController extends Controller
             ];
 
             $fotoPath = null;
+            $assignedLocation = null;
+            $distance = 0;
+
             if ($action === 'clockIn') {
+                $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
                 $postData['jam'] = $presensi->jam_datang;
                 $postData['status'] = $presensi->status_datang;
-                $postData['latitude'] = round($presensi->latitude_datang, 6);
-                $postData['longitude'] = round($presensi->longitude_datang, 6);
+                $postData['latitude'] = $presensi->latitude_datang;
+                $postData['longitude'] = $presensi->longitude_datang;
                 $fotoPath = $presensi->foto_datang;
+                
+                // Ambil lokasi penugasan jika CVSR
+                if ($user->role === 'cvsr') {
+                    $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
+                    if ($assignedLocation) {
+                        $distance = LocationPresensiCvsr::calculateDistance(
+                            $presensi->latitude_datang,
+                            $presensi->longitude_datang,
+                            $assignedLocation->latitude,
+                            $assignedLocation->longitude
+                        );
+                        $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
+                        $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
+                        $postData['lokasi_penugasan_nama'] = $assignedLocation->nama_lokasi ?? 'Lokasi Penugasan';
+                    }
+                }
+                $postData['distance'] = round($distance);
+                
             } elseif ($action === 'clockOut') {
+                $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
                 $postData['jam'] = $presensi->jam_pulang;
                 $postData['status'] = $presensi->status_pulang;
-                $postData['latitude'] = round($presensi->latitude_pulang, 6);
-                $postData['longitude'] = round($presensi->longitude_pulang, 6);
+                $postData['latitude'] = $presensi->latitude_pulang;
+                $postData['longitude'] = $presensi->longitude_pulang;
                 $fotoPath = $presensi->foto_pulang;
+                
+                // Ambil lokasi penugasan jika CVSR
+                if ($user->role === 'cvsr') {
+                    $assignedLocation = LocationPresensiCvsr::where('user_id', $user->id)->first();
+                    if ($assignedLocation) {
+                        $distance = LocationPresensiCvsr::calculateDistance(
+                            $presensi->latitude_pulang,
+                            $presensi->longitude_pulang,
+                            $assignedLocation->latitude,
+                            $assignedLocation->longitude
+                        );
+                        $postData['lokasi_penugasan_lat'] = $assignedLocation->latitude;
+                        $postData['lokasi_penugasan_lng'] = $assignedLocation->longitude;
+                        $postData['lokasi_penugasan_nama'] = $assignedLocation->nama_lokasi ?? 'Lokasi Penugasan';
+                    }
+                }
+                $postData['distance'] = round($distance);
+                
+            } elseif ($action === 'izin') {
+                $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
+                $postData['tipe_izin'] = $presensi->status_datang; // Izin atau Sakit
+                $postData['keterangan'] = $presensi->keterangan ?? '-';
             }
 
-            // Jika ada foto, konversi ke base64
+            // Jika ada foto (clock in/out), konversi ke base64
             if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
                 $fotoContent = Storage::disk('public')->get($fotoPath);
                 $postData['foto_base64'] = base64_encode($fotoContent);
