@@ -309,7 +309,9 @@ class PresensiController extends Controller
 
             if ($action === 'clockIn') {
                 $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
-                $postData['jam'] = $presensi->jam_datang;
+                $postData['jam'] = is_object($presensi->jam_datang) 
+                    ? $presensi->jam_datang->format('H:i') 
+                    : $presensi->jam_datang;
                 $postData['status'] = $presensi->status_datang;
                 $postData['latitude'] = $presensi->latitude_datang;
                 $postData['longitude'] = $presensi->longitude_datang;
@@ -334,7 +336,9 @@ class PresensiController extends Controller
                 
             } elseif ($action === 'clockOut') {
                 $postData['tanggal'] = Carbon::parse($presensi->tanggal)->locale('id')->translatedFormat('d F Y');
-                $postData['jam'] = $presensi->jam_pulang;
+                $postData['jam'] = is_object($presensi->jam_pulang) 
+                    ? $presensi->jam_pulang->format('H:i') 
+                    : $presensi->jam_pulang;
                 $postData['status'] = $presensi->status_pulang;
                 $postData['latitude'] = $presensi->latitude_pulang;
                 $postData['longitude'] = $presensi->longitude_pulang;
