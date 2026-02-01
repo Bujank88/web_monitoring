@@ -163,11 +163,11 @@
             <small>Pilih tanggal awal periode</small>
         </div>
 
-        <div class="filter-group">
+        {{-- <div class="filter-group">
             <label for="end_date">Tanggal Akhir</label>
             <input type="date" id="end_date" class="form-control" value="{{ now()->toDateString() }}">
             <small>Pilih tanggal akhir periode</small>
-        </div>
+        </div> --}}
 
         <div class="filter-group">
             <button id="btnExport" class="btn btn-success w-100" style="height: 38px;">
@@ -193,6 +193,10 @@
                     <span>Realisasi</span>
                     <strong id="real_new_leads">0</strong>
                 </div>
+                <div class="d-flex justify-content-between">
+                    <span>Gap</span>
+                    <strong id="gap_new_leads">0</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -208,6 +212,10 @@
                 <div class="d-flex justify-content-between">
                     <span>Realisasi</span>
                     <strong id="real_100">0</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Gap</span>
+                    <strong id="gap_100">0</strong>
                 </div>
             </div>
         </div>
@@ -225,6 +233,10 @@
                     <span>Realisasi</span>
                     <strong id="real_50">0</strong>
                 </div>
+                <div class="d-flex justify-content-between">
+                    <span>Gap</span>
+                    <strong id="gap_50">0</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -241,6 +253,10 @@
                     <span>Realisasi</span>
                     <strong id="real_less_50">0</strong>
                 </div>
+                <div class="d-flex justify-content-between">
+                    <span>Gap</span>
+                    <strong id="gap_less_50">0</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -256,6 +272,10 @@
                 <div class="d-flex justify-content-between">
                     <span>Realisasi</span>
                     <strong id="real_total">0</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Gap</span>
+                    <strong id="gap_total">0</strong>
                 </div>
             </div>
         </div>
@@ -286,6 +306,7 @@
                     <th>Komitmen</th>
                     <th>Plan Min Topup</th>
                     <th>Status</th>
+                    <th>Followup</th>
                     <th>Realisasi Topup</th>
                     <th>Action</th>
 
@@ -365,6 +386,46 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="modalViewRealisasi" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Detail Realisasi Logbook</h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        {{-- FOTO --}}
+        <div class="text-center mb-3">
+            <img id="viewPhoto" src="" class="img-fluid rounded" style="max-height:300px">
+        </div>
+
+        {{-- METODE --}}
+        <div class="form-group">
+            <label><strong>Metode</strong></label>
+            <input type="text" id="viewMethod" class="form-control" readonly>
+        </div>
+
+        {{-- PEMBAHASAN --}}
+        <div class="form-group">
+            <label><strong>Pembahasan</strong></label>
+            <textarea id="viewDiscus" class="form-control" rows="4" readonly></textarea>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 
 @endsection
 
@@ -396,24 +457,29 @@ function loadSummary() {
         url: "{{ route('logbook-daily.summary') }}",
         data: {
             start_date: $('#start_date').val(),
-            end_date: $('#end_date').val(),
+            // end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val()
         },
         success: function (res) {
             $('#sum_new_leads').text(rupiah(res.new_leads));
             $('#real_new_leads').text(rupiah(res.real_new_leads));
+            $('#gap_new_leads').text(rupiah(res.real_new_leads - res.new_leads));
 
             $('#sum_100').text(rupiah(res.full));
             $('#real_100').text(rupiah(res.real_full));
+            $('#gap_100').text(rupiah(res.real_full - res.full));
 
             $('#sum_50').text(rupiah(res.half));
             $('#real_50').text(rupiah(res.real_half));
+            $('#gap_50').text(rupiah(res.real_half - res.half));
 
             $('#sum_less_50').text(rupiah(res.less_half));
             $('#real_less_50').text(rupiah(res.real_less_half));
+            $('#gap_less_50').text(rupiah(res.real_less_half - res.less_half));
 
             $('#sum_total').text(rupiah(res.total));
             $('#real_total').text(rupiah(res.real_total));
+            $('#gap_total').text(rupiah(res.real_total - res.total));
         }
     });
 }
@@ -433,7 +499,7 @@ $(function () {
             data: function (d) {
                 d.canvasser   = $('#filter_canvasser').val();
                 d.start_date = $('#start_date').val();
-                d.end_date   = $('#end_date').val();
+                // d.end_date   = $('#end_date').val();
             },
             beforeSend: function() {
                 showLoading();
@@ -453,6 +519,7 @@ $(function () {
             { data: 'komitmen' },
             { data: 'plan_min_topup' },
             { data: 'status' },
+            { data: 'followup' },
             { data: 'realisasi_topup' },
             { data: 'action' },
         ]
@@ -465,40 +532,40 @@ $(function () {
     });
 
     $('#start_date').on('change', function () {
-        let startDate = $(this).val();
+        // let startDate = $(this).val();
 
-        if (startDate) {
-            $('#end_date').attr('min', startDate);
+        // if (startDate) {
+        //     $('#end_date').attr('min', startDate);
 
-            if ($('#end_date').val() && $('#end_date').val() < startDate) {
-                $('#end_date').val('');
-            }
-        }
-
-        table.ajax.reload();
-        loadSummary();
-    });
-
-    $('#end_date').on('change', function () {
-        let endDate = $(this).val();
-
-        if (endDate) {
-            $('#start_date').attr('max', endDate);
-
-            if ($('#start_date').val() && $('#start_date').val() > endDate) {
-                $('#start_date').val('');
-            }
-        }
+        //     if ($('#end_date').val() && $('#end_date').val() < startDate) {
+        //         $('#end_date').val('');
+        //     }
+        // }
 
         table.ajax.reload();
         loadSummary();
     });
+
+    // $('#end_date').on('change', function () {
+    //     let endDate = $(this).val();
+
+    //     if (endDate) {
+    //         $('#start_date').attr('max', endDate);
+
+    //         if ($('#start_date').val() && $('#start_date').val() > endDate) {
+    //             $('#start_date').val('');
+    //         }
+    //     }
+
+    //     table.ajax.reload();
+    //     loadSummary();
+    // });
 
     // Export dengan filter yang sedang diterapkan
     $('#btnExport').on('click', function () {
         let params = {
             start_date: $('#start_date').val(),
-            end_date: $('#end_date').val(),
+            // end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val()
         };
 
@@ -605,6 +672,47 @@ function retakePhoto() {
             video.srcObject = stream;
         });
 }
+
+$('#modalRealisasi').on('hidden.bs.modal', function () {
+    // 1. Reset form
+    $('#formEdit')[0].reset();
+
+    // 2. Reset selfie
+    selfieInput.value = '';
+    canvas.classList.add('d-none');
+    video.classList.remove('d-none');
+    retakeBtn.classList.add('d-none');
+
+    // 3. Stop camera kalau masih jalan
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+
+    // 4. Start ulang kamera biar fresh pas modal dibuka lagi
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(s => {
+            stream = s;
+            video.srcObject = stream;
+        })
+        .catch(() => {
+            alert('Tidak bisa mengakses kamera');
+        });
+});
 </script>
+<script>
+$(document).on('click', '.btn-view-realisasi', function () {
+    let photo  = $(this).data('photo');
+    let method = $(this).data('method');
+    let discus = $(this).data('discus');
+
+    $('#viewPhoto').attr('src', '/storage/' + photo);
+    $('#viewMethod').val(method);
+    $('#viewDiscus').val(discus);
+
+    $('#modalViewRealisasi').modal('show');
+});
+</script>
+
 
 @endsection
