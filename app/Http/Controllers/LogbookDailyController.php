@@ -351,28 +351,42 @@ class LogbookDailyController extends Controller
                 'pembahasan'  => 'required|string',
                 'selfie'      => 'required|string', // base64
             ]);
+
             // === HANDLE SELFIE BASE64 ===
             $image = $request->selfie;
 
-            // format: data:image/jpeg;base64,...
-            $image = str_replace('data:image/jpeg;base64,', '', $image);
+            // remove base64 header (jpeg/png)
+            $image = preg_replace('#^data:image/\w+;base64,#i', '', $image);
             $image = str_replace(' ', '+', $image);
 
-            $imageName = 'selfie_' . time() . '.jpg';
-            $path = 'selfie-logbook/' . $imageName;
-            
+            // folder per bulan
+            $monthFolder = Carbon::now()->format('Y-m');
+            $directory   = public_path("selfie-logbook/{$monthFolder}");
 
-            Storage::disk('public')->put($path, base64_decode($image));
+            // buat folder kalau belum ada
+            if (!File::exists($directory)) {
+                File::makeDirectory($directory, 0755, true);
+            }
+
+            // nama file
+            $imageName = 'selfie_' . time() . '.jpg';
+            $fullPath  = $directory . '/' . $imageName;
+
+            // simpan file
+            file_put_contents($fullPath, base64_decode($image));
+
+            // path untuk disimpan ke DB (relatif ke public)
+            $dbPath = "selfie-logbook/{$monthFolder}/{$imageName}";
 
             // === UPDATE LOGBOOK ===
             DB::table('logbook_daily')
                 ->where('id', $request->id)
                 ->update([
-                    'realisasi_method'        => $request->metode,
-                    'realisasi_discus'        => $request->pembahasan,
-                    'realisasi_photo'         => $path,
-                    'realisasi_at'  => Carbon::now(),
-                    'updated_at'    => Carbon::now(),
+                    'realisasi_method' => $request->metode,
+                    'realisasi_discus' => $request->pembahasan,
+                    'realisasi_photo'  => $dbPath,
+                    'realisasi_at'     => Carbon::now(),
+                    'updated_at'       => Carbon::now(),
                 ]);
 
             return redirect()->back()->with('success', 'Realisasi logbook berhasil disimpan');
