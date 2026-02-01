@@ -110,7 +110,7 @@ Schedule::call(function () {
                     $postData['keterangan'] = $presensi->keterangan;
                 }
 
-                $response = Http::timeout(30)->post($waBot . '/api/send-wa-presensi', $postData);
+                $response = Http::timeout(60)->post($waBot . '/api/send-wa-presensi', $postData);
 
                 if ($response->successful()) {
                     // Update status jadi true
