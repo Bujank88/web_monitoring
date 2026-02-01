@@ -121,10 +121,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="mitraSBPTableCard">
-            <div class="card-header bg-gradient-success text-white">
+            <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Mitra SBP</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveMitraSBP" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportMitraSBPExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureMitraSBPTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -217,10 +225,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="agencyTableCard">
-            <div class="card-header bg-gradient-info text-white">
+            <div class="card-header bg-gradient-info text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Agency Indihome</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveAgency" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportAgencyExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureAgencyTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -312,10 +328,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="internalTableCard">
-            <div class="card-header bg-gradient-danger text-white">
+            <div class="card-header bg-gradient-danger text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Internal Indihome</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveInternal" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportInternalExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureInternalTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -426,6 +450,73 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
         $('#month').on('change', function() {
             $('#filterForm').submit();
         });
+    });
+
+    // Handle Save Image Button
+    document.getElementById('btnSaveMitraSBP').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureMitraSBPTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'mitra_sbp_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportMitraSBPExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.mitra-sbp') }}?month=" + monthValue;
+    });
+    // Handle Save Image Button
+    document.getElementById('btnSaveAgency').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureAgencyTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'agency_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportAgencyExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.agency') }}?month=" + monthValue;
+    });
+    // Handle Save Image Button
+    document.getElementById('btnSaveInternal').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureInternalTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'internal_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportInternalExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.internal') }}?month=" + monthValue;
     });
 </script>
 
