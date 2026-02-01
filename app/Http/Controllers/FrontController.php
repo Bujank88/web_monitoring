@@ -17,16 +17,14 @@ class FrontController extends Controller
         if (Auth::user() or 'sukseslogin' == Session::get('login')) {
             if ('User' == Auth::user()->role) {
                 return redirect('/home');
-            } else if ('TL' == Auth::user()->role) {
-                return redirect('/loglogin');
             } else if ('Treg' == Auth::user()->role) {
                 return redirect()->route('race_summary_treg');
             } else if (in_array(Auth::user()->role, ['Admin', 'Tsel'])) {
                 return redirect('/admin/home');
-            } else if (in_array(Auth::user()->role, ['Admin', 'cvsr'])) {
-                return redirect()->route('leads-master.index');
+            } else if ('cvsr' == Auth::user()->role) {
+                return redirect()->route('presensi.index');
             } else {
-                return redirect('/admin/home');
+            return redirect('/admin/home');
             }
             return view('user.index');
         }
