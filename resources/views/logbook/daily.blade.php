@@ -706,7 +706,7 @@ $(document).on('click', '.btn-view-realisasi', function () {
     let method = $(this).data('method');
     let discus = $(this).data('discus');
 
-    $('#viewPhoto').attr('src', '/storage/' + photo);
+    $('#viewPhoto').attr('src', '/storage/selfie-logbook' + photo);
     $('#viewMethod').val(method);
     $('#viewDiscus').val(discus);
 
