@@ -271,7 +271,7 @@ class PresensiController extends Controller
 
     /**
      * Send WA Bot Notification untuk Presensi
-     * Kirim notifikasi ke WA Bot endpoint dedicated untuk presensi
+     * Kirim notifikasi ke WA Bot endpoint dedicated untuk presensi dengan foto
      */
     private function sendWANotification($user, $presensi, $action = 'clockIn')
     {
@@ -297,16 +297,26 @@ class PresensiController extends Controller
                 'action' => $action,
             ];
 
+            $fotoPath = null;
             if ($action === 'clockIn') {
                 $postData['jam'] = $presensi->jam_datang;
                 $postData['status'] = $presensi->status_datang;
                 $postData['latitude'] = round($presensi->latitude_datang, 6);
                 $postData['longitude'] = round($presensi->longitude_datang, 6);
+                $fotoPath = $presensi->foto_datang;
             } elseif ($action === 'clockOut') {
                 $postData['jam'] = $presensi->jam_pulang;
                 $postData['status'] = $presensi->status_pulang;
                 $postData['latitude'] = round($presensi->latitude_pulang, 6);
                 $postData['longitude'] = round($presensi->longitude_pulang, 6);
+                $fotoPath = $presensi->foto_pulang;
+            }
+
+            // Jika ada foto, konversi ke base64
+            if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
+                $fotoContent = Storage::disk('public')->get($fotoPath);
+                $postData['foto_base64'] = base64_encode($fotoContent);
+                $postData['foto_mime'] = 'image/png';
             }
 
             // Send ke endpoint presensi WA Bot
