@@ -308,16 +308,19 @@
                                     @php
                                     $jamKerjaAwal = \Carbon\Carbon::createFromFormat('H:i', '08:00');
                                     $selisih = $item->jam_datang->diffInMinutes($jamKerjaAwal);
+                                    $jam = intdiv($selisih, 60);
+                                    $menit = $selisih % 60;
+                                    $durasiFormatted = ($jam > 0 ? $jam . ' jam ' : '') . ($menit > 0 ? $menit . ' menit' : '');
                                     @endphp
-                                    <span class="durasi-terlambat">{{ $selisih }} menit</span>
+                                    <span class="durasi-terlambat">{{ trim($durasiFormatted) }}</span>
                                     @else
                                     -
                                     @endif
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_datang)
-                                    <a href="{{ asset('storage/' . $item->foto_datang) }}" target="_blank" onclick="openModalFoto(this.href, event)">
-                                        <img src="{{ asset('storage/' . $item->foto_datang) }}" alt="Foto Masuk" title="Klik untuk preview">
+                                    <a href="#" onclick="openModalFoto('{{ \Illuminate\Support\Facades\Storage::url($item->foto_datang) }}', event)">
+                                        <img src="{{ \Illuminate\Support\Facades\Storage::url($item->foto_datang) }}" alt="Foto Masuk" title="Klik untuk preview">
                                     </a>
                                     @else
                                     -
@@ -332,8 +335,8 @@
                                 </td>
                                 <td class="foto-cell">
                                     @if ($item->foto_pulang)
-                                    <a href="{{ asset('storage/' . $item->foto_pulang) }}" target="_blank" onclick="openModalFoto(this.href, event)">
-                                        <img src="{{ asset('storage/' . $item->foto_pulang) }}" alt="Foto Keluar" title="Klik untuk preview">
+                                    <a href="#" onclick="openModalFoto('{{ \Illuminate\Support\Facades\Storage::url($item->foto_pulang) }}', event)">
+                                        <img src="{{ \Illuminate\Support\Facades\Storage::url($item->foto_pulang) }}" alt="Foto Keluar" title="Klik untuk preview">
                                     </a>
                                     @else
                                     -
