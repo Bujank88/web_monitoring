@@ -202,6 +202,9 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
+    Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
+    Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
+    Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
 
     // Panen Poin Routes
     Route::get('panen-poin/input', [PanenPoinController::class, 'index'])->name('panenpoin.index');
