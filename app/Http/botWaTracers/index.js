@@ -16,6 +16,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Variable global untuk socket WA
 let globalSock = null;
+let isConnecting = false; // Flag untuk cegah multiple reconnect
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+let lastReconnectTime = 0;
+const RECONNECT_DELAY = 5000; // 5 detik minimum antar reconnect
 
 // ===== Helpers =====
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -24,8 +29,8 @@ const MIN_GAP = 2200; // ms minimal jeda antar pesan per JID
 
 // ---- Helper kirim WA =====
 async function sendWAMessage(phone, message) {
-  if (!globalSock) {
-    throw new Error('WhatsApp not connected');
+  if (!globalSock || isConnecting) {
+    throw new Error('WhatsApp not connected or still connecting');
   }
   
   let jid = phone;
@@ -54,12 +59,16 @@ async function sendWAMessage(phone, message) {
 
 // ---- Helper cari grup berdasarkan nama =====
 async function findGroupByName(groupName) {
-  if (!globalSock) {
-    throw new Error('WhatsApp not connected');
+  if (!globalSock || isConnecting) {
+    throw new Error('WhatsApp not connected or still connecting');
   }
   
   try {
     const groups = await globalSock.groupFetchAllParticipating();
+    if (!groups || Object.keys(groups).length === 0) {
+      console.log(`[GROUP-FINDER] No groups available`);
+      return null;
+    }
     console.log(`[GROUP-FINDER] Available groups: ${Object.values(groups).map(g => g.subject).join(', ')}`);
     
     for (const group of Object.values(groups)) {
@@ -122,15 +131,19 @@ app.get('/', (req, res) => {
       health: '/api/health',
       groups: '/api/groups',
       sendWA: 'POST /api/send-wa',
-      sendWAPresensi: 'POST /api/send-wa-presensi'
+      sendWAPresensi: 'POST /api/send-wa-presensi',
+      sendWALogbook: 'POST /api/send-wa-logbook'
     }
   });
 });
 
 app.get('/api/health', (req, res) => {
+  const isReady = globalSock && !isConnecting;
   res.json({ 
-    status: 'ok', 
-    wa_connected: globalSock ? true : false,
+    status: isReady ? 'ok' : 'not-ready',
+    wa_connected: isReady,
+    is_connecting: isConnecting,
+    reconnect_attempts: reconnectAttempts,
     timestamp: new Date().toISOString()
   });
 });
@@ -262,6 +275,10 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       message += `📅 Tanggal: ${tanggal}\n`;
       message += `🕐 Pukul: ${jam} WIB\n`;
       message += `📍 Status: ${status}\n`;
+      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
+        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+      }
       if (distance !== undefined) {
         message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
@@ -270,6 +287,10 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       message += `📅 Tanggal: ${tanggal}\n`;
       message += `🕐 Pukul: ${jam} WIB\n`;
       message += `📍 Status: ${status}\n`;
+      message += `📌 Lokasi: ${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}\n`;
+      if (lokasi_penugasan_lat && lokasi_penugasan_lng) {
+        message += `🗺️ Lokasi Penugasan Koordinat: ${parseFloat(lokasi_penugasan_lat).toFixed(6)}, ${parseFloat(lokasi_penugasan_lng).toFixed(6)}\n`;
+      }
       if (distance !== undefined) {
         message += `📏 Jarak Lokasi dari Lokasi Penugasan: ${distance} Meter`;
       }
@@ -396,6 +417,150 @@ app.post('/api/send-wa-presensi', async (req, res) => {
   }
 });
 
+// ===== ENDPOINT UNTUK LOGBOOK =====
+app.post('/api/send-wa-logbook', async (req, res) => {
+  try {
+    const { 
+      phone, nama_canvasser, tanggal, komitmen, plan_min_topup, status, 
+      metode, pembahasan, foto_base64, foto_mime, group_id
+    } = req.body;
+    
+    if (!phone) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'phone is required' 
+      });
+    }
+    
+    if (!nama_canvasser || !tanggal || !komitmen) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'nama_canvasser, tanggal, dan komitmen are required' 
+      });
+    }
+    
+    if (!globalSock) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'WhatsApp not connected. Please scan QR code first.' 
+      });
+    }
+    
+    // Format caption message
+    let caption = `📋 *LOGBOOK REALISASI*\n\n`;
+    caption += `👤 *Canvasser:* ${nama_canvasser}\n`;
+    caption += `📅 *Tanggal:* ${tanggal}\n`;
+    caption += `💼 *Komitmen:* ${komitmen}\n`;
+    caption += `💰 *Plan Min Topup:* Rp${plan_min_topup?.toLocaleString('id-ID')}\n`;
+    caption += `📊 *Status:* ${status}\n`;
+    
+    if (metode) {
+      caption += `\n🔄 *Metode:* ${metode === 'online' ? 'Online' : 'Offline'}\n`;
+    }
+    
+    if (pembahasan) {
+      caption += `\n💬 *Pembahasan:*\n${pembahasan}\n`;
+    }
+
+    // Prepare JID untuk personal message
+    let jid = phone;
+    if (!jid.includes('@')) {
+      jid = jid.replace(/\D/g, '');
+      if (!jid.startsWith('62')) {
+        if (jid.startsWith('0')) {
+          jid = '62' + jid.substring(1);
+        } else if (jid.startsWith('8')) {
+          jid = '62' + jid;
+        }
+      }
+      jid = jid + '@s.whatsapp.net';
+    }
+    
+    // Validasi JID
+    if (!jid || !jid.includes('@')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid phone number format' 
+      });
+    }
+    
+    console.log(`[LOGBOOK-API] Processing logbook for ${jid}`);
+    
+    const sentTo = [];
+    let hasError = false;
+    
+    // 1️⃣ Kirim ke personal number
+    try {
+      if (foto_base64 && foto_mime) {
+        const imageBuffer = Buffer.from(foto_base64, 'base64');
+        await globalSock.sendMessage(jid, {
+          image: imageBuffer,
+          caption: caption,
+          mimetype: foto_mime
+        });
+      } else {
+        await globalSock.sendMessage(jid, { text: caption });
+      }
+      sentTo.push({
+        type: 'personal',
+        jid: jid,
+        status: 'success'
+      });
+      console.log(`[LOGBOOK-API] ✅ Message sent to personal: ${jid}`);
+    } catch (personalError) {
+      console.error('[LOGBOOK-API] Error sending to personal:', personalError.message);
+      hasError = true;
+    }
+    
+    // 2️⃣ Kirim ke grup (jika ada group_id)
+    if (group_id) {
+      try {
+        if (foto_base64 && foto_mime) {
+          const imageBuffer = Buffer.from(foto_base64, 'base64');
+          await globalSock.sendMessage(group_id, {
+            image: imageBuffer,
+            caption: caption,
+            mimetype: foto_mime
+          });
+        } else {
+          await globalSock.sendMessage(group_id, { text: caption });
+        }
+        sentTo.push({
+          type: 'group',
+          groupId: group_id,
+          status: 'success'
+        });
+        console.log(`[LOGBOOK-API] ✅ Message sent to group: ${group_id}`);
+      } catch (groupError) {
+        console.error('[LOGBOOK-API] Error sending to group:', groupError.message);
+        // Tidak set hasError karena group adalah optional
+      }
+    }
+    
+    // Return error hanya jika personal gagal
+    if (hasError && sentTo.length === 0) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to send logbook notification',
+        sentTo 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      sentTo,
+      message: 'Logbook notification sent' 
+    });
+    
+  } catch (error) {
+    console.error('[LOGBOOK-API] Error sending message:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // Start Express server
 const PORT = process.env.WA_BOT_PORT || 3000;
 app.listen(PORT, () => {
@@ -404,6 +569,7 @@ app.listen(PORT, () => {
   console.log(`📍 List groups: http://localhost:${PORT}/api/groups`);
   console.log(`📍 Send WA: POST http://localhost:${PORT}/api/send-wa`);
   console.log(`📍 Send WA Presensi: POST http://localhost:${PORT}/api/send-wa-presensi`);
+  console.log(`📍 Send WA Logbook: POST http://localhost:${PORT}/api/send-wa-logbook`);
 });
 
 // ===== WA Boot =====

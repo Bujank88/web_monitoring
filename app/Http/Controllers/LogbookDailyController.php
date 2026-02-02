@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 
 class LogbookDailyController extends Controller
 {
@@ -390,6 +391,151 @@ class LogbookDailyController extends Controller
                     'updated_at'       => Carbon::now(),
                 ]);
 
+            // === SEND WA NOTIFICATION ===
+            $this->sendLogbookNotification($request->id);
+
             return redirect()->back()->with('success', 'Realisasi logbook berhasil disimpan');
         }
+
+    /**
+     * Function: Ambil pending notifications untuk logbook yang belum terkirim
+     */
+    public function getPendingLogbookNotifications($logbookDailyId)
+    {
+        $logbook = DB::table('logbook_daily')
+            ->where('id', $logbookDailyId)
+            ->first();
+        
+        if (!$logbook) {
+            return [];
+        }
+
+        $pending = [];
+
+        // Check apakah ada realisasi dan belum terkirim notifikasi
+        if (!empty($logbook->realisasi_photo) && ($logbook->is_sent_logbook === false || $logbook->is_sent_logbook === null)) {
+            $pending[] = 'realisasi';
+        }
+
+        return $pending;
+    }
+
+    /**
+     * Function: Send logbook notification via WhatsApp
+     */
+    public function sendLogbookNotification($logbookDailyId)
+    {
+        try {
+            $logbook = DB::table('logbook_daily')
+                ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
+                ->join('users', 'users.id', '=', 'leads_master.user_id')
+                ->select([
+                    'logbook_daily.id',
+                    'logbook_daily.komitmen',
+                    'logbook_daily.plan_min_topup',
+                    'logbook_daily.status',
+                    'logbook_daily.realisasi_method',
+                    'logbook_daily.realisasi_discus',
+                    'logbook_daily.realisasi_photo',
+                    'logbook_daily.created_at',
+                    'users.name as nama_canvasser',
+                    'users.mobile_phone',
+                ])
+                ->where('logbook_daily.id', $logbookDailyId)
+                ->first();
+
+            if (!$logbook) {
+                \Log::error("Logbook daily ID {$logbookDailyId} not found");
+                return false;
+            }
+
+            $pending = $this->getPendingLogbookNotifications($logbookDailyId);
+
+            if (empty($pending)) {
+                return true; // Tidak ada yang perlu dikirim
+            }
+
+            $waBot = env('WA_BOT_URL');
+            $botPhone = env('WA_BOT_PHONE');
+            $botGroupId = env('WA_BOT_GROUP_ID'); // Group ID untuk "All MyAds canvasser Team" atau sejenis
+
+            if (!$waBot || !$botPhone) {
+                \Log::error('WA_BOT_URL or WA_BOT_PHONE not configured');
+                return false;
+            }
+
+            // Format phone
+            $phone = preg_replace('/^0/', '62', $botPhone);
+            if (!str_starts_with($phone, '62')) {
+                $phone = '62' . $phone;
+            }
+
+            foreach ($pending as $action) {
+                if ($action === 'realisasi') {
+                    $postData = [
+                        'phone' => $phone,
+                        'nama_canvasser' => $logbook->nama_canvasser,
+                        'tanggal' => Carbon::parse($logbook->created_at)->locale('id')->translatedFormat('d F Y'),
+                        'komitmen' => $logbook->komitmen,
+                        'plan_min_topup' => $logbook->plan_min_topup,
+                        'status' => $logbook->status,
+                        'metode' => $logbook->realisasi_method,
+                        'pembahasan' => $logbook->realisasi_discus,
+                    ];
+
+                    // Add foto jika ada
+                    if ($logbook->realisasi_photo && Storage::disk('public')->exists($logbook->realisasi_photo)) {
+                        $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($logbook->realisasi_photo));
+                        $postData['foto_mime'] = Storage::disk('public')->mimeType($logbook->realisasi_photo);
+                    }
+
+                    // Add group ID jika ada
+                    if ($botGroupId) {
+                        $postData['group_id'] = $botGroupId;
+                    }
+
+                    $response = Http::timeout(60)->post($waBot . '/api/send-wa-logbook', $postData);
+
+                    if ($response->successful()) {
+                        // Update status jadi true
+                        DB::table('logbook_daily')
+                            ->where('id', $logbookDailyId)
+                            ->update([
+                                'is_sent_logbook' => true,
+                                'last_send_attempt' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        
+                        \Log::info("Logbook {$logbookDailyId} notification sent successfully");
+                        return true;
+                    } else {
+                        \Log::warning("Failed to send logbook {$logbookDailyId} notification: " . $response->body());
+                        
+                        // Update last_send_attempt
+                        DB::table('logbook_daily')
+                            ->where('id', $logbookDailyId)
+                            ->update([
+                                'last_send_attempt' => now(),
+                            ]);
+                        
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error('Send logbook notification error: ' . $e->getMessage());
+            
+            // Update last_send_attempt
+            DB::table('logbook_daily')
+                ->where('id', $logbookDailyId)
+                ->update([
+                    'last_send_attempt' => now(),
+                ]);
+            
+            return false;
+        }
+    }
 }

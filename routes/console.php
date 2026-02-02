@@ -153,3 +153,25 @@ Schedule::call(function () {
 Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
 })->everyTwoMinutes()->name('refreshDetailLeadsSummary');
+
+// ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
+Schedule::call(function () {
+    $failedLogbook = DB::table('logbook_daily')
+        ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
+        ->join('users', 'users.id', '=', 'leads_master.user_id')
+        ->select('logbook_daily.id')
+        ->where(function ($query) {
+            $query->where('logbook_daily.is_sent_logbook', false)
+                  ->whereNotNull('logbook_daily.realisasi_photo');
+        })
+        ->limit(50)
+        ->get();
+
+    foreach ($failedLogbook as $logbookDaily) {
+        try {
+            app(LogbookDailyController::class)->sendLogbookNotification($logbookDaily->id);
+        } catch (\Exception $e) {
+            \Log::error('Retry send logbook notification error: ' . $e->getMessage());
+        }
+    }
+})->everyMinute()->name('retrySendLogbookNotifications');
