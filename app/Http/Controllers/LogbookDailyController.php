@@ -436,6 +436,8 @@ class LogbookDailyController extends Controller
     public function sendLogbookNotification($logbookDailyId)
     {
         try {
+            \Log::info("=== Processing logbook ID: {$logbookDailyId} ===");
+            
             $logbook = DB::table('logbook_daily')
                 ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
                 ->join('users', 'users.id', '=', 'leads_master.user_id')
@@ -447,6 +449,7 @@ class LogbookDailyController extends Controller
                     'logbook_daily.realisasi_method',
                     'logbook_daily.realisasi_discus',
                     'logbook_daily.realisasi_photo',
+                    'logbook_daily.is_sent_logbook',
                     'logbook_daily.created_at',
                     'users.name as nama_canvasser',
                     'users.nohp',
@@ -459,9 +462,14 @@ class LogbookDailyController extends Controller
                 return false;
             }
 
+            \Log::info("Logbook found. is_sent_logbook: {$logbook->is_sent_logbook}, realisasi_photo: {$logbook->realisasi_photo}");
+
             $pending = $this->getPendingLogbookNotifications($logbookDailyId);
 
+            \Log::info("Pending notifications: " . json_encode($pending));
+
             if (empty($pending)) {
+                \Log::info("No pending notifications for logbook {$logbookDailyId}");
                 return true; // Tidak ada yang perlu dikirim
             }
 
@@ -497,6 +505,9 @@ class LogbookDailyController extends Controller
                     if ($logbook->realisasi_photo && Storage::disk('public')->exists($logbook->realisasi_photo)) {
                         $postData['foto_base64'] = base64_encode(Storage::disk('public')->get($logbook->realisasi_photo));
                         $postData['foto_mime'] = Storage::disk('public')->mimeType($logbook->realisasi_photo);
+                        \Log::info("Foto included in request for logbook {$logbookDailyId}");
+                    } else {
+                        \Log::warning("Foto not found for logbook {$logbookDailyId}: {$logbook->realisasi_photo}");
                     }
 
                     // Add group ID jika ada
@@ -504,9 +515,12 @@ class LogbookDailyController extends Controller
                         $postData['group_id'] = $botGroupId;
                     }
 
+                    \Log::info("Sending logbook notification to: {$phone}");
                     $response = Http::timeout(60)->post($waBot . '/api/send-wa-logbook', $postData);
 
                     if ($response->successful()) {
+                        \Log::info("HTTP response successful for logbook {$logbookDailyId}");
+                        
                         // Update status jadi true
                         DB::table('logbook_daily')
                             ->where('id', $logbookDailyId)
@@ -516,10 +530,10 @@ class LogbookDailyController extends Controller
                                 'updated_at' => now(),
                             ]);
                         
-                        \Log::info("Logbook {$logbookDailyId} notification sent successfully");
+                        \Log::info("Logbook {$logbookDailyId} notification sent successfully. Updated DB.");
                         return true;
                     } else {
-                        \Log::warning("Failed to send logbook {$logbookDailyId} notification: " . $response->body());
+                        \Log::warning("Failed to send logbook {$logbookDailyId} notification. Status: " . $response->status() . ", Body: " . $response->body());
                         
                         // Update last_send_attempt
                         DB::table('logbook_daily')
@@ -536,7 +550,7 @@ class LogbookDailyController extends Controller
             return true;
 
         } catch (\Exception $e) {
-            \Log::error('Send logbook notification error: ' . $e->getMessage());
+            \Log::error('Send logbook notification error for ID ' . $logbookDailyId . ': ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
             
             // Update last_send_attempt
             DB::table('logbook_daily')
