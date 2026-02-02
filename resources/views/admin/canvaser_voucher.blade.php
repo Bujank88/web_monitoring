@@ -467,6 +467,17 @@
     {{ session('error') }}
 </div>
 @endif
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+        <select id="filterMonthCvsr" name="filterMonthCvsr" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
+            @foreach ($months as $month)
+            <option value="{{ $month['value'] }}" {{ $month['selected'] ? 'selected' : '' }}>
+                {{ $month['label'] }}
+            </option>
+            @endforeach
+        </select>
+    </div>
+</div>
 
 <!-- Summary Report Referral Champion Canvasser -->
 <div class="row mb-4">
@@ -567,7 +578,10 @@
             responsive: true,
             ajax: {
                 url: "{{ route('canvasser_voucher_data') }}",
-                type: 'GET'
+                type: 'GET',
+                data: function(d) {
+                    d.month = $('#filterMonthCvsr').val();
+                }
             },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
@@ -600,7 +614,10 @@
             paging: false,
             ajax: {
                 url: "{{ route('canvasser_voucher_summary') }}",
-                type: 'GET'
+                type: 'GET',
+                data: function(d) {
+                    d.month = $('#filterMonthCvsr').val();
+                }
             },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
@@ -642,7 +659,15 @@
                     alert('Gagal menyimpan gambar. Silakan coba lagi.');
                 });
         });
-
+        // Handle month filter change
+        $('#filterMonthCvsr').on('change', function() {
+            // Update label bulan yang ditampilkan dengan text dari selected option
+            var selectedText = $('#filterMonthCvsr option:selected').text();
+            // $('#displayedMonthCvsr').text(selectedText);
+            // Reload data table
+            table.ajax.reload();
+            summaryTable.ajax.reload();
+        });
         // Handle Save Image Button for Summary
         document.getElementById('btnSaveCanvasserSummaryImage').addEventListener('click', function () {
             html2canvas(document.getElementById('captureCanvasserSummaryTable'), { 
