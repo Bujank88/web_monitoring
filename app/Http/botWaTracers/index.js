@@ -11,8 +11,8 @@ require("dotenv").config();
 
 // ===== Express App untuk HTTP API =====
 const app = express();
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Variable global untuk socket WA
 let globalSock = null;
@@ -422,7 +422,8 @@ app.post('/api/send-wa-logbook', async (req, res) => {
   try {
     const { 
       phone, nama_canvasser, tanggal, komitmen, plan_min_topup, status, 
-      metode, pembahasan, foto_base64, foto_mime, group_id
+      metode, pembahasan, foto_base64, foto_mime, group_id,
+      jam, company_name, email, regional, myads_account, mobile_phone
     } = req.body;
     
     if (!phone) {
@@ -447,12 +448,38 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     }
     
     // Format caption message
+    // Helper function untuk format angka dengan titik pemisah ribuan
+    const formatCurrency = (num) => {
+      if (!num) return '0';
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    };
+    
     let caption = `📋 *LOGBOOK REALISASI*\n\n`;
     caption += `👤 *Canvasser:* ${nama_canvasser}\n`;
     caption += `📅 *Tanggal:* ${tanggal}\n`;
+    if (jam) {
+      caption += `🕐 *Jam Input:* ${jam} WIB\n`;
+    }
     caption += `💼 *Komitmen:* ${komitmen}\n`;
-    caption += `💰 *Plan Min Topup:* Rp${plan_min_topup?.toLocaleString('id-ID')}\n`;
+    caption += `💰 *Plan Min Topup:* Rp${formatCurrency(plan_min_topup)}\n`;
     caption += `📊 *Status:* ${status}\n`;
+    
+    // Informasi tambahan dari leads_master
+    if (company_name) {
+      caption += `\n🏢 *Perusahaan:* ${company_name}\n`;
+    }
+    if (email) {
+      caption += `📧 *Email:* ${email}\n`;
+    }
+    if (regional) {
+      caption += `🗺️ *Regional:* ${regional}\n`;
+    }
+    if (myads_account) {
+      caption += `📱 *MyAds Account:* ${myads_account}\n`;
+    }
+    if (mobile_phone) {
+      caption += `☎️ *No. HP:* ${mobile_phone}\n`;
+    }
     
     if (metode) {
       caption += `\n🔄 *Metode:* ${metode === 'online' ? 'Online' : 'Offline'}\n`;
@@ -485,6 +512,11 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     }
     
     console.log(`[LOGBOOK-API] Processing logbook for ${jid}`);
+    console.log(`[LOGBOOK-API] Received data:`, {
+      phone, nama_canvasser, tanggal, jam, komitmen, plan_min_topup, status,
+      company_name, email, regional, myads_account, mobile_phone,
+      metode, pembahasan: pembahasan?.substring(0, 50)
+    });
     
     const sentTo = [];
     let hasError = false;
