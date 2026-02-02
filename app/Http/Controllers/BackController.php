@@ -1110,8 +1110,11 @@ class BackController extends Controller
      */
     public function getCanvasserVoucher(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
-        
+        // Get month from request (format Y-m-d) or use current month
+        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        // Extract only Y-m from the date parameter
+        $month = Carbon::parse($monthParam)->format('Y-m');
+
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
         
@@ -1144,11 +1147,11 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
+            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
             ->get();
-
+        // dd($voucherData);
         // Build result per akun (per email_client)
         $result = [];
         foreach ($voucherData as $data) {
@@ -1188,7 +1191,10 @@ class BackController extends Controller
      */
     public function getCanvasserVoucherSummary(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        // Get month from request (format Y-m-d) or use current month
+        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        // Extract only Y-m from the date parameter
+        $month = Carbon::parse($monthParam)->format('Y-m');
         
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
@@ -1220,7 +1226,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
+            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
             ->get();

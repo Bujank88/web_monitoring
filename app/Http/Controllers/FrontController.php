@@ -201,7 +201,19 @@ class FrontController extends Controller
     public function monitoringCanvasserVoucher()
     {
         logUserLogin();
-        return view('admin.canvaser_voucher');
+        $months = [];
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+        
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+        return view('admin.canvaser_voucher', compact('months'));
     }
     public function monitoringPowerHouseReferral()
     {
