@@ -519,7 +519,19 @@ class LogbookDailyController extends Controller
                     $response = Http::timeout(60)->post($waBot . '/api/send-wa-logbook', $postData);
 
                     if ($response->successful()) {
+                        $responseData = $response->json();
                         \Log::info("HTTP response successful for logbook {$logbookDailyId}");
+                        \Log::info("WA Bot response details: " . json_encode($responseData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                        
+                        // Log detail pengiriman ke personal dan group
+                        if (isset($responseData['sentTo']) && is_array($responseData['sentTo'])) {
+                            foreach ($responseData['sentTo'] as $delivery) {
+                                $type = $delivery['type'] ?? 'unknown';
+                                $status = $delivery['status'] ?? 'unknown';
+                                $target = $delivery['jid'] ?? $delivery['groupId'] ?? 'unknown';
+                                \Log::info("✅ Logbook {$logbookDailyId} sent to {$type}: {$target} - Status: {$status}");
+                            }
+                        }
                         
                         // Update status jadi true
                         DB::table('logbook_daily')
