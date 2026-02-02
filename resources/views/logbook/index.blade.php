@@ -252,7 +252,15 @@
 <script>
 $(document).on('click', '.btn-day', function () {
     let id = $(this).data('id');
+    // Function untuk show loading
+    function showLoading() {
+        $('#loading-overlay').show();
+    }
 
+    // Function untuk hide loading
+    function hideLoading() {
+        $('#loading-overlay').hide();
+    }
     Swal.fire({
         title: 'Yakin?',
         text: 'Logbook daily akan dibuat untuk hari ini',
@@ -262,6 +270,9 @@ $(document).on('click', '.btn-day', function () {
         cancelButtonText: 'Batal'
     }).then((result) => {
         if (result.isConfirmed) {
+            
+            showLoading(); 
+
             $.ajax({
                 url: "{{ route('logbook.day') }}",
                 type: "POST",
@@ -270,17 +281,31 @@ $(document).on('click', '.btn-day', function () {
                     id: id
                 },
                 success: function (res) {
+
+                    hideLoading();
+
                     Swal.fire({
                         icon: 'success',
                         title: 'Berhasil',
                         text: res.message
+                    }).then(() => {
+                        $('.btn-day[data-id="'+id+'"]').prop('disabled', true);
                     });
                 },
-                error: function () {
+                error: function (xhr) {
+
+                    hideLoading(); 
+                    
+                    let message = 'Terjadi kesalahan';
+
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Gagal',
-                        text: 'Terjadi kesalahan'
+                        text: message
                     });
                 }
             });

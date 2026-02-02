@@ -272,7 +272,21 @@ class LogbookController extends Controller
         if ($exists) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Logbook daily hari ini sudah ada'
+                'message' => 'Akun sudah terdaftar di logbook hari ini'
+            ], 422);
+        }
+
+        // ❌ Cegah prospect lebih dari 5x dalam bulan berjalan
+        $countThisMonth = DB::table('logbook_daily')
+            ->where('leads_master_id', $request->id)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->count();
+
+        if ($countThisMonth >= 5) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Akun ini sudah di prospect sebanyak 5x dalam bulan ini silahkan cari akun lain untuk dimasukan ke logbook'
             ], 422);
         }
 
