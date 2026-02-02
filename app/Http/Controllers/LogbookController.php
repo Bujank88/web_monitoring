@@ -228,6 +228,8 @@ class LogbookController extends Controller
         // dd($request->all());
         $exists = DB::table('logbook')
             ->where('leads_master_id', $request->id)
+            ->where('bulan', now()->month)   // atau angka bulan (1–12)
+            ->where('tahun', now()->year)
             ->exists();
 
         if ($exists) {
@@ -237,7 +239,7 @@ class LogbookController extends Controller
         DB::table('logbook')->insert([
             'leads_master_id' => $request->id,
             'komitmen'        => $request->komitmen,
-            'plan_min_topup'  => $request->plan_min_topup,
+            'plan_min_topup'  => $request->plan_min_topup ?? 100000,
             'status'          => $request->status,
             'bulan'           => now()->month,
             'tahun'           => now()->year,
