@@ -538,4 +538,27 @@ class LogbookDailyController extends Controller
             return false;
         }
     }
+
+    /**
+     * Function: Get foto logbook untuk viewing
+     */
+    public function getFoto($filePath)
+    {
+        // Normalize path - replace URL-encoded slashes with actual slashes
+        $filePath = str_replace(['%2F', '%5C'], '/', $filePath);
+        
+        // Construct full path
+        $fullPath = public_path('selfie-logbook/' . $filePath);
+        
+        // Security: check if file exists and is within the selfie-logbook directory
+        $realPath = realpath($fullPath);
+        $baseDir = realpath(public_path('selfie-logbook'));
+        
+        if (!$realPath || strpos($realPath, $baseDir) !== 0 || !File::exists($realPath)) {
+            \Log::warning("Unauthorized foto access attempt: {$filePath}");
+            abort(404, 'Foto tidak ditemukan');
+        }
+        
+        return response()->file($realPath);
+    }
 }

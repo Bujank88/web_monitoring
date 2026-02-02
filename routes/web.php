@@ -195,6 +195,8 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('/logbook-daily/summary', [LogbookDailyController::class, 'summary'])->name('logbook-daily.summary');
     Route::get('/logbook-daily/refresh', [LogbookDailyController::class, 'refreshLogbookDaily']);
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
+    Route::get('/logbook-daily/foto/{filePath}', [LogbookDailyController::class, 'getFoto'])->name('logbook-daily.foto')->where('filePath', '.*');
+    Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
 
     // Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');

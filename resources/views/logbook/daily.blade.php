@@ -634,15 +634,30 @@ let selfieInput = document.getElementById('selfieInput');
 let retakeBtn = document.getElementById('retakeBtn');
 let stream = null;
 
-// Start camera
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-    .then(s => {
-        stream = s;
-        video.srcObject = stream;
-    })
-    .catch(() => {
-        alert('Tidak bisa mengakses kamera');
-    });
+// === HANYA MULAI CAMERA SAAT MODAL DIBUKA ===
+function startCamera() {
+    if (stream) return; // Jika sudah running, jangan start lagi
+    
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(s => {
+            stream = s;
+            video.srcObject = stream;
+            console.log('[CAMERA] Camera started');
+        })
+        .catch((err) => {
+            console.error('[CAMERA] Error:', err.message);
+            alert('Tidak bisa mengakses kamera: ' + err.message);
+        });
+}
+
+// === STOP CAMERA ===
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        console.log('[CAMERA] Camera stopped');
+    }
+}
 
 function takePhoto() {
     canvas.width = video.videoWidth;
@@ -655,9 +670,6 @@ function takePhoto() {
     video.classList.add('d-none');
     canvas.classList.remove('d-none');
     retakeBtn.classList.remove('d-none');
-
-    // Stop camera
-    stream.getTracks().forEach(track => track.stop());
 }
 
 function retakePhoto() {
@@ -665,15 +677,19 @@ function retakePhoto() {
     canvas.classList.add('d-none');
     retakeBtn.classList.add('d-none');
     selfieInput.value = '';
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-        .then(s => {
-            stream = s;
-            video.srcObject = stream;
-        });
+    // Camera sudah berjalan, tinggal tampilkan video lagi
 }
 
+// === SAAT MODAL DIBUKA ===
+$('#modalRealisasi').on('shown.bs.modal', function () {
+    console.log('[MODAL] Modal opened, starting camera...');
+    startCamera();
+});
+
+// === SAAT MODAL DITUTUP ===
 $('#modalRealisasi').on('hidden.bs.modal', function () {
+    console.log('[MODAL] Modal closed, cleaning up...');
+    
     // 1. Reset form
     $('#formEdit')[0].reset();
 
@@ -683,21 +699,8 @@ $('#modalRealisasi').on('hidden.bs.modal', function () {
     video.classList.remove('d-none');
     retakeBtn.classList.add('d-none');
 
-    // 3. Stop camera kalau masih jalan
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-    }
-
-    // 4. Start ulang kamera biar fresh pas modal dibuka lagi
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-        .then(s => {
-            stream = s;
-            video.srcObject = stream;
-        })
-        .catch(() => {
-            alert('Tidak bisa mengakses kamera');
-        });
+    // 3. Stop camera
+    stopCamera();
 });
 </script>
 <script>
@@ -706,7 +709,9 @@ $(document).on('click', '.btn-view-realisasi', function () {
     let method = $(this).data('method');
     let discus = $(this).data('discus');
 
-    $('#viewPhoto').attr('src', '/' + photo);
+    // Construct foto URL dengan proper URL encoding
+    let fotoUrl = '{{ url("logbook-daily/foto") }}/' + encodeURIComponent(photo);
+    $('#viewPhoto').attr('src', fotoUrl);
     $('#viewMethod').val(method);
     $('#viewDiscus').val(discus);
 
