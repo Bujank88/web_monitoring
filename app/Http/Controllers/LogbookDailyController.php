@@ -355,6 +355,17 @@ class LogbookDailyController extends Controller
                 'selfie'      => 'required|string', // base64
             ]);
 
+            // === GET LOGBOOK DATA UNTUK USER_ID ===
+            $logbook = DB::table('logbook_daily')
+                ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
+                ->select('leads_master.user_id')
+                ->where('logbook_daily.id', $request->id)
+                ->first();
+
+            if (!$logbook) {
+                return redirect()->back()->with('error', 'Logbook tidak ditemukan');
+            }
+
             // === HANDLE SELFIE BASE64 ===
             $image = $request->selfie;
 
@@ -366,8 +377,9 @@ class LogbookDailyController extends Controller
             $monthFolder = Carbon::now()->format('Y-m');
             $storagePath = "selfie-logbook/{$monthFolder}";
 
-            // nama file
-            $imageName = 'selfie_' . time() . '.jpg';
+            // nama file: user_id_selfie_MM_HH:mm
+            $now = Carbon::now();
+            $imageName = $logbook->user_id . '_selfie_' . $now->format('d_H:i') . '.jpg';
             
             // simpan file ke storage
             Storage::disk('public')->put(
