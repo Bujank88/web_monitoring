@@ -423,7 +423,7 @@ class LogbookDailyController extends Controller
         $pending = [];
 
         // Check apakah ada realisasi dan belum terkirim notifikasi
-        if (!empty($logbook->realisasi_photo) && ($logbook->is_sent_logbook === false || $logbook->is_sent_logbook === null)) {
+        if (!empty($logbook->realisasi_photo) && !$logbook->is_sent_logbook) {
             $pending[] = 'realisasi';
         }
 
