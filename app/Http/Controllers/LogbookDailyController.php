@@ -495,6 +495,8 @@ class LogbookDailyController extends Controller
 
             foreach ($pending as $action) {
                 if ($action === 'realisasi') {
+                    \Log::info("Raw logbook data from DB: company_name={$logbook->company_name}, email={$logbook->email}, regional={$logbook->regional}, myads_account={$logbook->myads_account}, mobile_phone={$logbook->mobile_phone}");
+                    
                     $postData = [
                         'phone' => $phone,
                         'nama_canvasser' => $logbook->nama_canvasser,
@@ -506,12 +508,13 @@ class LogbookDailyController extends Controller
                         'metode' => $logbook->realisasi_method,
                         'pembahasan' => $logbook->realisasi_discus,
                         // Informasi tambahan dari leads_master
-                        'company_name' => $logbook->company_name,
-                        'email' => $logbook->email,
-                        'regional' => $logbook->regional,
-                        'myads_account' => $logbook->myads_account,
-                        'mobile_phone' => $logbook->mobile_phone,
+                        'company_name' => $logbook->company_name ?? '',
+                        'email' => $logbook->email ?? '',
+                        'regional' => $logbook->regional ?? '',
+                        'myads_account' => $logbook->myads_account ?? '',
+                        'mobile_phone' => $logbook->mobile_phone ?? '',
                     ];
+                    \Log::info("Prepared post data for logbook {$logbookDailyId}: " . json_encode($postData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
                     // Add foto jika ada
                     if ($logbook->realisasi_photo && Storage::disk('public')->exists($logbook->realisasi_photo)) {
