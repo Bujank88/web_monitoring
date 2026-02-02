@@ -439,7 +439,7 @@ class LogbookDailyController extends Controller
                     'logbook_daily.realisasi_photo',
                     'logbook_daily.created_at',
                     'users.name as nama_canvasser',
-                    'users.mobile_phone',
+                    'users.no_hp',
                 ])
                 ->where('logbook_daily.id', $logbookDailyId)
                 ->first();
