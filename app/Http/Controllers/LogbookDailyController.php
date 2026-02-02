@@ -453,6 +453,11 @@ class LogbookDailyController extends Controller
                     'logbook_daily.created_at',
                     'users.name as nama_canvasser',
                     'users.nohp',
+                    'leads_master.company_name',
+                    'leads_master.email',
+                    'leads_master.regional',
+                    'leads_master.myads_account',
+                    'leads_master.mobile_phone',
                 ])
                 ->where('logbook_daily.id', $logbookDailyId)
                 ->first();
@@ -494,11 +499,18 @@ class LogbookDailyController extends Controller
                         'phone' => $phone,
                         'nama_canvasser' => $logbook->nama_canvasser,
                         'tanggal' => Carbon::parse($logbook->created_at)->locale('id')->translatedFormat('d F Y'),
+                        'jam' => Carbon::parse($logbook->created_at)->format('H:i'),
                         'komitmen' => $logbook->komitmen,
                         'plan_min_topup' => $logbook->plan_min_topup,
                         'status' => $logbook->status,
                         'metode' => $logbook->realisasi_method,
                         'pembahasan' => $logbook->realisasi_discus,
+                        // Informasi tambahan dari leads_master
+                        'company_name' => $logbook->company_name,
+                        'email' => $logbook->email,
+                        'regional' => $logbook->regional,
+                        'myads_account' => $logbook->myads_account,
+                        'mobile_phone' => $logbook->mobile_phone,
                     ];
 
                     // Add foto jika ada
@@ -510,9 +522,12 @@ class LogbookDailyController extends Controller
                         \Log::warning("Foto not found for logbook {$logbookDailyId}: {$logbook->realisasi_photo}");
                     }
 
-                    // Add group ID jika ada
+                    // Add group ID jika ada - ALWAYS try to send to group
                     if ($botGroupId) {
                         $postData['group_id'] = $botGroupId;
+                        \Log::info("Group ID added to request for logbook {$logbookDailyId}: {$botGroupId}");
+                    } else {
+                        \Log::warning("WA_BOT_GROUP_ID not configured, logbook will only be sent to personal");
                     }
 
                     \Log::info("Sending logbook notification to: {$phone}");
