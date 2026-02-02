@@ -693,11 +693,7 @@
             }
         });
     }
-            }
-        } catch (error) {
-            alert('Error: ' + error.message);
-        }
-    }
+            
 
     // Close modal on outside click
     document.getElementById('locationModal')?.addEventListener('click', (e) => {
