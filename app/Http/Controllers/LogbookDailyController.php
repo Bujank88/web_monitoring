@@ -547,8 +547,8 @@ class LogbookDailyController extends Controller
         // Normalize path - replace URL-encoded slashes with actual slashes
         $filePath = str_replace(['%2F', '%5C'], '/', $filePath);
         
-        // Construct full path
-        $fullPath = public_path('selfie-logbook/' . $filePath);
+        // Construct full path - $filePath already contains selfie-logbook/ prefix
+        $fullPath = public_path($filePath);
         
         // Security: check if file exists and is within the selfie-logbook directory
         $realPath = realpath($fullPath);
