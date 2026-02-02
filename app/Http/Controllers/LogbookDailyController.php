@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class LogbookDailyController extends Controller
 {
@@ -363,22 +364,19 @@ class LogbookDailyController extends Controller
 
             // folder per bulan
             $monthFolder = Carbon::now()->format('Y-m');
-            $directory   = public_path("selfie-logbook/{$monthFolder}");
-
-            // buat folder kalau belum ada
-            if (!File::exists($directory)) {
-                File::makeDirectory($directory, 0755, true);
-            }
+            $storagePath = "selfie-logbook/{$monthFolder}";
 
             // nama file
             $imageName = 'selfie_' . time() . '.jpg';
-            $fullPath  = $directory . '/' . $imageName;
+            
+            // simpan file ke storage
+            Storage::disk('public')->put(
+                $storagePath . '/' . $imageName,
+                base64_decode($image)
+            );
 
-            // simpan file
-            file_put_contents($fullPath, base64_decode($image));
-
-            // path untuk disimpan ke DB (relatif ke public)
-            $dbPath = "selfie-logbook/{$monthFolder}/{$imageName}";
+            // path untuk disimpan ke DB
+            $dbPath = $storagePath . '/' . $imageName;
 
             // === UPDATE LOGBOOK ===
             DB::table('logbook_daily')
@@ -541,24 +539,31 @@ class LogbookDailyController extends Controller
 
     /**
      * Function: Get foto logbook untuk viewing
+     * Support both old (public_path) dan new (storage) format
      */
     public function getFoto($filePath)
     {
         // Normalize path - replace URL-encoded slashes with actual slashes
         $filePath = str_replace(['%2F', '%5C'], '/', $filePath);
         
-        // Construct full path - $filePath already contains selfie-logbook/ prefix
-        $fullPath = public_path($filePath);
-        
-        // Security: check if file exists and is within the selfie-logbook directory
-        $realPath = realpath($fullPath);
-        $baseDir = realpath(public_path('selfie-logbook'));
-        
-        if (!$realPath || strpos($realPath, $baseDir) !== 0 || !File::exists($realPath)) {
+        // Security: check if valid selfie-logbook path
+        if (!Str::startsWith($filePath, 'selfie-logbook/')) {
             \Log::warning("Unauthorized foto access attempt: {$filePath}");
             abort(404, 'Foto tidak ditemukan');
         }
         
-        return response()->file($realPath);
+        // Try storage disk first (new format)
+        if (Storage::disk('public')->exists($filePath)) {
+            return response()->file(Storage::disk('public')->path($filePath));
+        }
+        
+        // Fallback ke public_path (old format) untuk backward compatibility
+        $publicPath = public_path($filePath);
+        if (File::exists($publicPath)) {
+            return response()->file($publicPath);
+        }
+        
+        \Log::warning("Foto tidak ditemukan di storage maupun public: {$filePath}");
+        abort(404, 'Foto tidak ditemukan');
     }
 }
