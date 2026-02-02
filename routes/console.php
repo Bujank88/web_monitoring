@@ -20,6 +20,8 @@ Artisan::command('inspire', function () {
 
 // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
+    \Log::info('=== RETRY SEND PRESENSI NOTIFICATIONS STARTED ===');
+    
     $failedPresensi = Presensi::query()
         ->where(function ($query) {
             $query->where('is_sent_clock_in', false)->whereNotNull('jam_datang')
@@ -28,6 +30,11 @@ Schedule::call(function () {
         })
         ->limit(50)
         ->get();
+
+    \Log::info("Total failed presensi found: " . count($failedPresensi));
+
+    $success = 0;
+    $failed = 0;
 
     foreach ($failedPresensi as $presensi) {
         try {
@@ -121,12 +128,18 @@ Schedule::call(function () {
                     } elseif ($action === 'izin') {
                         $presensi->update(['is_sent_izin' => true]);
                     }
+                    $success++;
+                } else {
+                    $failed++;
                 }
             }
         } catch (\Exception $e) {
             \Log::error('Retry send presensi notification error: ' . $e->getMessage());
+            $failed++;
         }
     }
+
+    \Log::info("Retry Send Presensi - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendPresensiNotifications');
 
 Schedule::call(function () {
@@ -156,6 +169,8 @@ Schedule::call(function () {
 
 // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {
+    \Log::info('=== RETRY SEND LOGBOOK NOTIFICATIONS STARTED ===');
+    
     $failedLogbook = DB::table('logbook_daily')
         ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
         ->join('users', 'users.id', '=', 'leads_master.user_id')
@@ -167,11 +182,24 @@ Schedule::call(function () {
         ->limit(50)
         ->get();
 
+    \Log::info("Total failed logbook found: " . count($failedLogbook));
+
+    $success = 0;
+    $failed = 0;
+
     foreach ($failedLogbook as $logbookDaily) {
         try {
-            app(LogbookDailyController::class)->sendLogbookNotification($logbookDaily->id);
+            $result = app(LogbookDailyController::class)->sendLogbookNotification($logbookDaily->id);
+            if ($result) {
+                $success++;
+            } else {
+                $failed++;
+            }
         } catch (\Exception $e) {
             \Log::error('Retry send logbook notification error: ' . $e->getMessage());
+            $failed++;
         }
     }
+
+    \Log::info("Retry Send Logbook - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendLogbookNotifications');
