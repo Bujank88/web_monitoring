@@ -705,6 +705,60 @@ class LeadsMasterController extends Controller
             ]
         );
     }
+    public function syncLeadsFromTopUp()
+    {
+        // 1️⃣ Referral code yang valid
+        $validReferralCodes = [
+            'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
+            'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13',
+            'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
+        ];
 
+        // 2️⃣ Ambil data top up + referral_code user
+        $topUps = DB::table('report_balance_top_up as r')
+            ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
+            ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
+            ->whereNotNull('r.email_client')
+            ->whereDate('r.tgl_transaksi', Carbon::today())
+            ->select(
+                'u.id as user_id',
+                'r.company_name',
+                'r.email_client',
+                'r.alamat',
+                DB::raw('UPPER(u.referral_code) as referral_code')
+            )
+            ->get();
+            
+        foreach ($topUps as $topUp) {
+            
+            // 3️⃣ CEK EMAIL — kalau sudah ada, skip
+            $emailExists = LeadsMaster::where('email', $topUp->email_client)->exists();
+            if ($emailExists) {
+                continue;
+            }
+
+            // 4️⃣ Insert ke leads_master
+            LeadsMaster::create([
+                'user_id'        => $topUp->user_id,
+                'source_id'      => null,
+                'sector_id'      => 2, // Default ke sektor "Lain-lain"
+                'company_name'   => $topUp->company_name,
+                'mobile_phone'   => '-',
+                'email'          => $topUp->email_client,
+                'status'         => 1,
+                'nama'           => $topUp->company_name ?? 'Unknown',
+                'address'        => $topUp->alamat,
+                'remarks'        => 'Automate Create by Referral Code: ' . $topUp->referral_code,
+                'myads_account'  => null,
+                'data_type'      => 'Leads'
+            ]);
+        \Log::info('Sync Leads from TopUp - Total new leads added: ' . $topUps->count());
+        }
+        return response()->json([
+            'success' => true,
+            'total'   => $topUps->count(),
+            'message' => 'Sync leads selesai (email duplicate di-skip)',
+        ]);
+    }
 
 }

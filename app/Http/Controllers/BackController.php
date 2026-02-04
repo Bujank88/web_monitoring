@@ -982,9 +982,16 @@ class BackController extends Controller
     public function getPowerHouseVoucher(Request $request)
     {
         // Get month from request (format Y-m-d) or use current month
-        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
-        // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        // $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        // // Extract only Y-m from the date parameter
+        // $month = Carbon::parse($monthParam)->format('Y-m');
+        $startDate = $request->get('start_date')
+        ? Carbon::parse($request->start_date)->startOfDay()
+        : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -1023,7 +1030,7 @@ class BackController extends Controller
                 DB::raw('MAX(rb.tgl_transaksi) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
+            ->whereBetween('rb.paid_date', [$startDate, $endDate])
             ->groupBy('dv.voucher_code')
             ->get()
             ->keyBy('voucher_code');
@@ -1047,7 +1054,7 @@ class BackController extends Controller
             if (!empty($userIds)) {
                 $jumlahLeads = DB::table('leads_master')
                     ->whereIn('user_id', $userIds)
-                    ->whereRaw('DATE_FORMAT(created_at, "%Y-%m") = ?', [$month])
+                    ->whereBetween('created_at', [$startDate, $endDate])
                     ->count();
             }
 
@@ -1056,7 +1063,7 @@ class BackController extends Controller
             if (!empty($userNames)) {
                 $jumlahVisit = DB::table('bookings')
                     ->whereIn('nama', $userNames)
-                    ->whereRaw('DATE_FORMAT(tanggal, "%Y-%m") = ?', [$month])
+                    ->whereBetween('tanggal', [$startDate, $endDate])
                     ->count();
             }
             

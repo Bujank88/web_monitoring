@@ -519,7 +519,7 @@
 @endif
 
 <!-- Filter Section -->
-<div class="row mb-3">
+{{-- <div class="row mb-3">
     <div class="col-12 d-flex justify-content-end align-items-center gap-2">
         <select id="filterMonthPH" name="filterMonthPH" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
             @foreach ($months as $month)
@@ -535,7 +535,49 @@
             <i class="fas fa-file-excel mr-2"></i> Download Excel
         </a>
     </div>
+</div> --}}
+
+@php
+    use Carbon\Carbon;
+
+    $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+    $endDate   = Carbon::now()->format('Y-m-d');
+@endphp
+
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+
+        <!-- Start Date -->
+        <input type="date" id="startDatePH" name="start_date" class="form-control" value="{{ $startDate }}"
+            style="background-color: #313131; color: white; min-width: 160px; max-width: 180px;"
+        >
+
+        <!-- End Date -->
+        <input type="date" id="endDatePH" name="end_date" class="form-control" value="{{ $endDate }}"
+            style="background-color: #313131; color: white; min-width: 160px; max-width: 180px;"
+        >
+
+        <!-- Save Image -->
+        <button type="button" id="btnSavePowerHouseImage" class="btn btn-success" title="Save as Image">
+            <i class="fas fa-image mr-2"></i> Save Image
+        </button>
+
+        <!-- Download Excel -->
+        <a
+            href="{{ route('export.powerhouse_voucher', [
+                'start_date' => $startDate,
+                'end_date'   => $endDate
+            ]) }}"
+            id="btnExportPowerHouse"
+            class="btn btn-success"
+            title="Download Excel"
+        >
+            <i class="fas fa-file-excel mr-2"></i> Download Excel
+        </a>
+
+    </div>
 </div>
+
 
 <!-- Report PowerHouse Referral -->
 <div class="row mb-4">
@@ -618,7 +660,9 @@
                 url: "{{ route('powerhouse_voucher_data') }}",
                 type: 'GET',
                 data: function(d) {
-                    d.month = $('#filterMonthPH').val();
+                    // d.month = $('#filterMonthPH').val();
+                    d.start_date = $('#startDatePH').val();
+                    d.end_date = $('#endDatePH').val();
                 }
             },
             columns: [
@@ -662,14 +706,40 @@
         });
 
         // Handle month filter change
-        $('#filterMonthPH').on('change', function() {
-            // Update label bulan yang ditampilkan dengan text dari selected option
-            var selectedText = $('#filterMonthPH option:selected').text();
-            $('#displayedMonthPH').text(selectedText);
-            // Reload data table
+        // $('#filterMonthPH').on('change', function() {
+        //     // Update label bulan yang ditampilkan dengan text dari selected option
+        //     var selectedText = $('#filterMonthPH option:selected').text();
+        //     $('#displayedMonthPH').text(selectedText);
+        //     // Reload data table
+        //     table.ajax.reload();
+        // });
+        $('#startDatePH').on('change', function () {
+            let startDate = $(this).val();
+
+            if (startDate) {
+                $('#endDatePH').attr('min', startDate);
+
+                if ($('#endDatePH').val() && $('#endDatePH').val() < startDate) {
+                    $('#endDatePH').val('');
+                }
+            }
+
             table.ajax.reload();
         });
 
+        $('#endDatePH').on('change', function () {
+            let endDate = $(this).val();
+
+            if (endDate) {
+                $('#startDatePH').attr('max', endDate);
+
+                if ($('#startDatePH').val() && $('#startDatePH').val() > endDate) {
+                    $('#startDatePH').val('');
+                }
+            }
+
+            table.ajax.reload();
+        });
         // Function to calculate totals
         function calculateTotals() {
             let totalAkun = 0;

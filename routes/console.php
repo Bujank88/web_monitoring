@@ -160,6 +160,10 @@ Schedule::call(function () {
 })->everyTenMinutes()->name('syncLeadsWithRegistration');
 
 Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsFromTopUp();
+})->everyTenMinutes()->name('syncLeadsFromTopUp');
+
+Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegional();
 })->everyTenMinutes()->name('syncLeadsWithRegional');
 
