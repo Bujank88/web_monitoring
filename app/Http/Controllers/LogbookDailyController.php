@@ -500,8 +500,8 @@ class LogbookDailyController extends Controller
                     $postData = [
                         'phone' => $phone,
                         'nama_canvasser' => $logbook->nama_canvasser,
-                        'tanggal' => Carbon::parse($logbook->created_at)->locale('id')->translatedFormat('d F Y'),
-                        'jam' => Carbon::parse($logbook->created_at)->format('H:i'),
+                        'tanggal' => Carbon::parse($logbook->updated_at)->locale('id')->translatedFormat('d F Y'),
+                        'jam' => Carbon::parse($logbook->updated_at)->format('H:i'),
                         'komitmen' => $logbook->komitmen,
                         'plan_min_topup' => $logbook->plan_min_topup,
                         'status' => $logbook->status,
