@@ -7,7 +7,7 @@
 <!-- Filter Section -->
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-end align-items-center">
-        <form id="filterForm" method="GET" action="{{ route('mitra-sbp') }}" class="d-flex align-items-center gap-2">
+        <form id="filterForm" method="GET" action="{{ route('mitra-sbp') }}" class="d-flex align-items-center gap-2" style="background-color: #313131; color: white;">
             <select id="month" name="month" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
                 @foreach ($months as $m)
                 <option value="{{ $m['value'] }}" {{ $m['selected'] ? 'selected' : '' }}>
