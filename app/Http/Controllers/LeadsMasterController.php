@@ -242,7 +242,7 @@ class LeadsMasterController extends Controller
             'source_id' => 'required|exists:leads_source,id',
             'sector_id' => 'required|exists:sectors,id',
             // 'kode_voucher' => 'nullable|string|max:255',
-            'company_name' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
             'mobile_phone' => [
                 'required',
                 'string',
@@ -255,6 +255,13 @@ class LeadsMasterController extends Controller
                 'email',
                 'max:255',
                 'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
             ],
             // 'status' => 'required|in:Ok,No',
             'nama' => 'nullable|string|max:255',
@@ -284,7 +291,7 @@ class LeadsMasterController extends Controller
             'source_id' => $validated['source_id'],
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
-            'company_name' => $validated['company_name'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
             'mobile_phone' => $validated['mobile_phone'],
             'email' => $validated['email'] ?? null,
             'status' => $statusValue,  // simpan 1 untuk Ok, 0 untuk No
@@ -345,7 +352,7 @@ class LeadsMasterController extends Controller
             'user_id' => 'required|exists:users,id',
             // 'source_id' => 'required|exists:leads_source,id',
             'sector_id' => 'nullable|exists:sectors,id',
-            'company_name' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
             'mobile_phone' => [
                 'required',
                 'string',
@@ -358,6 +365,13 @@ class LeadsMasterController extends Controller
                 'email',
                 'max:255',
                 'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
             ],
             // 'status' => 'required|in:Ok,No',
             'nama' => 'nullable|string|max:255',
@@ -381,7 +395,7 @@ class LeadsMasterController extends Controller
             'source_id' => null,
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
-            'company_name' => $validated['company_name'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
             'mobile_phone' => $validated['mobile_phone'],
             'email' => $validated['email'] ?? null,
             'status' => $statusValue,  // simpan 1 untuk Ok, 0 untuk No

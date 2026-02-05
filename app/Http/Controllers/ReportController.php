@@ -411,8 +411,9 @@ public function topupCanvasserData(Request $request)
             )
             ->where('rt.data_type', 'Mitra SBP')
             ->where('ms.remark', 'Mitra SBP')
+            ->whereDate('rt.date', $monthStart) 
             // Exclude emails yang ada di leads_master sebagai CVSR
-            ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
+            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
                 'rt.region_name',
@@ -438,8 +439,9 @@ public function topupCanvasserData(Request $request)
             )
             ->where('rt.data_type', 'Agency')
             ->where('ms.remark', 'Agency')
+            ->whereDate('rt.date', $monthStart) 
             // Exclude emails yang ada di leads_master sebagai CVSR
-            ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
+            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
                 'rt.region_name',
@@ -466,8 +468,9 @@ public function topupCanvasserData(Request $request)
             )
             ->where('rt.data_type', 'Internal')
             ->where('ms.remark', 'Internal')
+            ->whereDate('rt.date', $monthStart) 
             // Exclude emails yang ada di leads_master sebagai CVSR
-            ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
+            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
                 'rt.region_name',
