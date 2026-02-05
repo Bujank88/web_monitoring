@@ -450,7 +450,7 @@ class LogbookDailyController extends Controller
                     'logbook_daily.realisasi_discus',
                     'logbook_daily.realisasi_photo',
                     'logbook_daily.is_sent_logbook',
-                    'logbook_daily.created_at',
+                    'logbook_daily.updated_at',
                     'users.name as nama_canvasser',
                     'users.nohp',
                     'leads_master.company_name',
