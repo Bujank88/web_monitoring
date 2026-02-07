@@ -61,31 +61,39 @@
                 </li>
                 @endif
                 @if($isAdmin || $isTsel || $isPH)
-                <li class="nav-item {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'menu-open' : '' }} ml-2">
-                    <a href="#" class="nav-link waves-effect {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'active' : '' }}">
+                <li class="nav-item has-treeview 
+                    {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'menu-open' : '' }}">
+                    
+                    <a href="#" class="nav-link 
+                        {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-house-chimney-user"></i>
                         <p>
                             Powerhouse
                             <i class="right fas fa-angle-left"></i>
                         </p>
                     </a>
-                    <li class="nav-item {{ request()->routeIs('region-target') ? 'menu-open' : '' }} ml-2">
-                        <a href="{{ route('region-target') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('region-target') ? 'active' : '' }}">
-                            <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
-                            <p>Report Powerhouse</p>
-                        </a>
-                    </li>   
-                    <!-- PowerHouse Referral -->
-                    <li class="nav-item {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'menu-open' : '' }} ml-2">
-                        <a href="{{ route('admin.monitoring.powerhouse_referral') }}"
-                        class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}"
-                        style="padding-left: 20px;">
-                            <i class="fas fa-star nav-icon" style="color:#ffc107;"></i>
-                            <p>PowerHouse Referral</p>
-                        </a>
-                    </li>
+
+                    <ul class="nav nav-treeview">
+                        <!-- Report Powerhouse -->
+                        <li class="nav-item">
+                            <a href="{{ route('region-target') }}"
+                            class="nav-link {{ request()->routeIs('region-target') ? 'active' : '' }} ml-2">
+                                <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
+                                <p>Report Powerhouse</p>
+                            </a>
+                        </li>
+
+                        <!-- Powerhouse Referral -->
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_referral') }}"
+                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }} ml-2">
+                                <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
+                                <p>PowerHouse Referral</p>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
+
                 @endif
                 {{--<li class="nav-item {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'active' : '' }}">
