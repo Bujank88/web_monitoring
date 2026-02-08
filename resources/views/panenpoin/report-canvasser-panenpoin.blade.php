@@ -520,19 +520,32 @@
 
 
 
-<!-- Report PanenPoin Referral -->
+<!-- Filter Section -->
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+        <select id="filterMonthCanvasser" name="filterMonthCanvasser" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
+            @foreach ($months as $month)
+            <option value="{{ $month['value'] }}" {{ $month['selected'] ? 'selected' : '' }}>
+                {{ $month['label'] }}
+            </option>
+            @endforeach
+        </select>
+    </div>
+</div>
+
+<!-- Report PanenPoin Canvasser -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="panenPoinTableCard">
             <div class="card-header bg-gradient-danger text-white">
-                <h4 class="mb-0"><i class="fas fa-table"></i> Report PanenPoin Canvasser & Powerhouse</h4>
+                <h4 class="mb-0"><i class="fas fa-table"></i> Report PanenPoin Summary</h4>
             </div>
             <div class="card-body">
                 <div id="capturePanenPoinTable" class="table-responsive">
             <table class="table table-sm w-100 table-bordered table-hover" id="panenPoinTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PanenPoin Canvasser | Bulan: <span id="displayedMonthCanvasser">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -548,7 +561,7 @@
                             <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
                                 <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
                                 <td id="totalJumlahTerdaftar" style="text-align: center; padding: 12px;">0</td>
-                                <td id="totalJumlahAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalJumlahAkunPunyaPoin" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahPoin" style="text-align: center; padding: 12px;">0</td>
                             </tr>
                         </tfoot>
@@ -591,26 +604,23 @@
             searching: false,
             info: false,
             ajax: {
-                url: "{{ route('canvasser_panenpoin') }}",
+                url: "{{ route('panenpoin.report-canvasser-data') }}",
                 type: 'GET',
                 data: function(d) {
+                    d.tanggal = $('#filterMonthCanvasser').val();
                 }
             },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
-                { data: 'referral_code', name: 'referral_code', className: 'text-center' },
-                { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
-                { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
-                { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
-                { data: 'jumlah_akun', name: 'jumlah_akun', className: 'text-center' },
-                { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                { data: 'poin', name: 'poin', className: 'text-center' },
-                { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
+                { data: 'nama_canvasser', name: 'nama_canvasser', className: 'text-center' },
+                { data: 'jumlah_terdaftar', name: 'jumlah_terdaftar', className: 'text-center' },
+                { data: 'jumlah_akun_punya_poin', name: 'jumlah_akun_punya_poin', className: 'text-center' },
+                { data: 'jumlah_poin', name: 'jumlah_poin', className: 'text-center' }
             ],
             order: [[1, 'asc']],
             rowCallback: function(row, data, index) {
                 // Highlight poin cells dengan warna biru gradient untuk nilai > 0
-                var poinCell = $('td', row).eq(7);
+                var poinCell = $('td', row).eq(4);
                 var poinValue = parseInt(poinCell.text().trim());
                 
                 if (poinValue > 0) {
@@ -637,107 +647,38 @@
         });
 
         // Handle month filter change
-        // $('#filterMonthPH').on('change', function() {
-        //     // Update label bulan yang ditampilkan dengan text dari selected option
-        //     var selectedText = $('#filterMonthPH option:selected').text();
-        //     $('#displayedMonthPH').text(selectedText);
-        //     // Reload data table
-        //     table.ajax.reload();
-        // });
-        // $('#startDatePH').on('change', function () {
-        //     let startDate = $(this).val();
+        $('#filterMonthCanvasser').on('change', function() {
+            var selectedText = $('#filterMonthCanvasser option:selected').text();
+            $('#displayedMonthCanvasser').text(selectedText);
+            table.ajax.reload();
+        });
 
-        //     if (startDate) {
-        //         $('#endDatePH').attr('min', startDate);
-
-        //         if ($('#endDatePH').val() && $('#endDatePH').val() < startDate) {
-        //             $('#endDatePH').val('');
-        //         }
-        //     }
-
-        //     table.ajax.reload();
-        // });
-
-        // $('#endDatePH').on('change', function () {
-        //     let endDate = $(this).val();
-
-        //     if (endDate) {
-        //         $('#startDatePH').attr('max', endDate);
-
-        //         if ($('#startDatePH').val() && $('#startDatePH').val() > endDate) {
-        //             $('#startDatePH').val('');
-        //         }
-        //     }
-
-        //     table.ajax.reload();
-        // });
         // Function to calculate totals
         function calculateTotals() {
-            let totalAkun = 0;
-            let totalLeads = 0;
-            let totalVisit = 0;
-            let totalTopup = 0;
+            let totalTerdaftar = 0;
+            let totalAkunPunyaPoin = 0;
             let totalPoin = 0;
 
             // Iterate through all rows in tbody
             $('#panenPoinTable tbody tr').each(function() {
                 const cells = $(this).find('td');
                 
-                // Column 4: Jumlah Akun
-                totalAkun += parseInt(cells.eq(5).text().trim()) || 0;
-                
-                // Column 5: Jumlah Leads
-                totalLeads += parseInt(cells.eq(4).text().trim()) || 0;
-                
-                // Column 6: Jumlah Visit
-                totalVisit += parseInt(cells.eq(3).text().trim()) || 0;
-                
-                // Column 7: Top Up (extract number from Rp text)
-                const topupText = cells.eq(6).text().trim();
-                const topupMatch = topupText.match(/[\d.,]+/);
-                if (topupMatch) {
-                    let topupValue = topupMatch[0].replace(/\./g, '').replace(/,/g, '.');
-                    totalTopup += parseFloat(topupValue) || 0;
-                }
-                
-                // Column 8: Poin
-                totalPoin += parseInt(cells.eq(7).text().trim()) || 0;
+                // Column 3: Jumlah Terdaftar
+                totalTerdaftar += parseInt(cells.eq(2).text().trim()) || 0;
+
+                // Column 4: Jumlah Akun Punya Poin
+                totalAkunPunyaPoin += parseInt(cells.eq(3).text().trim()) || 0;
+
+                // Column 5: Jumlah Poin
+                totalPoin += parseInt(cells.eq(4).text().trim()) || 0;
             });
 
             // Update total row
-            $('#totalJumlahAkun').text(totalAkun);
-            $('#totalJumlahLeads').text(totalLeads);
-            $('#totalJumlahVisit').text(totalVisit);
-            
-            // Format total topup as currency
-            if (totalTopup > 0) {
-                const topupFormatted = 'Rp ' + Math.floor(totalTopup).toLocaleString('id-ID');
-                $('#totalTopUp').text(topupFormatted);
-            } else {
-                $('#totalTopUp').text('Rp 0');
-            }
-            
-            $('#totalPoin').text(totalPoin);
+            $('#totalJumlahTerdaftar').text(totalTerdaftar);
+            $('#totalJumlahAkunPunyaPoin').text(totalAkunPunyaPoin);
+            $('#totalJumlahPoin').text(totalPoin);
         }
 
-        // Handle Save Image Button
-        // document.getElementById('btnSavePowerHouseImage').addEventListener('click', function () {
-        //     html2canvas(document.getElementById('capturePanenPoinTable'), { 
-        //         scale: 2,
-        //         allowTaint: true,
-        //         useCORS: true
-        //     })
-        //         .then(canvas => {
-        //             const link = document.createElement('a');
-        //             link.download = 'powerhouse-report-' + new Date().getTime() + '.png';
-        //             link.href = canvas.toDataURL();
-        //             link.click();
-        //         })
-        //         .catch(err => {
-        //             console.error('Error capturing image:', err);
-        //             alert('Gagal menyimpan gambar. Silakan coba lagi.');
-        //         });
-        // });
     });
 </script>
 @endsection

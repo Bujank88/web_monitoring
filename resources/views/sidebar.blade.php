@@ -271,6 +271,15 @@
                                 </li>
 
                                 <li class="nav-item">
+                                    <a href="{{ route('panenpoin.report-canvasser') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoin.report-canvasser') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-users nav-icon" style="color:#17a2b8;"></i>
+                                        <p>Report Summary</p>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
                                     <a href="{{ route('panenpoin.list-akun') }}"
                                     class="nav-link {{ request()->routeIs('panenpoin.list-akun') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
