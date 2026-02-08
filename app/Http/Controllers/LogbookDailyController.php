@@ -283,9 +283,10 @@ class LogbookDailyController extends Controller
                 })
                 ->select(
                     'leads_master.id as leads_master_id',
+                    DB::raw('DATE(report_balance_top_up.tgl_transaksi) as tgl_transaksi'),
                     DB::raw('COALESCE(SUM(report_balance_top_up.total_settlement_klien), 0) AS realisasi_topup')
                 )
-                ->groupBy('leads_master.id')
+                ->groupBy('leads_master.id', DB::raw('DATE(report_balance_top_up.tgl_transaksi)'))
                 ->having('realisasi_topup', '>', 0)
                 ->get();
 
@@ -293,7 +294,7 @@ class LogbookDailyController extends Controller
             foreach ($topupsPast as $data) {
                 DB::table('logbook_daily')
                     ->where('leads_master_id', $data->leads_master_id)
-                    ->whereDate('created_at', '<', $today)
+                    ->whereDate('created_at', $data->tgl_transaksi)
                     ->update([
                         'status'          => 'Topup',
                         'realisasi_topup' => $data->realisasi_topup,

@@ -151,9 +151,9 @@ Schedule::call(function () {
     app(LogbookController::class)->refreshLogbookStatus();
 })->everyMinute()->name('refreshLogbookStatus');
 
-// Schedule::call(function () {
-    // app(LogbookDailyController::class)->refreshLogbookDaily();
-// })->everyMinute()->name('refreshLogbookDaily');
+Schedule::call(function () {
+    app(LogbookDailyController::class)->refreshLogbookDaily();
+})->everyMinute()->name('refreshLogbookDaily');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegistration();
