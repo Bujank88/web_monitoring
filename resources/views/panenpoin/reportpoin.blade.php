@@ -398,6 +398,7 @@
                                 <th>Nomor HP Client</th>
                                 <th>Source</th>
                                 <th>Total Settlement</th>
+                                <th>Poin Paket</th>
                                 <th>Total Poin</th>
                                 <th>Poin Redeem</th>
                                 <th>Poin Sisa</th>
@@ -499,6 +500,12 @@
                     data: 'total_settlement',
                     render: function(data) {
                         return 'Rp ' + data;
+                    }
+                },
+                {
+                    data: 'poin_package',
+                    render: function(data) {
+                        return '<span class="badge badge-primary">' + data + ' Poin</span>';
                     }
                 },
                 {
