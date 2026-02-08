@@ -215,6 +215,8 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::post('panen-poin/store', [PanenPoinController::class, 'store'])->name('panenpoin.store');
     Route::get('panen-poin/report', [PanenPoinController::class, 'report'])->name('panenpoin.report');
     Route::get('panen-poin/report-data', [PanenPoinController::class, 'getReportData'])->name('panenpoin.report-data');
+    Route::get('panen-poin/report-canvasser', [PanenPoinController::class, 'reportCanvasser'])->name('panenpoin.report-canvasser');
+    Route::get('panen-poin/report-canvasser-data', [PanenPoinController::class, 'getReportCanvasserData'])->name('panenpoin.report-canvasser-data');
     Route::get('panen-poin/export', [PanenPoinController::class, 'export'])->name('panenpoin.export');
     Route::get('panen-poin/refresh-summary', [PanenPoinController::class, 'refreshSummaryPanenPoin'])->name('panenpoin.refresh');
     Route::get('panen-poin/list-akun', [PanenPoinController::class, 'listAkun'])->name('panenpoin.list-akun');
