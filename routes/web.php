@@ -206,6 +206,9 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
+    Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
+    Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
+    Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
     Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
     Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
     Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
@@ -217,6 +220,8 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('panen-poin/report-data', [PanenPoinController::class, 'getReportData'])->name('panenpoin.report-data');
     Route::get('panen-poin/report-canvasser', [PanenPoinController::class, 'reportCanvasser'])->name('panenpoin.report-canvasser');
     Route::get('panen-poin/report-canvasser-data', [PanenPoinController::class, 'getReportCanvasserData'])->name('panenpoin.report-canvasser-data');
+    Route::get('panen-poin/report-ph', [PanenPoinController::class, 'reportPowerhouse'])->name('panenpoin.report-ph');
+    Route::get('panen-poin/report-ph-data', [PanenPoinController::class, 'getReportPowerhouseData'])->name('panenpoin.report-ph-data');
     Route::get('panen-poin/export', [PanenPoinController::class, 'export'])->name('panenpoin.export');
     Route::get('panen-poin/refresh-summary', [PanenPoinController::class, 'refreshSummaryPanenPoin'])->name('panenpoin.refresh');
     Route::get('panen-poin/list-akun', [PanenPoinController::class, 'listAkun'])->name('panenpoin.list-akun');

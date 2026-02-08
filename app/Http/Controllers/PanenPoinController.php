@@ -240,55 +240,91 @@ class PanenPoinController extends Controller
         \Log::info('Filter Tanggal: ' . $request->tanggal);
 
         try {
-            $query = DB::table('summary_panen_poin')
-                ->select(
-                    'summary_panen_poin.user_id',
-                    'summary_panen_poin.nama_canvasser',
-                    DB::raw('COUNT(*) as jumlah_terdaftar'),
-                    DB::raw('
-                        SUM(
-                            CASE 
-                                WHEN COALESCE(summary_panen_poin.poin, 0) > 0
-                                OR COALESCE(summary_panen_poin.poin_package, 0) > 0
-                                THEN 1 
-                                ELSE 0 
-                            END
-                        ) AS jumlah_akun_punya_poin
-                    '),
-                    DB::raw('SUM(summary_panen_poin.poin) as jumlah_poin')
-                )
-                ->join('akun_panen_poin', 'summary_panen_poin.email_client', '=', 'akun_panen_poin.email_client')
-                ->leftJoin('mitra_sbp', 'summary_panen_poin.email_client', '=', 'mitra_sbp.email_myads')
-                ->whereNull('mitra_sbp.id');
+            $query = $this->buildReportByRole('cvsr', $request->tanggal);
 
-            // Filter berdasarkan role: kalau cvsr, hanya tampilkan data dia sendiri
-            if (Auth::user()->role === 'cvsr') {
-                $query->where('summary_panen_poin.user_id', Auth::id());
-                \Log::info("Filtering by User ID: " . Auth::id() . " (Canvasser)");
-            }
-
-            // Filter berdasarkan bulan jika ada parameter tanggal
-            if ($request->tanggal) {
-                $date = Carbon::parse($request->tanggal);
-                $month = $date->month;
-                $year = $date->year;
-                $query->whereMonth('summary_panen_poin.created_at', $month)
-                      ->whereYear('summary_panen_poin.created_at', $year);
-                \Log::info("Filtering by Month: {$month}, Year: {$year}");
-            }
-
-            $query->groupBy('summary_panen_poin.user_id', 'summary_panen_poin.nama_canvasser')
-                ->orderByRaw('SUM(summary_panen_poin.poin) DESC');
-
-            return datatables()->of($query)
-                ->addIndexColumn()
-                ->make(true);
+            return datatables()->of($query)->addIndexColumn()->make(true);
 
         } catch (\Exception $e) {
             \Log::error("Error in getReportCanvasserData: " . $e->getMessage());
             \Log::error($e->getTraceAsString());
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    // Tampilkan halaman report powerhouse
+    public function reportPowerhouse()
+    {
+        logUserLogin();
+        $months = [];
+
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        return view('panenpoin.report-ph-panenpoin', compact('months'));
+    }
+
+    // Get data ringkasan per powerhouse
+    public function getReportPowerhouseData(Request $request)
+    {
+        \Log::info('=== GET REPORT POWERHOUSE DATA CALLED ===');
+        \Log::info('User: ' . Auth::user()->name);
+        \Log::info('Request URI: ' . $request->getRequestUri());
+        \Log::info('Filter Tanggal: ' . $request->tanggal);
+
+        try {
+            $query = $this->buildReportByRole('PH', $request->tanggal);
+
+            return datatables()->of($query)->addIndexColumn()->make(true);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in getReportPowerhouseData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Build report query by role (include zero)
+    private function buildReportByRole(string $role, $tanggal = null)
+    {
+        $query = DB::table('users')
+            ->select(
+                'users.id as user_id',
+                'users.name as nama_canvasser',
+                DB::raw('COALESCE(COUNT(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.id END), 0) as jumlah_terdaftar'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL AND (COALESCE(summary_panen_poin.poin, 0) > 0 OR COALESCE(summary_panen_poin.poin_package, 0) > 0) THEN 1 ELSE 0 END), 0) as jumlah_akun_punya_poin'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.poin ELSE 0 END), 0) as jumlah_poin')
+            )
+            ->where('users.role', $role)
+            ->leftJoin('summary_panen_poin', function ($join) use ($tanggal) {
+                $join->on('summary_panen_poin.user_id', '=', 'users.id');
+
+                if ($tanggal) {
+                    $date = Carbon::parse($tanggal);
+                    $join->whereMonth('summary_panen_poin.created_at', $date->month)
+                         ->whereYear('summary_panen_poin.created_at', $date->year);
+                }
+            })
+            ->leftJoin('akun_panen_poin', 'summary_panen_poin.email_client', '=', 'akun_panen_poin.email_client')
+            ->leftJoin('mitra_sbp', 'summary_panen_poin.email_client', '=', 'mitra_sbp.email_myads')
+            ->groupBy('users.id', 'users.name')
+            ->orderByRaw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.poin ELSE 0 END), 0) DESC');
+
+        // Filter berdasarkan role: kalau cvsr/PH, hanya tampilkan data dia sendiri
+        if (Auth::user()->role === $role) {
+            $query->where('users.id', Auth::id());
+            \Log::info("Filtering by User ID: " . Auth::id() . " (Role {$role})");
+        }
+
+        return $query;
     }
     
     // Hitung data panen poin (ambil dari summary table)

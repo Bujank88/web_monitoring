@@ -192,7 +192,7 @@
                 
 
                 @if($isAdmin || $isPH)
-                    <li class="nav-item {{ request()->routeIs('mitra-sbp') ? 'menu-open' : '' }}">
+                    <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
                                 <p>
@@ -200,17 +200,24 @@
                                     <i class="right fas fa-angle-left"></i>
                                 </p>
                             </a>
-                            <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ route('mitra-sbp') }}"
-                                    class="nav-link waves-effect {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
-                                    <i class="nav-icon fa-solid fa-chart-column" style="color:rgb(173, 252, 157);"></i>
-                                    <p>Performance Report</p>
-                                </a>
-                            </li> 
-                            </ul>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('mitra-sbp') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-chart-column" style="color:rgb(173, 252, 157);"></i>
+                            <p>Performance Report</p>
+                        </a>
+                    </li> 
+                    <li class="nav-item">
+                        <a href="{{ route('report-campaign-sbp') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
+                            <p>Report Campaign</p>
+                        </a>
                     </li>
-                @endif
+                    </ul>
+            </li>
+        @endif
                 {{-- <li class="nav-item">
                     <a href="{{ route('logbook.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logbook.index') ? 'active' : '' }}">
@@ -275,7 +282,16 @@
                                     class="nav-link {{ request()->routeIs('panenpoin.report-canvasser') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-users nav-icon" style="color:#17a2b8;"></i>
-                                        <p>Report Summary</p>
+                                        <p>Report Canvasser</p>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a href="{{ route('panenpoin.report-ph') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoin.report-ph') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-user-shield nav-icon" style="color:#6f42c1;"></i>
+                                        <p>Report Powerhouse</p>
                                     </a>
                                 </li>
 
