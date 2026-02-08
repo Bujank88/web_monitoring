@@ -225,8 +225,9 @@ class PanenPoinController extends Controller
                     'summary_panen_poin.poin_bulan_ini',
                     'summary_panen_poin.poin_akumulasi',
                     'summary_panen_poin.poin',
+                    'summary_panen_poin.poin_package',
                     DB::raw('COALESCE(summary_panen_poin.poin_redeem, 0) as poin_redeem'),
-                    DB::raw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) as poin_sisa'),
+                    DB::raw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0) + COALESCE(summary_panen_poin.poin_package, 0)) as poin_sisa'),
                     'summary_panen_poin.remark',
                     'summary_panen_poin.bulan'
                 )
@@ -279,6 +280,7 @@ class PanenPoinController extends Controller
                         'total_settlement_raw' => $item->total_settlement_raw,
                         'poin_bulan_ini' => $item->poin_bulan_ini,
                         'poin_akumulasi' => $item->poin_akumulasi,
+                        'poin_package' => $item->poin_package,
                         'poin' => $item->poin,
                         'poin_redeem' => $item->poin_redeem,
                         'poin_sisa' => $item->poin_sisa,
@@ -461,6 +463,20 @@ class PanenPoinController extends Controller
                     $previousMonthPoints[strtolower(trim($prev->email_client))] = $prev->poin_sisa;
                 }
                 
+                $packagePoint = DB::table('data_campaign_seasonal as a')
+                    ->join('panen_poin_package as b', function ($join) {
+                        $join->on(
+                            DB::raw('LOWER(a.name)'),
+                            '=',
+                            DB::raw('LOWER(b.code)')
+                        );
+                    })
+                    ->selectRaw('LOWER(TRIM(email)) as email, SUM(COALESCE(b.point, 0)) as point')
+                    ->groupBy('a.email')
+                    ->pluck('point', 'email')
+                    ->toArray();
+                    
+                
                 // Hitung total poin yang sudah di-redeem dari table prize_redeem (bulan ini)
                 $totalPoinRedeem = DB::table('prize_redeems')
                     ->where('user_id', $canvasser->id)
@@ -476,6 +492,8 @@ class PanenPoinController extends Controller
                     // Ambil poin sisa dari bulan sebelumnya
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     
+                    $totalpackagePoint = $packagePoint[$email] ?? 0;
+
                     if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
                         continue;
                     }
@@ -507,6 +525,7 @@ class PanenPoinController extends Controller
                         'poin_akumulasi' => $poinAkumulasi,
                         'poin' => $totalPoin,
                         'poin_redeem' => $totalPoinRedeem,
+                        'poin_package' => $totalpackagePoint,
                         'remark' => $remark,
                         'bulan' => Carbon::now()->locale('id')->translatedFormat('F Y'),
                         'updated_at' => now()

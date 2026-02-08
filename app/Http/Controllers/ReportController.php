@@ -397,87 +397,90 @@ public function topupCanvasserData(Request $request)
             ->pluck('email')
             ->toArray();
 
-        $data_mitra_sbp = DB::table('region_target as rt')
-            ->leftJoin('mitra_sbp as ms', 'ms.regional', '=', 'rt.region_name')
+        $data_mitra_sbp = DB::table('mitra_sbp as ms')
+            ->leftJoin('region_target as rt', function ($join) use ($monthStart) {
+                $join->on('rt.region_name', '=', 'ms.regional')
+                    ->where('rt.data_type', 'Mitra SBP')
+                    ->whereDate('rt.date', $monthStart);
+            })
             ->leftJoin('report_balance_top_up as rbt', function ($join) use ($monthStart, $monthEnd)  {
                 $join->on('rbt.email_client', '=', 'ms.email_myads')
                         ->whereBetween('rbt.tgl_transaksi', [$monthStart, $monthEnd]);
             })
             ->select(
                 'ms.area',
-                'rt.region_name',
-                'rt.target_amount',
+                'ms.regional as region_name',
+                DB::raw('COALESCE(rt.target_amount, 0) as target_amount'),
                 DB::raw('COALESCE(SUM(rbt.total_settlement_klien), 0) as mitra_sbp')
             )
-            ->where('rt.data_type', 'Mitra SBP')
             ->where('ms.remark', 'Mitra SBP')
-            ->whereDate('rt.date', $monthStart) 
-            // Exclude emails yang ada di leads_master sebagai CVSR
-            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
-                'rt.region_name',
+                'ms.regional',
                 'rt.target_amount'
             )
+            ->havingRaw('(ms.regional != "" OR COALESCE(rt.target_amount,0) > 0 OR COALESCE(SUM(rbt.total_settlement_klien),0) > 0)')
             ->orderBy('ms.area')
-            ->orderBy('rt.region_name')
+            ->orderBy('ms.regional')
             ->get();
 
         $grouped_mitra_sbp = $data_mitra_sbp->groupBy('area');
 
-        $data_agency = DB::table('region_target as rt')
-            ->leftJoin('mitra_sbp as ms', 'ms.regional', '=', 'rt.region_name')
+        $data_agency = DB::table('mitra_sbp as ms')
+            ->leftJoin('region_target as rt', function ($join) use ($monthStart) {
+                $join->on('rt.region_name', '=', 'ms.regional')
+                    ->where('rt.data_type', 'Agency')
+                    ->whereDate('rt.date', $monthStart);
+            })
             ->leftJoin('report_balance_top_up as rbt', function ($join) use ($monthStart, $monthEnd)  {
                 $join->on('rbt.email_client', '=', 'ms.email_myads')
                         ->whereBetween('rbt.tgl_transaksi', [$monthStart, $monthEnd]);
             })
             ->select(
                 'ms.area',
-                'rt.region_name',
-                'rt.target_amount',
+                'ms.regional as region_name',
+                DB::raw('COALESCE(rt.target_amount, 0) as target_amount'),
                 DB::raw('COALESCE(SUM(rbt.total_settlement_klien), 0) as agency')
             )
-            ->where('rt.data_type', 'Agency')
             ->where('ms.remark', 'Agency')
-            ->whereDate('rt.date', $monthStart) 
-            // Exclude emails yang ada di leads_master sebagai CVSR
-            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
-                'rt.region_name',
+                'ms.regional',
                 'rt.target_amount'
             )
+            ->havingRaw('(ms.regional != "" OR COALESCE(rt.target_amount,0) > 0 OR COALESCE(SUM(rbt.total_settlement_klien),0) > 0)')
             ->orderBy('ms.area')
-            ->orderBy('rt.region_name')
+            ->orderBy('ms.regional')
             ->get();
 
         $grouped_agency = $data_agency->groupBy('area');
 
 
-        $data_internal = DB::table('region_target as rt')
-            ->leftJoin('mitra_sbp as ms', 'ms.regional', '=', 'rt.region_name')
-            ->leftJoin('report_balance_top_up as rbt', function ($join) use ($monthStart, $monthEnd) {
+        $data_internal = DB::table('mitra_sbp as ms')
+            ->leftJoin('region_target as rt', function ($join) use ($monthStart) {
+                $join->on('rt.region_name', '=', 'ms.regional')
+                    ->where('rt.data_type', 'Internal')
+                    ->whereDate('rt.date', $monthStart);
+            })
+            ->leftJoin('report_balance_top_up as rbt', function ($join) use ($monthStart, $monthEnd)  {
                 $join->on('rbt.email_client', '=', 'ms.email_myads')
-                       ->whereBetween('rbt.tgl_transaksi', [$monthStart, $monthEnd]);
+                        ->whereBetween('rbt.tgl_transaksi', [$monthStart, $monthEnd]);
             })
             ->select(
                 'ms.area',
-                'rt.region_name',
-                'rt.target_amount',
+                'ms.regional as region_name',
+                DB::raw('COALESCE(rt.target_amount, 0) as target_amount'),
                 DB::raw('COALESCE(SUM(rbt.total_settlement_klien), 0) as internal')
             )
-            ->where('rt.data_type', 'Internal')
             ->where('ms.remark', 'Internal')
-            ->whereDate('rt.date', $monthStart) 
-            // Exclude emails yang ada di leads_master sebagai CVSR
-            // ->whereNotIn(DB::raw('LOWER(TRIM(ms.email_myads))'), $cvsrEmails)
             ->groupBy(
                 'ms.area',
-                'rt.region_name',
+                'ms.regional',
                 'rt.target_amount'
             )
+            ->havingRaw('(ms.regional != "" OR COALESCE(rt.target_amount,0) > 0 OR COALESCE(SUM(rbt.total_settlement_klien),0) > 0)')
             ->orderBy('ms.area')
-            ->orderBy('rt.region_name')
+            ->orderBy('ms.regional')
             ->get();
 
         $grouped_internal = $data_internal->groupBy('area');
