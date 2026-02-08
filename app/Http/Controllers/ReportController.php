@@ -487,6 +487,196 @@ public function topupCanvasserData(Request $request)
         
         return view('mitra-sbp.report-performance', compact('grouped_mitra_sbp', 'data_mitra_sbp', 'grouped_agency', 'data_agency', 'grouped_internal', 'data_internal', 'months', 'month'));
     }
+
+    public function reportCampaignSbp(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+
+        $months = [];
+        for ($i = 0; $i < 12; $i++) {
+            $date = now()->subMonths($i);
+            $value = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+        }
+
+        return view('mitra-sbp.report-campaign-sbp', compact('months', 'month'));
+    }
+
+    public function reportCampaignSbpData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $baseQuery = DB::table('mitra_sbp as a')
+            ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+            ->whereYear('b.tanggal_iklan', $year)
+            ->whereMonth('b.tanggal_iklan', $monthNum);
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
+                'b.email',
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_instansi',
+                'b.area_provinsi',
+                'b.campaign_type',
+                'b.inventory_type',
+                'b.total',
+                'b.success',
+                'b.failed',
+                'b.balance_terpakai',
+                'b.wording as pesan',
+                'b.campaign_status',
+                'a.remark'
+            );
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->make(true);
+    }
+
+    public function exportCampaignSbp(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $remark = $request->get('remark');
+
+            $query = DB::table('mitra_sbp as a')
+                ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+                ->select(
+                    DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
+                    'b.email',
+                    'b.id_iklan',
+                    'b.nama_iklan',
+                    'b.nama_instansi',
+                    'b.area_provinsi',
+                    'b.campaign_type',
+                    'b.inventory_type',
+                    'b.total',
+                    'b.success',
+                    'b.failed',
+                    'b.balance_terpakai',
+                    'b.wording as pesan',
+                    'b.campaign_status',
+                    'a.remark'
+                )
+                ->whereYear('b.tanggal_iklan', $year)
+                ->whereMonth('b.tanggal_iklan', $monthNum);
+
+            if (!empty($remark)) {
+                $query->where('a.remark', $remark);
+            }
+
+            $data = $query->orderBy('b.tanggal_iklan', 'desc')->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleRemark = $remark ?: 'Semua';
+            $sheet->setCellValue('A1', 'REPORT CAMPAIGN SBP - ' . strtoupper($titleRemark) . ' - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Iklan',
+                'Email',
+                'ID Iklan',
+                'Nama Iklan',
+                'Nama Instansi',
+                'Area Provinsi',
+                'Campaign Type',
+                'Inventory Type',
+                'Total',
+                'Success',
+                'Failed',
+                'Balance Terpakai',
+                'Pesan',
+                'Campaign Status',
+                'Remark'
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->email,
+                    $row->id_iklan,
+                    $row->nama_iklan,
+                    $row->nama_instansi,
+                    $row->area_provinsi,
+                    $row->campaign_type,
+                    $row->inventory_type,
+                    $row->total,
+                    $row->success,
+                    $row->failed,
+                    $row->balance_terpakai,
+                    $row->pesan,
+                    $row->campaign_status,
+                    $row->remark,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Campaign_SBP_' . ($remark ?: 'Semua') . '_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+
+        } catch (\Exception $e) {
+            \Log::error('Export Campaign SBP Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
     public function exportMitraSBP()
     {
         try {
