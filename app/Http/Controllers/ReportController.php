@@ -532,7 +532,7 @@ public function topupCanvasserData(Request $request)
                 'b.total',
                 'b.success',
                 'b.failed',
-                'b.balance_terpakai',
+            DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 'b.wording as pesan',
                 'b.campaign_status',
                 'a.remark'
@@ -555,6 +555,9 @@ public function topupCanvasserData(Request $request)
 
         return datatables()->of($query)
             ->with('summary', $summary)
+            ->editColumn('balance_terpakai', function ($row) {
+                return '' . number_format($row->balance_terpakai, 0, ',', '.');
+            })
             ->make(true);
     }
 
