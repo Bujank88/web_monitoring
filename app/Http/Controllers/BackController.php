@@ -1486,9 +1486,8 @@ class BackController extends Controller
     public function exportRegional()
     {
         try {
-            $monthFilter = request()->get('month');
             $leadProgramController = new LeadProgramController();
-            $data = $leadProgramController->getRegionalData($monthFilter);
+            $data = $leadProgramController->getRegionalData(request());
 
             if (empty($data)) {
                 return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');

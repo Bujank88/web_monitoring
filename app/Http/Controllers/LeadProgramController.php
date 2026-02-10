@@ -383,9 +383,17 @@ class LeadProgramController extends Controller
         }
     }
 
-    public function getRegionalData()
+    public function getRegionalData(Request $request)
     {
         try {
+            $monthFilter = $request->get('month');
+            $monthDate = null;
+            if (!empty($monthFilter)) {
+                $monthDate = strlen($monthFilter) === 7
+                    ? Carbon::createFromFormat('Y-m-d', $monthFilter . '-01')
+                    : Carbon::createFromFormat('Y-m-d', $monthFilter);
+            }
+
             // 1. Ambil semua user dengan role 'Canvasser' dari kolom role di tabel users
             $canvasers = DB::table('users')
                 ->where('role', 'cvsr')
@@ -396,10 +404,10 @@ class LeadProgramController extends Controller
             \Log::info("Total Canvassers found: " . $canvasers->count());
 
             // Hitung sisa hari di bulan berjalan
-            $today = Carbon::now();
+            $today = $monthDate ? $monthDate->copy()->endOfMonth() : Carbon::now();
             $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth(); // Untuk hitung sisa hari kerja
+            $startOfMonth = ($monthDate ? $monthDate->copy() : Carbon::now())->startOfMonth()->format('Y-m-d');
+            $endOfMonth = ($monthDate ? $monthDate->copy() : Carbon::now())->endOfMonth(); // Untuk hitung sisa hari kerja
 
             // Daftar tanggal merah Indonesia 2026 (bisa disesuaikan atau query dari database)
             $holidays = [
@@ -502,7 +510,10 @@ class LeadProgramController extends Controller
                 // Case-insensitive email matching
                 $topUpStats = DB::table('report_balance_top_up as rp')
                     ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('users as u', 'lm.user_id', '=', 'u.id')
                     ->where('lm.user_id', $canvaser->id)
+                    ->where('u.role', 'cvsr')
+                    ->where('u.name', '!=', 'self service')
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->select(
                         DB::raw("COUNT(rp.id) as top_up_count"),
@@ -516,7 +527,7 @@ class LeadProgramController extends Controller
                 // PENTING: Case-insensitive email matching dan hitung semua top-up SETELAH approval
                 $endOfMonthFormatted = $endOfMonth->format('Y-m-d');
                 $topUpNewAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->leftJoin('report_balance_top_up as rp', function($join) {
+                    ->join('report_balance_top_up as rp', function($join) {
                         $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                              ->whereRaw('DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, \'%Y-%m-%d\')'); // Top-up harus SETELAH approval
                     })
@@ -527,17 +538,23 @@ class LeadProgramController extends Controller
                         DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                         [$startOfMonth, $endOfMonthFormatted]
                     )
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->select(
                         DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
                         DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_new_akun_rp")
                     )
                     ->first();
-
-                $topUpExistingAkunStats = DB::table('report_balance_top_up as rp')
-                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                
+                $topUpExistingAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('report_balance_top_up as rp', function($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
                     ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Eksisting Akun')
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])    
+                    ->where('dt.status', 'APPROVE')
+                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->select(
                         DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
                         DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_existing_akun_rp")
@@ -739,7 +756,7 @@ class LeadProgramController extends Controller
      public function getRegionalDataTable(Request $request)
     {
         try {
-            $result = $this->getRegionalData();
+            $result = $this->getRegionalData($request);
             
             return datatables()->of(collect($result))
                 ->make(true);
@@ -955,13 +972,18 @@ class LeadProgramController extends Controller
                     ->count('lb.leads_master_id');
 
                 // 4. Top Up Existing Akun Count
-                $topUpExistingAkunCount = DB::table('leads_master as lm')
-                    ->join('report_balance_top_up as rp', 'lm.email', '=', 'rp.email_client')
+                $topUpExistingAkunCount = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('report_balance_top_up as rp', function($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
                     ->where('lm.regional', $region)
-                    ->where('lm.data_type', 'Eksisting Akun')
+                    ->where('dt.status', 'APPROVE')
+                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                     ->distinct()
-                    ->count('lm.email');
+                    ->count(DB::raw('LOWER(dt.email)'));
 
                 // 5. Target (optional jika masih per user → boleh di-skip)
                 $targetData = DB::table('region_target')
@@ -1274,4 +1296,3 @@ class LeadProgramController extends Controller
         }
     }
 }
-
