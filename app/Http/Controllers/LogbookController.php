@@ -254,6 +254,9 @@ class LogbookController extends Controller
         // Ambil data logbook berdasarkan leads_master_id
         $logbook = DB::table('logbook')
             ->where('leads_master_id', $request->id)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->orderBy('created_at', 'desc')
             ->first();
 
         if (!$logbook) {
