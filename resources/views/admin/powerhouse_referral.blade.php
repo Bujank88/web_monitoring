@@ -572,7 +572,7 @@
             class="btn btn-success"
             title="Download Excel"
         >
-            <i class="fas fa-file-excel mr-2"></i> Download Excelasdasd
+            <i class="fas fa-file-excel mr-2"></i> Download Excel
         </a>
 
     </div>
