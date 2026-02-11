@@ -776,15 +776,26 @@ class BackController extends Controller
 
     /**     * Export PowerHouse Voucher Report to Excel
      */
-    public function exportPowerHouseVoucher()
+    public function exportPowerHouseVoucher(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+        \Log::info($startDate);
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
         
         // Query dengan JOIN untuk mendapatkan data lengkap
-        $data = DB::table('report_balance_top_up as rb')
+        $query = DB::table('report_balance_top_up as rb')
             ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
             ->select(
                 'rb.email_client',
@@ -797,10 +808,10 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
-            ->orderBy('dv.voucher_code')
-            ->get();
-        
+            ->whereBetween('rb.paid_date', [$startDate, $endDate])
+            ->orderBy('dv.voucher_code');
+
+        $data = $query->get();
         // Mapping untuk PowerHouse names
         $powerHouseMapping = [
             'SUPER1' => 'Angga Satria Gusti',
@@ -815,11 +826,12 @@ class BackController extends Controller
         
         // Transform data untuk Excel
         $exportData = $data->map(function ($item) use ($powerHouseMapping) {
+            $voucherCode = strtoupper($item->voucher_code);
             return [
                 'Email' => $item->email_client,
                 'Perusahaan' => $item->company_name,
-                'Voucher Code' => $item->voucher_code,
-                'PowerHouse' => $powerHouseMapping[$item->voucher_code] ?? '-',
+                'Voucher Code' => $voucherCode,
+                'PowerHouse' => $powerHouseMapping[$voucherCode] ?? '-',
                 'Amount' => $item->amount,
                 'Discount' => $item->discount,
                 'Total Settlement' => $item->total,

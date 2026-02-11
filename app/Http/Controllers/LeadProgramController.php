@@ -529,7 +529,7 @@ class LeadProgramController extends Controller
                 $topUpNewAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('report_balance_top_up as rp', function($join) {
                         $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw('DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, \'%Y-%m-%d\')'); // Top-up harus SETELAH approval
+                              ->whereRaw('DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, \'%Y-%m-%d\')'); // Top-up harus SETELAH approval
                     })
                     ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                     ->where('lm.user_id', $canvaser->id)
@@ -549,7 +549,7 @@ class LeadProgramController extends Controller
                     ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                     ->join('report_balance_top_up as rp', function($join) {
                         $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                          ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                     })
                     ->where('lm.user_id', $canvaser->id)
                     ->where('dt.status', 'APPROVE')

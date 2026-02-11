@@ -540,8 +540,8 @@
 @php
     use Carbon\Carbon;
 
-    $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
-    $endDate   = Carbon::now()->format('Y-m-d');
+    $startDate = request('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+    $endDate   = request('end_date', Carbon::now()->format('Y-m-d'));
 @endphp
 
 <div class="row mb-3">
@@ -564,15 +564,15 @@
 
         <!-- Download Excel -->
         <a
-            href="{{ route('export.powerhouse_voucher', [
+            {{-- href="{{ route('export.powerhouse_voucher', [
                 'start_date' => $startDate,
                 'end_date'   => $endDate
-            ]) }}"
+            ]) }}" --}}
             id="btnExportPowerHouse"
             class="btn btn-success"
             title="Download Excel"
         >
-            <i class="fas fa-file-excel mr-2"></i> Download Excel
+            <i class="fas fa-file-excel mr-2"></i> Download Excelasdasd
         </a>
 
     </div>
@@ -739,6 +739,25 @@
             }
 
             table.ajax.reload();
+        });
+
+        $('#btnExportPowerHouse').on('click', function (e) {
+            e.preventDefault();
+
+            const baseUrl = "{{ route('export.powerhouse_voucher') }}";
+            const startDate = $('#startDatePH').val();
+            const endDate = $('#endDatePH').val();
+            const query = new URLSearchParams();
+
+            if (startDate) {
+                query.append('start_date', startDate);
+            }
+            if (endDate) {
+                query.append('end_date', endDate);
+            }
+            alert(query)
+
+            window.location.href = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
         });
         // Function to calculate totals
         function calculateTotals() {
