@@ -440,7 +440,7 @@
                                 <th colspan="2" class="text-center" style="background-color: #fff3cd;">Mitra SBP</th>
                                 <th colspan="2" class="text-center" style="background-color: #d1ecf1;">Canvasser</th>
                                 <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
-                                <th colspan="2" class="text-center" style="background-color: #e2e3e5;">Agency</th>
+                                <th colspan="2" class="text-center" style="background-color: #e2e3e5;">Agency Indihome</th>
                                 <th colspan="2" class="text-center" style="background-color: #fcc271;">Internal</th>
                                 <th colspan="2" class="text-center" style="background-color: #f62b3c; color: white;">Total</th>
                             </tr>

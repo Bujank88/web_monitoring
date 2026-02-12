@@ -430,7 +430,15 @@ class LeadProgramController extends Controller
 
             // Hitung hanya hari kerja (Senin-Jumat) yang tersisa, exclude weekend dan tanggal merah
             $remainingWorkingDays = 0;
-            $currentDate = $today->copy();
+
+            if ($today->month == Carbon::today()->month && 
+                $today->year == Carbon::today()->year) {
+
+                $currentDate = Carbon::today();
+
+            } else {
+                $currentDate = $today->copy();
+            }
             
             while ($currentDate->lte($endOfMonth)) {
                 // Cek apakah hari ini adalah weekday (Senin-Jumat)
