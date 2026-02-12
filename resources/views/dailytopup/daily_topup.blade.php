@@ -434,27 +434,33 @@
                         <thead class="thead-light">
                             <tr>
                                 <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">Tanggal</th>
-                                <th colspan="12" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="16" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
-                                <th colspan="2" class="text-center" style="background-color: #fff3cd;">Mitra SBP</th>
                                 <th colspan="2" class="text-center" style="background-color: #d1ecf1;">Canvasser</th>
-                                <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
+                                <th colspan="2" class="text-center" style="background-color: #fff3cd;">Mitra SBP</th>
                                 <th colspan="2" class="text-center" style="background-color: #e2e3e5;">Agency Indihome</th>
                                 <th colspan="2" class="text-center" style="background-color: #fcc271;">Internal</th>
+                                <th colspan="2" class="text-center" style="background-color: #eef7d9;">Agency Advertising</th>
+                                <th colspan="2" class="text-center" style="background-color: #d4edea;">B2B</th>
+                                <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
                                 <th colspan="2" class="text-center" style="background-color: #f62b3c; color: white;">Total</th>
                             </tr>
                             <tr>
-                                <th class="text-center" style="background-color: #fff3cd;">user_id</th>
-                                <th class="text-center" style="background-color: #fff3cd;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #d1ecf1;">user_id</th>
                                 <th class="text-center" style="background-color: #d1ecf1;">Total Settlement</th>
-                                <th class="text-center" style="background-color: #d4edda;">user_id</th>
-                                <th class="text-center" style="background-color: #d4edda;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #fff3cd;">user_id</th>
+                                <th class="text-center" style="background-color: #fff3cd;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #e2e3e5;">user_id</th>
                                 <th class="text-center" style="background-color: #e2e3e5;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #fcc271;">user_id</th>
                                 <th class="text-center" style="background-color: #fcc271;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #eef7d9;">user_id</th>
+                                <th class="text-center" style="background-color: #eef7d9;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #d4edea;">user_id</th>
+                                <th class="text-center" style="background-color: #d4edea;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #d4edda;">user_id</th>
+                                <th class="text-center" style="background-color: #d4edda;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #f62b3c; color: white;">User Id</th>
                                 <th class="text-center" style="background-color: #f62b3c; color: white;">Settlement</th>
                             </tr>
@@ -594,20 +600,6 @@
                     }
                 },
                 {
-                    data: 'mitra_sbp_user',
-                    render: function(data, type, row) {
-                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
-                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
-                    }
-                },
-                {
-                    data: 'mitra_sbp_settle',
-                    render: function(data, type, row) {
-                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
-                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
-                    }
-                },
-                {
                     data: 'canvasser_user',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
@@ -623,19 +615,20 @@
                     }
                 },
                 {
-                    data: 'self_service_user',
+                    data: 'mitra_sbp_user',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
                     }
                 },
                 {
-                    data: 'self_service_settle',
+                    data: 'mitra_sbp_settle',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
                     }
                 },
+                
 
                 {
                     data: 'agency_user',
@@ -660,6 +653,48 @@
                 },
                 {
                     data: 'internal_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'advertising_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'advertising_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'b2b_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'b2b_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'self_service_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'self_service_settle',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
