@@ -34,6 +34,16 @@ class LeadProgramController extends Controller
                 ->pluck('email_myads')
                 ->toArray();
 
+            $b2bEmails = DB::table('mitra_sbp')
+                ->where('remark', 'B2B')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $advertisingEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Agency Advertising')
+                ->pluck('email_myads')
+                ->toArray();
+
             // Ambil list cvsr user IDs (untuk check canvasser dengan per-user join logic)
             $canvasserUserIds = DB::table('users')
                 ->where('role', 'cvsr')
@@ -87,6 +97,8 @@ class LeadProgramController extends Controller
                         'internal' => ['settlement' => 0, 'users' => []],
                         'outlet' => ['settlement' => 0, 'users' => []],
                         'canvasser' => ['settlement' => 0, 'users' => []],
+                        'b2b' => ['settlement' => 0, 'users' => []],
+                        'advertising' => ['settlement' => 0, 'users' => []],
                     ];
                 }
 
@@ -117,6 +129,12 @@ class LeadProgramController extends Controller
                     } elseif ($row->remark === 'Outlet') {
                         $groupedData[$date]['outlet']['settlement'] += $settlement;
                         $groupedData[$date]['outlet']['users'][] = $userId;
+                    } elseif ($row->remark === 'B2B') {
+                        $groupedData[$date]['b2b']['settlement'] += $settlement;
+                        $groupedData[$date]['b2b']['users'][] = $userId;
+                    } elseif ($row->remark === 'Agency Advertising') {
+                        $groupedData[$date]['advertising']['settlement'] += $settlement;
+                        $groupedData[$date]['advertising']['users'][] = $userId;
                     } else {
                         // Remark lainnya ke outlet
                         $groupedData[$date]['outlet']['settlement'] += $settlement;
@@ -143,6 +161,10 @@ class LeadProgramController extends Controller
                 'outlet_user' => [],
                 'canvasser_settle' => 0,
                 'canvasser_user' => [],
+                'b2b_settle' => 0,
+                'b2b_user' => [],
+                'advertising_settle' => 0,
+                'advertising_user' => [],
             ];
 
             // Sort by date descending
@@ -161,12 +183,17 @@ class LeadProgramController extends Controller
                     'self_service_user' => count(array_unique($data['outlet']['users'])),
                     'canvasser_settle' => number_format($data['canvasser']['settlement'], 0, ',', '.'),
                     'canvasser_user' => count(array_unique($data['canvasser']['users'])),
+                    'b2b_settle' => number_format($data['b2b']['settlement'], 0, ',', '.'),
+                    'b2b_user' => count(array_unique($data['b2b']['users'])),
+                    'advertising_settle' => number_format($data['advertising']['settlement'], 0, ',', '.'),
+                    'advertising_user' => count(array_unique($data['advertising']['users'])),
                     'total' => number_format(
                         $data['mitra_sbp']['settlement'] +
                             $data['internal']['settlement'] +
                             $data['agency']['settlement'] +
                             $data['outlet']['settlement'] +
-                            $data['canvasser']['settlement'],
+                            $data['canvasser']['settlement'] +
+                            $data['b2b']['settlement'],
                         0,
                         ',',
                         '.'
@@ -176,7 +203,9 @@ class LeadProgramController extends Controller
                         $data['internal']['users'],
                         $data['agency']['users'],
                         $data['outlet']['users'],
-                        $data['canvasser']['users']
+                        $data['canvasser']['users'],
+                        $data['b2b']['users'],
+                        $data['advertising']['users']
                     ))),
                 ];
 
@@ -193,6 +222,10 @@ class LeadProgramController extends Controller
                 $totals['outlet_user'] = array_merge($totals['outlet_user'], $data['outlet']['users']);
                 $totals['canvasser_settle'] += $data['canvasser']['settlement'];
                 $totals['canvasser_user'] = array_merge($totals['canvasser_user'], $data['canvasser']['users']);
+                $totals['b2b_settle'] += $data['b2b']['settlement'];
+                $totals['b2b_user'] = array_merge($totals['b2b_user'], $data['b2b']['users']);
+                $totals['advertising_settle'] += $data['advertising']['settlement'];
+                $totals['advertising_user'] = array_merge($totals['advertising_user'], $data['advertising']['users']);
             }
 
             // Tambahkan row total
@@ -209,12 +242,18 @@ class LeadProgramController extends Controller
                     'self_service_user' => count(array_unique($totals['outlet_user'])),
                     'canvasser_settle' => number_format($totals['canvasser_settle'], 0, ',', '.'),
                     'canvasser_user' => count(array_unique($totals['canvasser_user'])),
+                    'b2b_settle' => number_format($totals['b2b_settle'], 0, ',', '.'),
+                    'b2b_user' => count(array_unique($totals['b2b_user'])),
+                    'advertising_settle' => number_format($totals['advertising_settle'], 0, ',', '.'),
+                    'advertising_user' => count(array_unique($totals['advertising_user'])),
                     'total' => number_format(
                         $totals['mitra_sbp_settle'] +
                             $totals['internal_settle'] +
                             $totals['agency_settle'] +
                             $totals['outlet_settle'] +
-                            $totals['canvasser_settle'],
+                            $totals['canvasser_settle'] +
+                            $totals['b2b_settle'] +
+                            $totals['advertising_settle'],
                         0,
                         ',',
                         '.'
@@ -224,7 +263,9 @@ class LeadProgramController extends Controller
                         $totals['internal_user'],
                         $totals['agency_user'],
                         $totals['outlet_user'],
-                        $totals['canvasser_user']
+                        $totals['canvasser_user'],
+                        $totals['b2b_user'],
+                        $totals['advertising_user']
                     ))),
                 ];
             }
