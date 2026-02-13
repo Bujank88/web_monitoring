@@ -161,6 +161,8 @@
                                 <th>Success</th>
                                 <th>Failed</th>
                                 <th>Balance Terpakai</th>
+                                <th>Sisa Saldo Utama</th>
+                                <th>Sisa Saldo Monet</th>
                                 <th>Pesan</th>
                                 <th>Campaign Status</th>
                                 <th>Remark</th>
@@ -232,6 +234,8 @@
                 { data: 'success', name: 'success' },
                 { data: 'failed', name: 'failed' },
                 { data: 'balance_terpakai', name: 'balance_terpakai' },
+                { data: 'saldo_utama', name: 'saldo_utama' },
+                { data: 'saldo_monet', name: 'saldo_monet' },
                 {
                     data: 'pesan',
                     name: 'pesan',
