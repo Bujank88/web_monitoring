@@ -580,16 +580,16 @@ class PanenPoinController extends Controller
                     $previousMonthPoints[strtolower(trim($prev->email_client))] = $prev->poin_sisa;
                 }
                 
-                $packagePoint = DB::table('data_campaign_seasonal as a')
+                $packagePoint = DB::table('data_paket_seasonal as a')
                     ->join('panen_poin_package as b', function ($join) {
                         $join->on(
-                            DB::raw('LOWER(a.name)'),
+                            DB::raw('LOWER(TRIM(a.name))'),
                             '=',
-                            DB::raw('LOWER(b.code)')
+                            DB::raw('LOWER(TRIM(b.code))')
                         );
                     })
                     ->selectRaw('LOWER(TRIM(email)) as email, SUM(COALESCE(b.point, 0)) as point')
-                    ->groupBy('a.email')
+                    ->groupBy(DB::raw('LOWER(TRIM(a.email))'))
                     ->pluck('point', 'email')
                     ->toArray();
                     
@@ -610,7 +610,7 @@ class PanenPoinController extends Controller
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     
                     $totalpackagePoint = $packagePoint[$email] ?? 0;
-
+                    \Log::info("Email: {$email}, Package Point: " . ($packagePoint[$email] ?? 0));
                     if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
                         continue;
                     }
