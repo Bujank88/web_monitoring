@@ -621,7 +621,7 @@ class PanenPoinController extends Controller
                     $poinSisa = $totalPoin - $totalPoinRedeem;
                     
                     // Tentukan remark berdasarkan poin_sisa
-                    $remark = $this->calculateRemark($poinSisa);
+                    $remark = $this->calculateRemark($poinSisa + $totalpackagePoint);
                     
                     // Cek apakah data sudah ada
                     $existing = DB::table('summary_panen_poin')
