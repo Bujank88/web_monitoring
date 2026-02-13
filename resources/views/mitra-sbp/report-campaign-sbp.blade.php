@@ -161,9 +161,9 @@
                                 <th>Success</th>
                                 <th>Failed</th>
                                 <th>Balance Terpakai</th>
+                                <th>Pesan</th>
                                 <th>Sisa Saldo Utama</th>
                                 <th>Sisa Saldo Monet</th>
-                                <th>Pesan</th>
                                 <th>Campaign Status</th>
                                 <th>Remark</th>
                             </tr>
@@ -234,8 +234,6 @@
                 { data: 'success', name: 'success' },
                 { data: 'failed', name: 'failed' },
                 { data: 'balance_terpakai', name: 'balance_terpakai' },
-                { data: 'saldo_utama', name: 'saldo_utama' },
-                { data: 'saldo_monet', name: 'saldo_monet' },
                 {
                     data: 'pesan',
                     name: 'pesan',
@@ -247,6 +245,8 @@
                         return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
                     }
                 },
+                { data: 'saldo_utama', name: 'saldo_utama' },
+                { data: 'saldo_monet', name: 'saldo_monet' },
                 { data: 'campaign_status', name: 'campaign_status' },
                 { data: 'remark', name: 'remark' }
             ],
