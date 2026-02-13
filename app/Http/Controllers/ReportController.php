@@ -505,13 +505,46 @@ public function topupCanvasserData(Request $request)
         return view('mitra-sbp.report-campaign-sbp', compact('months', 'month'));
     }
 
+    private function campaignSbpEmailSubquery($year, $monthNum, $remark = null)
+    {
+        $emails = DB::table('mitra_sbp as ms')
+            ->join('data_campaign_seasonal as dc', 'ms.email_myads', '=', 'dc.email')
+            ->whereYear('dc.tanggal_iklan', $year)
+            ->whereMonth('dc.tanggal_iklan', $monthNum);
+
+        if (!empty($remark)) {
+            $emails->where('ms.remark', $remark);
+        }
+
+        return $emails->selectRaw('DISTINCT LOWER(TRIM(dc.email)) as email_key');
+    }
+
+    private function campaignSbpSaldoUsersSubquery($year, $monthNum, $remark = null)
+    {
+        $campaignEmails = $this->campaignSbpEmailSubquery($year, $monthNum, $remark);
+
+        return DB::table('saldo_users as su')
+            ->joinSub($campaignEmails, 'ce', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(su.email))'), '=', 'ce.email_key');
+            })
+            ->selectRaw('LOWER(TRIM(su.email)) as email_key')
+            ->selectRaw('MAX(COALESCE(su.saldo_utama, 0)) as saldo_utama')
+            ->selectRaw('MAX(COALESCE(su.saldo_monet, 0)) as saldo_monet')
+            ->groupBy(DB::raw('LOWER(TRIM(su.email))'));
+    }
+
     public function reportCampaignSbpData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
         [$year, $monthNum] = explode('-', $month);
 
+        $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
+
         $baseQuery = DB::table('mitra_sbp as a')
             ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+            ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(b.email))'), '=', 'su.email_key');
+            })
             ->whereYear('b.tanggal_iklan', $year)
             ->whereMonth('b.tanggal_iklan', $monthNum);
 
@@ -532,7 +565,9 @@ public function topupCanvasserData(Request $request)
                 'b.total',
                 'b.success',
                 'b.failed',
-            DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
+                DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
                 'b.wording as pesan',
                 'b.campaign_status',
                 'a.remark'
@@ -556,7 +591,13 @@ public function topupCanvasserData(Request $request)
         return datatables()->of($query)
             ->with('summary', $summary)
             ->editColumn('balance_terpakai', function ($row) {
-                return '' . number_format($row->balance_terpakai, 0, ',', '.');
+                return 'Rp ' . number_format($row->balance_terpakai, 0, ',', '.');
+            })
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
             })
             ->make(true);
     }
@@ -568,8 +609,13 @@ public function topupCanvasserData(Request $request)
             [$year, $monthNum] = explode('-', $month);
             $remark = $request->get('remark');
 
+            $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $remark);
+
             $query = DB::table('mitra_sbp as a')
                 ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+                ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(b.email))'), '=', 'su.email_key');
+                })
                 ->select(
                     DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
                     'b.email',
@@ -583,6 +629,8 @@ public function topupCanvasserData(Request $request)
                     'b.success',
                     'b.failed',
                     'b.balance_terpakai',
+                    DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
+                    DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
                     'b.wording as pesan',
                     'b.campaign_status',
                     'a.remark'
@@ -605,7 +653,7 @@ public function topupCanvasserData(Request $request)
 
             $titleRemark = $remark ?: 'Semua';
             $sheet->setCellValue('A1', 'REPORT CAMPAIGN SBP - ' . strtoupper($titleRemark) . ' - ' . $month);
-            $sheet->mergeCells('A1:O1');
+            $sheet->mergeCells('A1:Q1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -622,13 +670,15 @@ public function topupCanvasserData(Request $request)
                 'Success',
                 'Failed',
                 'Balance Terpakai',
+                'Sisa Saldo Utama',
+                'Sisa Saldo Monet',
                 'Pesan',
                 'Campaign Status',
                 'Remark'
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:O3')->applyFromArray([
+            $sheet->getStyle('A3:Q3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -657,6 +707,8 @@ public function topupCanvasserData(Request $request)
                     $row->success,
                     $row->failed,
                     $row->balance_terpakai,
+                    $row->saldo_utama,
+                    $row->saldo_monet,
                     $row->pesan,
                     $row->campaign_status,
                     $row->remark,
@@ -664,7 +716,7 @@ public function topupCanvasserData(Request $request)
                 $rowNum++;
             }
 
-            foreach (range('A', 'O') as $col) {
+            foreach (range('A', 'Q') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
