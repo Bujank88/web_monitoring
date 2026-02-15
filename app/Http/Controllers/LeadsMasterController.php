@@ -426,7 +426,8 @@ class LeadsMasterController extends Controller
         
         $leadSources = LeadsSource::all();
         $sectors = Sector::all();
-        return view('leads-master.edit', compact('lead', 'leadSources', 'sectors'));
+        $canvassers = Cache::remember('users_list_leads', 3600, fn() => User::orderBy('name')->get());
+        return view('leads-master.edit', compact('lead', 'leadSources', 'sectors', 'canvassers'));
     }
 
     public function update(Request $request, LeadsMaster $lead)
@@ -458,7 +459,10 @@ class LeadsMasterController extends Controller
             'myads_account' => 'nullable|string|max:255'
         ]);
 
+        $userId = auth()->user()->role === 'Admin' ? $request->user_id : $lead->user_id;
+
         $lead->update([
+            'user_id' => $userId,
             // 'kode_voucher' => $request->kode_voucher,
             'company_name' => $request->company_name,
             'mobile_phone' => $request->mobile_phone,
