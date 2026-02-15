@@ -31,7 +31,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel',
+            'role' => 'required|in:Admin,Tsel,TCD',
         ]);
         $data = [
             'name' => $request->name,
@@ -88,6 +88,8 @@ class BackController extends Controller
                     return redirect()->route('race_summary_treg');
                 case 'cvsr':
                     return redirect()->route('presensi.index');
+                case 'TCD':
+                    return redirect()->route('report-agency-advertising');
                 default:
                     return redirect()->route('home'); // fallback
             }

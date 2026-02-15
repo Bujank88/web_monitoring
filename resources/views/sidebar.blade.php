@@ -17,6 +17,7 @@
                 $isTreg = $user->role === 'Treg';
                 $isCanv = $user->role === 'cvsr';
                 $isPH = $user->role === 'PH';
+                $isTcd = $user->role === 'TCD';
                 @endphp
 
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -27,6 +28,8 @@
                 <span class="badge badge-success">TSEL</span>
                 @elseif($isPH)
                 <span class="badge badge-info">POWERHOUSE</span>
+                @elseif($isTcd)
+                <span class="badge badge-secondary">TCD</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
                 @elseif($isTreg)
@@ -41,6 +44,32 @@
         <!-- Sidebar Menu -->
         <nav class="mt-2">
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                @if($isTcd)
+                <li class="nav-header">AGENCY ADVERTISING</li>
+                <li class="nav-item">
+                    <a href="{{ route('report-agency-advertising') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                        <p>Report Agency Advertising</p>
+                    </a>
+                </li>
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
                 @if($isAdmin || $isTsel || $isCanv || $isPH)
@@ -412,6 +441,7 @@
                         <p>Logout</p>
                     </a>
                 </li>
+                @endif
                 @endif
             </ul>
         </nav>

@@ -23,6 +23,8 @@ class FrontController extends Controller
                 return redirect('/admin/home');
             } else if ('cvsr' == Auth::user()->role) {
                 return redirect()->route('presensi.index');
+            } else if ('TCD' == Auth::user()->role) {
+                return redirect()->route('report-agency-advertising');
             } else {
             return redirect('/admin/home');
             }
