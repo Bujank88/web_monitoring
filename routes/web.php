@@ -207,8 +207,11 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
     Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
+    Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
     Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
+    Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
     Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
+    Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
     Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
     Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
     Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');

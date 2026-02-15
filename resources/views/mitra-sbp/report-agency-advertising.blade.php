@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Report Campaign SBP @endsection
+@section('title') {{ $pageTitle ?? 'Report Campaign Advertising' }} @endsection
 
 @section('css')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap4.min.css">
@@ -85,42 +85,49 @@
                 @endforeach
             </select>
         </div>
-        <div class="filter-group">
-            <label for="remark">Remark</label>
-            <select id="remark" name="remark" class="form-control">
-                <option value="">Semua Remark</option>
-                <option value="Mitra SBP">Mitra SBP</option>
-                <option value="Agency">Agency</option>
-                <option value="Internal">Internal</option>
-            </select>
-        </div>
     </div>
 </div>
 
 <div class="row mb-3">
     <div class="col-12">
         <div class="row">
-            <div class="col-md-4 mb-2">
+            <div class="col-lg col-md-4 col-6 mb-2">
                 <div class="card border-left-primary">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Campaign Mitra SBP</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countMitraSbp">0</div>
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Success</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSuccess">0</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-2">
+            <div class="col-lg col-md-4 col-6 mb-2">
                 <div class="card border-left-success">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Campaign Agency</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countAgency">0</div>
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Failed</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countFailed">0</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-2">
+            <div class="col-lg col-md-4 col-6 mb-2">
                 <div class="card border-left-warning">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Campaign Internal</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countInternal">0</div>
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Total</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countTotal">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg col-md-6 col-6 mb-2">
+                <div class="card border-left-danger">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Saldo Utama</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSaldoUtama">Rp 0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg col-md-6 col-12 mb-2">
+                <div class="card border-left-info">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Saldo Monet</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSaldoMonet">Rp 0</div>
                     </div>
                 </div>
             </div>
@@ -133,7 +140,7 @@
         <div class="card">
             <div class="card-header bg-danger d-flex justify-content-between align-items-center">
                 <h3 class="card-title text-white mb-0">
-                    <i class="fas fa-bullhorn mr-2"></i>Report Campaign SBP
+                    <i class="fas fa-bullhorn mr-2"></i>{{ $pageTitle ?? 'Report Campaign Advertising' }}
                 </h3>
                 <div class="btn-actions">
                     <button type="button" class="btn btn-success btn-sm" id="btnSaveCampaignImage">
@@ -184,12 +191,13 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
     $(document).ready(function() {
+        var selectedRemark = @json($selectedRemark ?? '');
+
         function updateExportLink() {
             var month = $('#month').val();
-            var remark = $('#remark').val();
-            var url = "{{ route('report-campaign-sbp.export') }}" + "?month=" + encodeURIComponent(month);
-            if (remark) {
-                url += "&remark=" + encodeURIComponent(remark);
+            var url = "{{ route('report-agency-advertising.export') }}" + "?month=" + encodeURIComponent(month);
+            if (selectedRemark) {
+                url += "&remark=" + encodeURIComponent(selectedRemark);
             }
             $('#btnExportCampaign').attr('href', url);
         }
@@ -201,7 +209,7 @@
                 useCORS: true
             }).then(canvas => {
                 const link = document.createElement('a');
-                link.download = 'report-campaign-sbp-' + new Date().getTime() + '.png';
+                link.download = 'report-campaign-advertising-' + new Date().getTime() + '.png';
                 link.href = canvas.toDataURL();
                 link.click();
             }).catch(err => {
@@ -210,15 +218,20 @@
             });
         }
 
+        function formatRupiah(value) {
+            var num = Number(value || 0);
+            return 'Rp ' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        }
+
         var table = $('#campaignTable').DataTable({
             processing: true,
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('report-campaign-sbp.data') }}",
+                url: "{{ route('report-agency-advertising.data') }}",
                 data: function(d) {
                     d.month = $('#month').val();
-                    d.remark = $('#remark').val();
+                    d.remark = selectedRemark;
                 }
             },
             columns: [
@@ -273,13 +286,15 @@
             },
             drawCallback: function(settings) {
                 var summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
-                $('#countMitraSbp').text(summary['Mitra SBP'] || 0);
-                $('#countAgency').text(summary['Agency'] || 0);
-                $('#countInternal').text(summary['Internal'] || 0);
+                $('#countSuccess').text(summary.success || 0);
+                $('#countFailed').text(summary.failed || 0);
+                $('#countTotal').text(summary.total || 0);
+                $('#countSaldoUtama').text(formatRupiah(summary.saldo_utama || 0));
+                $('#countSaldoMonet').text(formatRupiah(summary.saldo_monet || 0));
             }
         });
 
-        $('#month, #remark').on('change', function() {
+        $('#month').on('change', function() {
             updateExportLink();
             table.ajax.reload();
         });

@@ -192,8 +192,8 @@
                 
 
                 @if($isAdmin || $isPH)
-                    <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}">
+                    <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
                                 <p>
                                     Mitra SBP
@@ -212,7 +212,14 @@
                         <a href="{{ route('report-campaign-sbp') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
-                            <p>Report Campaign</p>
+                            <p>Report Campaign Advertising</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-agency-advertising') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                            <p>Report Agency Advertising</p>
                         </a>
                     </li>
                     </ul>

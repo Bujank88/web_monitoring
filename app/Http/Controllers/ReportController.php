@@ -493,6 +493,7 @@ public function topupCanvasserData(Request $request)
         logUserLogin();
 
         $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
 
         $months = [];
         for ($i = 0; $i < 12; $i++) {
@@ -502,35 +503,83 @@ public function topupCanvasserData(Request $request)
             $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
         }
 
-        return view('mitra-sbp.report-campaign-sbp', compact('months', 'month'));
+        $pageTitle = 'Report Campaign SBP';
+
+        return view('mitra-sbp.report-campaign-sbp', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportAgencyAdvertising(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        for ($i = 0; $i < 12; $i++) {
+            $date = now()->subMonths($i);
+            $value = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+        }
+
+        $pageTitle = 'Report Campaign Agency Advertising';
+
+        return view('mitra-sbp.report-agency-advertising', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
 
     private function campaignSbpEmailSubquery($year, $monthNum, $remark = null)
     {
-        $emails = DB::table('mitra_sbp as ms')
+        $users = DB::table('mitra_sbp as ms')
             ->join('data_campaign_seasonal as dc', 'ms.email_myads', '=', 'dc.email')
             ->whereYear('dc.tanggal_iklan', $year)
             ->whereMonth('dc.tanggal_iklan', $monthNum);
 
         if (!empty($remark)) {
-            $emails->where('ms.remark', $remark);
+            $users->where('ms.remark', $remark);
         }
 
-        return $emails->selectRaw('DISTINCT LOWER(TRIM(dc.email)) as email_key');
+        return $users->selectRaw('DISTINCT dc.user_id as id_user_key');
     }
 
     private function campaignSbpSaldoUsersSubquery($year, $monthNum, $remark = null)
     {
-        $campaignEmails = $this->campaignSbpEmailSubquery($year, $monthNum, $remark);
+        $campaignUsers = $this->campaignSbpEmailSubquery($year, $monthNum, $remark);
 
         return DB::table('saldo_users as su')
-            ->joinSub($campaignEmails, 'ce', function ($join) {
-                $join->on(DB::raw('LOWER(TRIM(su.email))'), '=', 'ce.email_key');
+            ->joinSub($campaignUsers, 'cu', function ($join) {
+                $join->on('su.id_user', '=', 'cu.id_user_key');
             })
-            ->selectRaw('LOWER(TRIM(su.email)) as email_key')
-            ->selectRaw('MAX(COALESCE(su.saldo_utama, 0)) as saldo_utama')
-            ->selectRaw('MAX(COALESCE(su.saldo_monet, 0)) as saldo_monet')
-            ->groupBy(DB::raw('LOWER(TRIM(su.email))'));
+            ->selectRaw('su.id_user as id_user_key')
+            ->selectRaw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            ->selectRaw('COALESCE(su.saldo_monet, 0) as saldo_monet');
+    }
+
+    private function campaignAgencyAdvertisingUserSubquery($year, $monthNum, $remark = null)
+    {
+        $users = DB::table('agency_advertising as aa')
+            ->join('data_campaign_seasonal as dc', 'aa.email_myads', '=', 'dc.email')
+            ->whereYear('dc.tanggal_iklan', $year)
+            ->whereMonth('dc.tanggal_iklan', $monthNum);
+
+        // if (!empty($remark)) {
+        //     $users->where('aa.remark', $remark);
+        // }
+
+        return $users->selectRaw('DISTINCT dc.user_id as id_user_key');
+    }
+
+    private function campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $remark = null)
+    {
+        $campaignUsers = $this->campaignAgencyAdvertisingUserSubquery($year, $monthNum, $remark);
+
+        return DB::table('saldo_users as su')
+            ->joinSub($campaignUsers, 'cu', function ($join) {
+                $join->on('su.id_user', '=', 'cu.id_user_key');
+            })
+            ->selectRaw('su.id_user as id_user_key')
+            ->selectRaw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            ->selectRaw('COALESCE(su.saldo_monet, 0) as saldo_monet');
     }
 
     public function reportCampaignSbpData(Request $request)
@@ -543,7 +592,7 @@ public function topupCanvasserData(Request $request)
         $baseQuery = DB::table('mitra_sbp as a')
             ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
             ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
-                $join->on(DB::raw('LOWER(TRIM(b.email))'), '=', 'su.email_key');
+                $join->on('b.user_id', '=', 'su.id_user_key');
             })
             ->whereYear('b.tanggal_iklan', $year)
             ->whereMonth('b.tanggal_iklan', $monthNum);
@@ -602,6 +651,76 @@ public function topupCanvasserData(Request $request)
             ->make(true);
     }
 
+    public function reportAgencyAdvertisingData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
+
+        $baseQuery = DB::table('agency_advertising as a')
+            ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+            ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
+                $join->on('b.user_id', '=', 'su.id_user_key');
+            })
+            ->whereYear('b.tanggal_iklan', $year)
+            ->whereMonth('b.tanggal_iklan', $monthNum);
+
+        // if ($request->filled('remark')) {
+        //     $baseQuery->where('a.remark', $request->remark);
+        // }
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
+                'b.email',
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_instansi',
+                'b.area_provinsi',
+                'b.campaign_type',
+                'b.inventory_type',
+                'b.total',
+                'b.success',
+                'b.failed',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
+                DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
+                'b.wording as pesan',
+                'b.campaign_status',
+                'a.remark'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(CAST(COALESCE(b.success, 0) AS UNSIGNED)) as success_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.failed, 0) AS UNSIGNED)) as failed_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.total, 0) AS UNSIGNED)) as total_campaign')
+            ->selectRaw('SUM(COALESCE(su.saldo_utama, 0)) as saldo_utama_total')
+            ->selectRaw('SUM(COALESCE(su.saldo_monet, 0)) as saldo_monet_total')
+            ->first();
+
+        $summary = [
+            'success' => (int) ($summaryRow->success_total ?? 0),
+            'failed' => (int) ($summaryRow->failed_total ?? 0),
+            'total' => (int) ($summaryRow->total_campaign ?? 0),
+            'saldo_utama' => (float) ($summaryRow->saldo_utama_total ?? 0),
+            'saldo_monet' => (float) ($summaryRow->saldo_monet_total ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('balance_terpakai', function ($row) {
+                return 'Rp ' . number_format($row->balance_terpakai, 0, ',', '.');
+            })
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
     public function exportCampaignSbp(Request $request)
     {
         try {
@@ -614,7 +733,7 @@ public function topupCanvasserData(Request $request)
             $query = DB::table('mitra_sbp as a')
                 ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
-                    $join->on(DB::raw('LOWER(TRIM(b.email))'), '=', 'su.email_key');
+                    $join->on('b.id_user', '=', 'su.id_user_key');
                 })
                 ->select(
                     DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
@@ -732,6 +851,137 @@ public function topupCanvasserData(Request $request)
             return redirect()->back()->with('error', 'Gagal export data');
         }
     }
+
+    public function exportAgencyAdvertising(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $remark = $request->get('remark');
+
+            $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $remark);
+
+            $query = DB::table('agency_advertising as a')
+                ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+                ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
+                    $join->on('b.user_id', '=', 'su.id_user_key');
+                })
+                ->select(
+                    DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
+                    'b.email',
+                    'b.id_iklan',
+                    'b.nama_iklan',
+                    'b.nama_instansi',
+                    'b.area_provinsi',
+                    'b.campaign_type',
+                    'b.inventory_type',
+                    'b.total',
+                    'b.success',
+                    'b.failed',
+                    'b.balance_terpakai',
+                    DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
+                    DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
+                    'b.wording as pesan',
+                    'b.campaign_status',
+                    'a.remark'
+                )
+                ->whereYear('b.tanggal_iklan', $year)
+                ->whereMonth('b.tanggal_iklan', $monthNum);
+
+            if (!empty($remark)) {
+                $query->where('a.remark', $remark);
+            }
+
+            $data = $query->orderBy('b.tanggal_iklan', 'desc')->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleRemark = $remark ?: 'Semua';
+            $sheet->setCellValue('A1', 'REPORT CAMPAIGN AGENCY ADVERTISING - ' . strtoupper($titleRemark) . ' - ' . $month);
+            $sheet->mergeCells('A1:Q1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Iklan',
+                'Email',
+                'ID Iklan',
+                'Nama Iklan',
+                'Nama Instansi',
+                'Area Provinsi',
+                'Campaign Type',
+                'Inventory Type',
+                'Total',
+                'Success',
+                'Failed',
+                'Balance Terpakai',
+                'Sisa Saldo Utama',
+                'Sisa Saldo Monet',
+                'Pesan',
+                'Campaign Status',
+                'Remark'
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:Q3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->email,
+                    $row->id_iklan,
+                    $row->nama_iklan,
+                    $row->nama_instansi,
+                    $row->area_provinsi,
+                    $row->campaign_type,
+                    $row->inventory_type,
+                    $row->total,
+                    $row->success,
+                    $row->failed,
+                    $row->balance_terpakai,
+                    $row->saldo_utama,
+                    $row->saldo_monet,
+                    $row->pesan,
+                    $row->campaign_status,
+                    $row->remark,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'Q') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Campaign_Agency_Advertising_' . ($remark ?: 'Semua') . '_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Campaign Agency Advertising Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
     public function exportMitraSBP()
     {
         try {
