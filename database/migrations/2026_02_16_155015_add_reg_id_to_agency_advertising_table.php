@@ -11,13 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('agency_advertising', function (Blueprint $table) {
-            $table->id();
-            $table->string('reg_id');
-            $table->string('email_myads');
-            $table->string('email_parent');
-            $table->string('remark');
-            $table->timestamps();
+        Schema::table('agency_advertising', function (Blueprint $table) {
+            
+            $table->string('reg_id')->after('id')->nullable();
         });
     }
 
@@ -26,6 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('agency_advertising');
+        Schema::table('agency_advertising', function (Blueprint $table) {
+            //
+        });
     }
 };
