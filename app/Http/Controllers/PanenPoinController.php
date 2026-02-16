@@ -385,7 +385,7 @@ class PanenPoinController extends Controller
                 \Log::info("Filtering by Remark: " . request()->remark);
             }
             
-            $result = $query->orderByRaw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) DESC')
+            $result = $query->orderByRaw('(summary_panen_poin.poin_package + summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) DESC')
                 ->get()
                 ->map(function($item) {
                     return [
