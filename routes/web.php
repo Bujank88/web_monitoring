@@ -209,6 +209,12 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
     Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
     Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
+    Route::get('report-saldo-sbp', [ReportController::class, 'reportSaldoSbp'])->name('report-saldo-sbp');
+    Route::get('report-saldo-sbp/data', [ReportController::class, 'reportSaldoSbpData'])->name('report-saldo-sbp.data');
+    Route::get('report-saldo-sbp/export', [ReportController::class, 'exportSaldoSbp'])->name('report-saldo-sbp.export');
+    Route::get('report-saldo-advertising', [ReportController::class, 'reportSaldoAdvertising'])->name('report-saldo-advertising');
+    Route::get('report-saldo-advertising/data', [ReportController::class, 'reportSaldoAdvertisingData'])->name('report-saldo-advertising.data');
+    Route::get('report-saldo-advertising/export', [ReportController::class, 'exportSaldoAdvertising'])->name('report-saldo-advertising.export');
     Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
     Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
     Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');

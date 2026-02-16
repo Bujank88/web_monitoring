@@ -507,7 +507,44 @@ public function topupCanvasserData(Request $request)
 
         return view('mitra-sbp.report-campaign-sbp', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
+    public function reportSaldoSbp(Request $request)
+    {
+        logUserLogin();
 
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        for ($i = 0; $i < 12; $i++) {
+            $date = now()->subMonths($i);
+            $value = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+        }
+
+        $pageTitle = 'Report Saldo SBP';
+
+        return view('mitra-sbp.report-saldo-sbp', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+    public function reportSaldoAdvertising(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        for ($i = 0; $i < 12; $i++) {
+            $date = now()->subMonths($i);
+            $value = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+        }
+
+        $pageTitle = 'Report Saldo Agency Advertising';
+
+        return view('mitra-sbp.report-saldo-advertising', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
     public function reportAgencyAdvertising(Request $request)
     {
         logUserLogin();
@@ -528,6 +565,127 @@ public function topupCanvasserData(Request $request)
         return view('mitra-sbp.report-agency-advertising', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
 
+    public function reportSaldoSbpData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+
+        $baseQuery = DB::table('mitra_sbp as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.area',
+                'a.regional',
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+            // dd($baseQuery->get()->take(5));
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportSaldoAdvertisingData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+
+        $baseQuery = DB::table('agency_advertising as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+            // dd($baseQuery->get()->take(5));
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
     private function campaignSbpEmailSubquery($year, $monthNum, $remark = null)
     {
         $users = DB::table('mitra_sbp as ms')
