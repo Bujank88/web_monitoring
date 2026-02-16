@@ -1024,7 +1024,7 @@ class BackController extends Controller
 
         // Get users associated with PowerHouse teams
         $powerHouseUserMap = [
-            'Angga Satria Gusti' => ['Angga Satria Gusti'],
+            'Angga Satria Gusti' => ['Angga Satria Gusti', 'Angga S. Gusti'],
             'Abdul Halim' => ['Abdul Halim'],
             'Raden Agie S. Akbar' => ['Raden Agie Satria Akbar', 'Raden Agie S. Akbar'],
             'Sony Widjaya' => ['Sony Widjaya'],

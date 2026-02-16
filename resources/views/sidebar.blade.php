@@ -118,7 +118,7 @@
                         <!-- Report Powerhouse -->
                         <li class="nav-item">
                             <a href="{{ route('region-target') }}"
-                            class="nav-link {{ request()->routeIs('region-target') ? 'active' : '' }} ml-2">
+                            class="nav-link {{ request()->routeIs('region-target') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
                                 <p>Report Powerhouse</p>
                             </a>
@@ -127,7 +127,7 @@
                         <!-- Powerhouse Referral -->
                         <li class="nav-item">
                             <a href="{{ route('admin.monitoring.powerhouse_referral') }}"
-                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }} ml-2">
+                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}"  style="padding-left: 45px;">
                                 <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
                                 <p>PowerHouse Referral</p>
                             </a>
@@ -207,7 +207,7 @@
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
                             <a href="{{ route('logbook.index') }}"
-                            class="nav-link {{ request()->routeIs('logbook.index') ? 'active' : '' }}" style="padding-left: 20px;">
+                            class="nav-link {{ request()->routeIs('logbook.index') ? 'active' : '' }}"  style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-book" style="color:rgb(90,90,250);"></i>
                                 <p>Logbook Monthly</p>
                             </a>
@@ -215,7 +215,7 @@
 
                         <li class="nav-item">
                             <a href="{{ route('logbook-daily.index') }}"
-                            class="nav-link {{ request()->routeIs('logbook-daily.index') ? 'active' : '' }}" style="padding-left: 20px;">
+                            class="nav-link {{ request()->routeIs('logbook-daily.index') ? 'active' : '' }}"  style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-book" style="color:rgb(250, 125, 90);"></i>
                                 <p>Logbook Daily</p>
                             </a>
@@ -252,7 +252,7 @@
                     <li class="nav-item">
                         <a href="{{ route('report-saldo-advertising') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-saldo-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc107;"></i>
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                             <p>Report Saldo Agency Advertising</p>
                         </a>
                     </li>
@@ -285,7 +285,7 @@
                     <li class="nav-item">
                         <a href="{{ route('report-saldo-sbp') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-saldo-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc107;"></i>
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                             <p>Report Saldo SBP</p>
                         </a>
                     </li>
