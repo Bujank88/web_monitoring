@@ -497,7 +497,7 @@
                         <thead class="thead-light">
                             <tr>
                                 <th colspan="5" class="text-center" style="background-color: #d1ecf1; font-weight: 700; padding: 12px;">
-                                    Report Daily TopUp Per Province | Bulan: <span id="displayedMonthByProvince">January 2026</span>
+                                    Report Daily TopUp Per Province | Bulan: <span id="displayedMonthByProvince">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span>
                                 </th>
                             </tr>
                             <tr>
