@@ -162,8 +162,8 @@
                                 <th>Failed</th>
                                 <th>Balance Terpakai</th>
                                 <th>Pesan</th>
-                                <th>Sisa Saldo Utama</th>
-                                <th>Sisa Saldo Monet</th>
+                                <!-- <th>Sisa Saldo Utama</th>
+                                <th>Sisa Saldo Monet</th> -->
                                 <th>Campaign Status</th>
                                 <th>Remark</th>
                             </tr>
@@ -245,8 +245,8 @@
                         return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
                     }
                 },
-                { data: 'saldo_utama', name: 'su.saldo_utama' },
-                { data: 'saldo_monet', name: 'su.saldo_monet' },
+                // { data: 'saldo_utama', name: 'su.saldo_utama' },
+                // { data: 'saldo_monet', name: 'su.saldo_monet' },
                 { data: 'campaign_status', name: 'b.campaign_status' },
                 { data: 'remark', name: 'a.remark' }
             ],

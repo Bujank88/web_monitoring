@@ -46,12 +46,24 @@
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
                 @if($isTcd)
                 <li class="nav-header">AGENCY ADVERTISING</li>
-                <li class="nav-item">
-                    <a href="{{ route('report-agency-advertising') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
-                        <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
-                        <p>Report Agency Advertising</p>
-                    </a>
+                <li class="nav-item {{ request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
+                                <p>
+                                    Agency Advertising
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    
+                    <li class="nav-item">
+                        <a href="{{ route('report-agency-advertising') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                            <p>Report Agency Advertising</p>
+                        </a>
+                    </li>
+                    </ul>
                 </li>
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
@@ -219,10 +231,28 @@
                     </a>
                 </li>           --}}
                 
-
+                <li class="nav-item {{ request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
+                                <p>
+                                    Agency Advertising
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    
+                    <li class="nav-item">
+                        <a href="{{ route('report-agency-advertising') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                            <p>Report Agency Advertising</p>
+                        </a>
+                    </li>
+                    </ul>
+                </li>
                 @if($isAdmin || $isPH)
-                    <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
+                    <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp')  ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
                                 <p>
                                     Mitra SBP
@@ -241,14 +271,7 @@
                         <a href="{{ route('report-campaign-sbp') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
-                            <p>Report Campaign Advertising</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('report-agency-advertising') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
-                            <p>Report Agency Advertising</p>
+                            <p>Report Campaign SBP</p>
                         </a>
                     </li>
                     </ul>

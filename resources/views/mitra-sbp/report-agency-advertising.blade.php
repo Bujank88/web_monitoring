@@ -115,7 +115,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg col-md-6 col-6 mb-2">
+            <!-- <div class="col-lg col-md-6 col-6 mb-2">
                 <div class="card border-left-danger">
                     <div class="card-body">
                         <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Saldo Utama</div>
@@ -130,7 +130,7 @@
                         <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSaldoMonet">Rp 0</div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
     </div>
 </div>
@@ -169,8 +169,8 @@
                                 <th>Failed</th>
                                 <th>Balance Terpakai</th>
                                 <th>Pesan</th>
-                                <th>Sisa Saldo Utama</th>
-                                <th>Sisa Saldo Monet</th>
+                                <!-- <th>Sisa Saldo Utama</th>
+                                <th>Sisa Saldo Monet</th> -->
                                 <th>Campaign Status</th>
                                 <th>Remark</th>
                             </tr>
@@ -258,8 +258,8 @@
                         return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
                     }
                 },
-                { data: 'saldo_utama', name: 'su.saldo_utama' },
-                { data: 'saldo_monet', name: 'su.saldo_monet' },
+                // { data: 'saldo_utama', name: 'su.saldo_utama' },
+                // { data: 'saldo_monet', name: 'su.saldo_monet' },
                 { data: 'campaign_status', name: 'b.campaign_status' },
                 { data: 'remark', name: 'a.remark' }
             ],
