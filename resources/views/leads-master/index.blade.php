@@ -219,6 +219,7 @@
                         <th>Tipe Data</th>
                         <th>Tanggal</th>
                         <th>Total Settlement ({{now()->translatedFormat('F Y')}})</th>
+                        <th>Saldo Utama</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
@@ -356,6 +357,7 @@ $(function () {
             { data: 'data_type', searchable: false },
             { data: 'created_at', searchable: false },
             { data: 'total_settlement_klien', searchable: false },
+            { data: 'saldo_utama', searchable: false },
             { data: 'aksi', orderable: false, searchable: false }
         ]
     });
