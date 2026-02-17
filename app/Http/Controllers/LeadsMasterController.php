@@ -117,6 +117,10 @@ class LeadsMasterController extends Controller
                 $amount = $row->total_settlement_klien ?? 0;
                 return 'Rp ' . number_format($amount, 0, ',', '.');
             })
+            ->addColumn('saldo_utama', function ($row) {
+                $amount = $row->saldo_utama ?? 0;
+                return 'Rp ' . number_format($amount, 0, ',', '.');
+            })
             ->addColumn('aksi', function ($row) {
                 $btn = '
                     <a href="' . route('leads-master.show', $row->leads_master_id) . '" class="btn btn-sm btn-warning mt-1">
@@ -510,13 +514,25 @@ class LeadsMasterController extends Controller
                 'lm.updated_at' => now(),
             ]);
 
-        \Log::info('Leads Master Sync - Email matched: ' . $syncedCount . ' records, Old accounts (1+ month): ' . $syncedOldCount . ' records');
+        // 3. Sinkronisasi reg_id dari user_id registrasi berdasarkan email
+        $syncedRegIdCount = DB::table('leads_master as lm')
+            ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
+            ->where('dsa.status', 'APPROVE')
+            ->whereNotNull('dsa.user_id')
+            ->where('dsa.user_id', '!=', '')
+            ->update([
+                'lm.reg_id' => DB::raw('dsa.user_id'),
+                'lm.updated_at' => now(),
+            ]);
+
+        \Log::info('Leads Master Sync - Email matched: ' . $syncedCount . ' records, Old accounts (1+ month): ' . $syncedOldCount . ' records, Reg ID synced: ' . $syncedRegIdCount . ' records');
 
         return response()->json([
             'success' => true,
-            'message' => "Sinkronisasi selesai. Email cocok: {$syncedCount}, Akun lama (>1 bulan): {$syncedOldCount}",
+            'message' => "Sinkronisasi selesai. Email cocok: {$syncedCount}, Akun lama (>1 bulan): {$syncedOldCount}, Reg ID: {$syncedRegIdCount}",
             'synced_email_count' => $syncedCount,
             'synced_old_account_count' => $syncedOldCount,
+            'synced_reg_id_count' => $syncedRegIdCount,
         ]);
     }
 
@@ -600,6 +616,13 @@ class LeadsMasterController extends Controller
             ->whereYear('tgl_transaksi', $year)
             ->groupBy('email_client');
 
+        // Subquery saldo utama berdasarkan reg_id (leads_master) = id_user (saldo_users)
+        $saldoUtamaSubquery = DB::table('saldo_users as su')
+            ->select(
+                'su.id_user',
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            );
+
         // Query untuk mendapatkan data yang akan dimasukkan
         $leadsData = LeadsMaster::with(['user'])
             ->leftJoinSub(
@@ -607,6 +630,13 @@ class LeadsMasterController extends Controller
                 'rbt',
                 function ($join) {
                     $join->on(DB::raw('LOWER(rbt.email_client)'), '=', DB::raw('LOWER(leads_master.email)'));
+                }
+            )
+            ->leftJoinSub(
+                $saldoUtamaSubquery,
+                'su',
+                function ($join) {
+                    $join->on('leads_master.reg_id', '=', 'su.id_user');
                 }
             )
             ->select(
@@ -628,7 +658,8 @@ class LeadsMasterController extends Controller
                 'leads_master.remarks',
                 'leads_master.created_at',
                 'leads_master.updated_at',
-                DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien')
+                DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             )
             ->get();
 
@@ -653,6 +684,7 @@ class LeadsMasterController extends Controller
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
                 'total_settlement_klien' => $lead->total_settlement_klien,
+                'saldo_utama' => $lead->saldo_utama,
                 'created_at' => $lead->created_at,
                 'updated_at' => $lead->updated_at,
             ];
@@ -696,6 +728,9 @@ class LeadsMasterController extends Controller
 
         // Get lead data
         $lead = LeadsMaster::with(['user'])->findOrFail($leadId);
+        $saldoUtama = DB::table('saldo_users')
+            ->where('id_user', $lead->reg_id)
+            ->value('saldo_utama');
 
         // Update atau insert ke summary table
         DB::table('detail_leads_summary')->updateOrInsert(
@@ -718,6 +753,7 @@ class LeadsMasterController extends Controller
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
                 'total_settlement_klien' => $settlement ?? 0,
+                'saldo_utama' => $saldoUtama ?? 0,
                 'created_at' => $lead->created_at,
                 'updated_at' => now(),
             ]
