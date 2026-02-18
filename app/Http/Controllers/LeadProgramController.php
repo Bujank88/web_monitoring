@@ -754,110 +754,43 @@ class LeadProgramController extends Controller
         }
     }
 
-    public function getRegionalChartData()
+    public function getRegionalChartData(Request $request)
     {
         try {
-            // Ambil semua canvasser
-            $canvasers = DB::table('users')
-                ->where('role', 'cvsr')
-                ->where('name', '!=', 'self service')
-                ->select('id', 'name')
-                ->get();
+            // Gunakan source data yang sama dengan tabel regional agar ACV chart
+            // selalu identik dengan kolom "Total (Rp.)" pada tabel.
+            $tableRows = $this->getRegionalData($request);
 
-            if ($canvasers->isEmpty()) {
-                return response()->json([
-                    'canvassers' => []
-                ]);
-            }
+            $toNumber = function ($value) {
+                if (is_numeric($value)) {
+                    return (float) $value;
+                }
 
-            $today = Carbon::now();
-            $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $currentMonth = $today->format('Y-m');
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth();
-            $result = [];
+                $normalized = str_replace('.', '', (string) $value);
+                $normalized = str_replace(',', '.', $normalized);
 
-            foreach ($canvasers as $canvaser) {
-                // 1. New Leads (prospect) - dari table logbook
-                $newLeads = DB::table('logbook as lb')
-                    ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'leads')
-                    ->distinct()
-                    ->count('lb.leads_master_id');
+                return (float) $normalized;
+            };
 
-                // 2. New Akun (deal) - dari data_registarsi yang disetujui di bulan berjalan
-                $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->whereBetween(
-                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                        [$startOfMonth, $endOfMonth->format('Y-m-d')]
-                    )
-                    ->distinct()
-                    ->count('dt.email');
-
-                // 3. Existing Akun Count (prospect) - dari table logbook
-                $existingAkunCount = DB::table('logbook as lb')
-                    ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Eksisting Akun')
-                    ->distinct()
-                    ->count('lb.leads_master_id');
-
-                // 4. Top Up Existing Akun Count (deal) - jumlah AKUN existing yang melakukan topup (DISTINCT)
-                $topUpExistingAkunCount = DB::table('leads_master as lm')
-                    ->join('report_balance_top_up as rp', 'lm.email', '=', 'rp.email_client')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Eksisting Akun')
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->distinct()
-                    ->count('lm.email');
-
-                // 5. Target dari target_canvaser
-                $targetData = DB::table('target_canvaser')
-                    ->where('user_id', $canvaser->id)
-                    ->where('bulan', $currentMonth)
-                    ->first();
-                
-                $target = $targetData->target ?? 0;
-
-                // 6. ACV (Actual Achievement Value) - total topup dalam rupiah (new + existing) - filter bulan berjalan
-                $topUpNewAkunRp = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('report_balance_top_up as rp', 'dt.email', '=', 'rp.email_client')
-                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->whereBetween(
-                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                        [$startOfMonth, $endOfMonth->format('Y-m-d')]
-                    )
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
-
-                $topUpExistingAkunRp = DB::table('leads_master as lm')
-                    ->join('report_balance_top_up as rp', 'lm.email', '=', 'rp.email_client')
-                    ->where('lm.user_id', $canvaser->id)
-                    ->where('lm.data_type', 'Eksisting Akun')
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
-                    ->sum(DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2))"));
-
-                $acv = ($topUpNewAkunRp ?? 0) + ($topUpExistingAkunRp ?? 0);
-
-                $result[] = [
-                    'name' => $canvaser->name,
-                    'new_leads' => $newLeads,
-                    'new_akun' => $newAkun,
-                    'existing_akun_count' => $existingAkunCount,
-                    'top_up_existing_akun_count' => $topUpExistingAkunCount,
-                    'target' => $target,
-                    'acv' => $acv,
-                ];
-            }
+            $result = collect($tableRows)
+                ->reject(fn($row) => !empty($row['is_total']))
+                ->map(function ($row) use ($toNumber) {
+                    return [
+                        'name' => $row['canvaser_name'] ?? '-',
+                        'new_leads' => (int) ($row['leads'] ?? 0),
+                        'new_akun' => (int) ($row['new_akun'] ?? 0),
+                        'existing_akun_count' => (int) ($row['existing_akun'] ?? 0),
+                        'top_up_existing_akun_count' => (int) ($row['top_up_existing_akun_count'] ?? 0),
+                        'target' => $toNumber($row['target'] ?? 0),
+                        'acv' => $toNumber($row['total_top_up_rp'] ?? 0),
+                    ];
+                })
+                ->values()
+                ->all();
 
             return response()->json([
                 'canvassers' => $result
             ]);
-
         } catch (\Exception $e) {
             \Log::error("Error in getRegionalChartData: " . $e->getMessage());
             \Log::error($e->getTraceAsString());

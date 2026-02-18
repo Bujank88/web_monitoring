@@ -677,6 +677,139 @@ public function topupCanvasserData(Request $request)
             ->make(true);
     }
 
+    public function exportSaldoSbp(Request $request)
+    {
+        try {
+            $remark = $request->get('remark');
+            $area = $request->get('area');
+            $regional = $request->get('regional');
+
+            $saldoQuery = DB::table('saldo_users')
+                ->select(
+                    'id_user',
+                    DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                    DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                    DB::raw('saldo_exp_utama'),
+                    DB::raw('saldo_exp_monet')
+                );
+
+            $query = DB::table('mitra_sbp as a')
+                ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                    $join->on('a.reg_id', '=', 'b.id_user');
+                })
+                ->select(
+                    'a.area',
+                    'a.regional',
+                    'a.email_myads',
+                    'a.remark',
+                    DB::raw('COALESCE(b.saldo_utama,0) as saldo_utama'),
+                    DB::raw('COALESCE(b.saldo_monet,0) as saldo_monet'),
+                    'b.saldo_exp_utama',
+                    'b.saldo_exp_monet'
+                );
+
+            if (!empty($remark)) {
+                $query->where('a.remark', $remark);
+            }
+            if (!empty($area)) {
+                $query->where('a.area', $area);
+            }
+            if (!empty($regional)) {
+                $query->where('a.regional', $regional);
+            }
+
+            $data = $query
+                ->orderByRaw('COALESCE(b.saldo_utama, 0) DESC')
+                ->orderBy('a.email_myads')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleRemark = $remark ?: 'Semua';
+            $titleArea = $area ?: 'Semua Area';
+            $titleRegional = $regional ?: 'Semua Regional';
+
+            $sheet->setCellValue(
+                'A1',
+                'REPORT SALDO SBP - ' .
+                strtoupper($titleRemark) .
+                ' - ' . $titleArea .
+                ' - ' . $titleRegional
+            );
+            $sheet->mergeCells('A1:H1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Area',
+                'Regional',
+                'Email',
+                'Remark',
+                'Saldo Utama',
+                'Saldo Monet',
+                'Saldo Exp Utama',
+                'Saldo Exp Monet',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:H3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->area,
+                    $row->regional,
+                    $row->email_myads,
+                    $row->remark,
+                    (float) $row->saldo_utama,
+                    (float) $row->saldo_monet,
+                    $row->saldo_exp_utama,
+                    $row->saldo_exp_monet,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'H') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $safeRemark = str_replace(' ', '_', $remark ?: 'Semua');
+            $safeArea = str_replace(' ', '_', $area ?: 'AllArea');
+            $safeRegional = str_replace(' ', '_', $regional ?: 'AllRegional');
+
+            $fileName = 'Report_Saldo_SBP_' .
+                $safeRemark . '_' .
+                $safeArea . '_' .
+                $safeRegional . '_' .
+                now()->format('Ymd_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Saldo SBP Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
     public function reportSaldoAdvertisingData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));

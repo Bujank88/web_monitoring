@@ -153,6 +153,45 @@
     </div>
 </div>
 
+<div class="row mb-3">
+    <div class="col-md-4 mb-3">
+        <div class="card border-left-primary h-100">
+            <div class="card-header bg-primary text-white py-2">
+                <strong>Summary Jumlah Akun (Komitmen)</strong>
+            </div>
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span>New Leads (Prospect)</span><strong id="sumCountNewLeads">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Leads</span><strong id="sumCountLeads">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Eksisting</span><strong id="sumCountEksisting">0</strong></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-left-success h-100">
+            <div class="card-header bg-success text-white py-2">
+                <strong>Summary Rupiah New Leads</strong>
+            </div>
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span>Plan New Leads</span><strong id="sumPlanNewLeads">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Realisasi New Leads</span><strong id="sumRealNewLeads">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Gap New Leads</span><strong id="sumGapNewLeads">Rp 0</strong></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-left-info h-100">
+            <div class="card-header bg-info text-white py-2">
+                <strong>Summary Rupiah Eksisting (Non New Leads)</strong>
+            </div>
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between"><span>Plan Eksisting (Non New Leads)</span><strong id="sumPlanEksistingNonNew">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Realisasi Eksisting (Non New Leads)</span><strong id="sumRealEksistingNonNew">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Gap Eksisting (Non New Leads)</span><strong id="sumGapEksistingNonNew">Rp 0</strong></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 {{-- TABLE --}}
 <div class="card">
@@ -231,7 +270,7 @@ $(function () {
         searching: true,
         responsive: true,
         ajax: {
-            url: "{{ route('logbook.data') }}",
+            url: "{{ route('logbook-event.data') }}",
             data: function (d) {
                 d.canvasser   = $('#filter_canvasser').val();
                 d.regional    = $('#filter_regional').val();
@@ -256,7 +295,28 @@ $(function () {
             { data: 'plan_min_topup' },
             { data: 'status' },
             { data: 'total_settlement_klien' }
-        ]
+        ],
+        drawCallback: function(settings) {
+            const summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
+
+            function toRupiah(val) {
+                const num = Number(val || 0);
+                return 'Rp ' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+            }
+
+            const count = summary.count || {};
+            $('#sumCountNewLeads').text(count.new_leads || 0);
+            $('#sumCountLeads').text(count.leads || 0);
+            $('#sumCountEksisting').text(count.eksisting || 0);
+
+            const rupiah = summary.rupiah || {};
+            $('#sumPlanNewLeads').text(toRupiah((rupiah.new_leads || {}).plan));
+            $('#sumRealNewLeads').text(toRupiah((rupiah.new_leads || {}).realisasi));
+            $('#sumGapNewLeads').text(toRupiah((rupiah.new_leads || {}).gap));
+            $('#sumPlanEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).plan));
+            $('#sumRealEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).realisasi));
+            $('#sumGapEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).gap));
+        }
     });
 
     // Auto-reload table ketika filter berubah

@@ -379,7 +379,7 @@ class LogbookController extends Controller
                     ->whereMonth('report_balance_top_up.tgl_transaksi', $month)
                     ->whereYear('report_balance_top_up.tgl_transaksi', $year);
                 })
-            ->whereRaw("LOWER(logbook.flag_event) = ?", ['ramadhan 2026'])
+            ->whereRaw("LOWER(COALESCE(leads_master.flag_event, '')) = ?", ['ramadhan 2026'])
             ->select([
                 'leads_master.id',
                 'users.name as user_name',
@@ -438,10 +438,65 @@ class LogbookController extends Controller
         }
         
 
+        $summaryRows = (clone $query)->get();
+
+        $summary = [
+            'count' => [
+                'new_leads' => 0,
+                'leads' => 0,
+                'eksisting' => 0,
+            ],
+            'rupiah' => [
+                'new_leads' => ['plan' => 0, 'realisasi' => 0, 'gap' => 0],
+                'eksisting_non_new' => ['plan' => 0, 'realisasi' => 0, 'gap' => 0],
+            ],
+            'eksisting_akun' => [
+                'count' => 0,
+                'plan' => 0,
+                'realisasi' => 0,
+            ],
+        ];
+
+        foreach ($summaryRows as $row) {
+            $komitmen = strtolower(trim((string) ($row->komitmen ?? '')));
+            $dataType = strtolower(trim((string) ($row->data_type ?? '')));
+
+            $isNewLeads = ($komitmen === 'new leads');
+            $bucket = $isNewLeads ? 'new_leads' : 'eksisting_non_new';
+
+            $plan = (float) ($row->plan_min_topup ?? 0);
+            $realisasi = (float) ($row->total_settlement_klien ?? 0);
+
+            if ($komitmen === 'new leads') {
+                $summary['count']['new_leads']++;
+            }
+            if ($dataType === 'leads') {
+                $summary['count']['leads']++;
+            }
+            if ($dataType === 'eksisting akun') {
+                $summary['count']['eksisting']++;
+            }
+
+            $summary['rupiah'][$bucket]['plan'] += $plan;
+            $summary['rupiah'][$bucket]['realisasi'] += $realisasi;
+
+            if ($dataType === 'eksisting akun') {
+                $summary['eksisting_akun']['count']++;
+                $summary['eksisting_akun']['plan'] += $plan;
+                $summary['eksisting_akun']['realisasi'] += $realisasi;
+            }
+        }
+
+        $summary['rupiah']['new_leads']['gap'] =
+            $summary['rupiah']['new_leads']['realisasi'] - $summary['rupiah']['new_leads']['plan'];
+        $summary['rupiah']['eksisting_non_new']['gap'] =
+            $summary['rupiah']['eksisting_non_new']['realisasi'] - $summary['rupiah']['eksisting_non_new']['plan'];
+
         // =======================
         // DATATABLE RESPONSE
         // =======================
         return datatables()->of($query)
+            ->with('summary', $summary)
             ->filter(function ($query) use ($request) {
                     // Ambil value search dari input bawaan datatables
                     $search = $request->input('search.value');

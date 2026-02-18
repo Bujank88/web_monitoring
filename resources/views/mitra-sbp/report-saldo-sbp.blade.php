@@ -80,15 +80,23 @@
 </div>
 
 <div class="card">
-    <div class="card-header bg-danger text-white">
+    <div class="card-header bg-danger d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
             <i class="fas fa-wallet mr-2"></i>
             {{ $pageTitle ?? 'Report Saldo SBP' }}
         </h5>
+        <div class="btn-actions">
+            <button type="button" class="btn btn-success btn-sm" id="btnSaveSaldoImage">
+                <i class="fas fa-image mr-1"></i> Save Image
+            </button>
+            <a class="btn btn-success btn-sm" id="btnExportSaldo" href="#">
+                <i class="fas fa-file-excel mr-1"></i> Download Excel
+            </a>
+        </div>
     </div>
 
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive" id="saldoTableWrap">
             <table id="saldoTable" class="table table-bordered table-hover" style="width:100%">
                 <thead>
                     <tr>
@@ -113,6 +121,7 @@
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
 $(function() {
@@ -133,12 +142,40 @@ $(function() {
         }
     }
 
-    // ============================
-    // Format Rupiah
-    // ============================
-    function formatRupiah(value) {
-        var num = Number(value || 0);
-        return 'Rp ' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    function updateExportLink() {
+        var remark = $('#remark').val();
+        var area = $('#area').val();
+        var regional = $('#regional').val();
+        var month = $('#month').val();
+
+        var url = "{{ route('report-saldo-sbp.export') }}";
+        var params = [];
+
+        if (month) params.push('month=' + encodeURIComponent(month));
+        if (remark) params.push('remark=' + encodeURIComponent(remark));
+        if (area) params.push('area=' + encodeURIComponent(area));
+        if (regional) params.push('regional=' + encodeURIComponent(regional));
+
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+
+        $('#btnExportSaldo').attr('href', url);
+    }
+
+    function saveTableAsImage() {
+        html2canvas(document.getElementById('saldoTableWrap'), {
+            scale: 2,
+            allowTaint: true,
+            useCORS: true
+        }).then(canvas => {
+            var link = document.createElement('a');
+            link.download = 'report-saldo-sbp-' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }).catch(function() {
+            alert('Gagal menyimpan gambar. Silakan coba lagi.');
+        });
     }
 
     // ============================
@@ -180,7 +217,8 @@ $(function() {
     // ============================
     // Filter Change
     // ============================
-    $('#remark, #area, #regional').on('change', function() {
+    $('#remark, #area, #regional, #month').on('change', function() {
+        updateExportLink();
         table.ajax.reload();
     });
 
@@ -189,8 +227,15 @@ $(function() {
     // ============================
     $('#area').on('change', function() {
         updateRegionalDropdown($(this).val());
+        updateExportLink();
         table.ajax.reload();
     });
+
+    $('#btnSaveSaldoImage').on('click', function() {
+        saveTableAsImage();
+    });
+
+    updateExportLink();
 
 });
 </script>
