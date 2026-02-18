@@ -6,6 +6,7 @@ const QRCode = require("qrcode");
 const P = require("pino");
 const express = require('express');
 const bodyParser = require('body-parser');
+const readline = require('readline');
 
 require("dotenv").config();
 
@@ -21,6 +22,25 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 let lastReconnectTime = 0;
 const RECONNECT_DELAY = 5000; // 5 detik minimum antar reconnect
+
+// Auth method: 'qr' atau 'pairing'
+// Set via env: AUTH_METHOD=pairing atau AUTH_METHOD=qr
+const AUTH_METHOD = process.env.AUTH_METHOD || 'qr';
+const PHONE_NUMBER = process.env.PHONE_NUMBER || ''; // Format: 62xxxx (tanpa +)
+
+// Helper untuk input dari console
+const question = (q) => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise((resolve) => {
+    rl.question(q, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+};
 
 // ===== Helpers =====
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -328,11 +348,22 @@ app.post('/api/send-wa-presensi', async (req, res) => {
     const sentTo = [];
     let hasError = false;
     
+    // Helper: Clean base64 string (remove data URI prefix if present)
+    const cleanBase64 = (b64String) => {
+      if (!b64String) return b64String;
+      // Remove data URI prefix like "data:image/png;base64,"
+      let cleaned = b64String.replace(/^data:image\/\w+;base64,/i, '');
+      // Replace spaces with +
+      cleaned = cleaned.replace(/ /g, '+');
+      return cleaned;
+    };
+
     // Kirim ke personal number
     try {
       if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
         try {
-          const buffer = Buffer.from(foto_base64, 'base64');
+          const cleanedBase64 = cleanBase64(foto_base64);
+          const buffer = Buffer.from(cleanedBase64, 'base64');
           const mediaType = foto_mime || 'image/png';
           
           console.log(`[PRESENSI-API] Sending photo with caption to personal ${jid}`);
@@ -342,7 +373,7 @@ app.post('/api/send-wa-presensi', async (req, res) => {
             mimetype: mediaType
           });
         } catch (photoError) {
-          console.error('[PRESENSI-API] Error sending photo:', photoError);
+          console.error('[PRESENSI-API] Error sending photo:', photoError.message);
           // Fallback: kirim text jika foto gagal
           console.log(`[PRESENSI-API] Fallback: sending text message to personal ${jid}`);
           await globalSock.sendMessage(jid, { text: message });
@@ -368,7 +399,8 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       
       if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
         try {
-          const buffer = Buffer.from(foto_base64, 'base64');
+          const cleanedBase64 = cleanBase64(foto_base64);
+          const buffer = Buffer.from(cleanedBase64, 'base64');
           const mediaType = foto_mime || 'image/png';
           
           console.log(`[PRESENSI-API] Sending photo with caption to group`);
@@ -457,9 +489,7 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     let caption = `📋 *LOGBOOK REALISASI*\n\n`;
     caption += `👤 *Canvasser:* ${nama_canvasser}\n`;
     caption += `📅 *Tanggal:* ${tanggal}\n`;
-    if (jam) {
-      caption += `🕐 *Jam Input:* ${jam} WIB\n`;
-    }
+    caption += `⏰ *Jam:* ${jam}\n`;
     caption += `💼 *Komitmen:* ${komitmen}\n`;
     caption += `💰 *Plan Min Topup:* Rp${formatCurrency(plan_min_topup)}\n`;
     caption += `📊 *Status:* ${status}\n`;
@@ -480,6 +510,9 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     if (mobile_phone) {
       caption += `☎️ *No. HP:* ${mobile_phone}\n`;
     }
+    console.error('[LOGBOOK-API] Additional Info:', {
+      company_name, email, regional, myads_account, mobile_phone
+    });
     
     if (metode) {
       caption += `\n🔄 *Metode:* ${metode === 'online' ? 'Online' : 'Offline'}\n`;
@@ -521,10 +554,21 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     const sentTo = [];
     let hasError = false;
     
+    // Helper: Clean base64 string (remove data URI prefix if present)
+    const cleanBase64 = (b64String) => {
+      if (!b64String) return b64String;
+      // Remove data URI prefix like "data:image/png;base64,"
+      let cleaned = b64String.replace(/^data:image\/\w+;base64,/i, '');
+      // Replace spaces with +
+      cleaned = cleaned.replace(/ /g, '+');
+      return cleaned;
+    };
+    
     // 1️⃣ Kirim ke personal number
     try {
       if (foto_base64 && foto_mime) {
-        const imageBuffer = Buffer.from(foto_base64, 'base64');
+        const cleanedBase64 = cleanBase64(foto_base64);
+        const imageBuffer = Buffer.from(cleanedBase64, 'base64');
         await globalSock.sendMessage(jid, {
           image: imageBuffer,
           caption: caption,
@@ -548,7 +592,8 @@ app.post('/api/send-wa-logbook', async (req, res) => {
     if (group_id) {
       try {
         if (foto_base64 && foto_mime) {
-          const imageBuffer = Buffer.from(foto_base64, 'base64');
+          const cleanedBase64 = cleanBase64(foto_base64);
+          const imageBuffer = Buffer.from(cleanedBase64, 'base64');
           await globalSock.sendMessage(group_id, {
             image: imageBuffer,
             caption: caption,
@@ -611,50 +656,146 @@ async function start() {
 
   const sock = makeWASocket({
     version,
-    logger: P({ level: "error" }), // Kurangi log warning
+    logger: P({ level: "silent" }), // Silent mode untuk hindari spam error log
     auth: state,
-    syncFullHistory: true, // Sync history untuk koneksi lebih stabil
+    syncFullHistory: false, // DISABLE sync history untuk pairing code (hindari Invalid buffer error)
     retryRequestDelayMs: 10000, // Retry delay 10 detik
     maxMsgsInMemory: 300, // Limit buffer
+    printQRInTerminal: false, // Disable default QR print karena kita handle manual
+    getMessage: async (key) => {
+      return { conversation: 'Hello' }; // Return dummy message untuk hindari error
+    },
+    shouldIgnoreJid: (jid) => {
+      // Ignore broadcast messages
+      return jid === 'status@broadcast';
+    },
+    markOnlineOnConnect: false, // Jangan auto set online
   });
 
   globalSock = sock;
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+  sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr, isNewLogin }) => {
     try {
-      if (qr) {
+      // Handle QR Code method
+      if (qr && AUTH_METHOD === 'qr') {
+        console.log('\n📱 === QR CODE METHOD ===');
         qrcodeTerm.generate(qr, { small: true });
         await QRCode.toFile("qr.png", qr);
         await QRCode.toFile("qr.jpg", qr, { type: "jpeg" });
-        console.log("✅ QR disimpan: qr.png & qr.jpg — scan dari HP untuk login");
+        console.log("✅ QR Code disimpan: qr.png & qr.jpg");
+        console.log("📲 Scan QR dari WhatsApp di HP Anda:");
+        console.log("   1. Buka WhatsApp di HP");
+        console.log("   2. Tap Menu (⋮) > Linked Devices");
+        console.log("   3. Tap 'Link a Device'");
+        console.log("   4. Scan QR code di atas atau file qr.png\n");
       }
+      
+      // Handle Pairing Code method - hanya minta jika belum registered
+      if (qr && AUTH_METHOD === 'pairing' && !sock.authState.creds.registered) {
+        console.log('\n📞 === PAIRING CODE METHOD ===');
+        let phoneNumber = PHONE_NUMBER;
+        
+        // Jika nomor tidak ada di env, tanya user
+        if (!phoneNumber) {
+          phoneNumber = await question('Masukkan nomor WhatsApp Anda (62xxxx, tanpa +): ');
+        }
+        
+        // Validasi format nomor
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, ''); // Hapus non-digit
+        if (!phoneNumber.startsWith('62')) {
+          if (phoneNumber.startsWith('0')) {
+            phoneNumber = '62' + phoneNumber.substring(1);
+          } else if (phoneNumber.startsWith('8')) {
+            phoneNumber = '62' + phoneNumber;
+          }
+        }
+        
+        console.log(`📱 Nomor yang digunakan: +${phoneNumber}`);
+        console.log('⏳ Meminta pairing code...');
+        
+        try {
+          // Tunggu sebentar untuk pastikan koneksi ready
+          await sleep(1500);
+          
+          // Request pairing code
+          const code = await sock.requestPairingCode(phoneNumber);
+          console.log('\n✅ ═══════════════════════════════════');
+          console.log('   PAIRING CODE ANDA: ' + code);
+          console.log('   ═══════════════════════════════════\n');
+          console.log('📲 Cara menggunakan pairing code:');
+          console.log('   1. Buka WhatsApp di HP Anda');
+          console.log('   2. Tap Menu (⋮) > Linked Devices');
+          console.log('   3. Tap "Link a Device"');
+          console.log('   4. Tap "Link with phone number instead"');
+          console.log(`   5. Masukkan kode: ${code.match(/.{1,4}/g).join('-')}`);
+          console.log('   6. Tunggu koneksi terhubung...\n');
+        } catch (pairingError) {
+          console.error('❌ Error requesting pairing code:', pairingError.message);
+          console.log('💡 Coba restart aplikasi atau hapus folder ./auth untuk reset session\n');
+        }
+      }
+      
       if (connection === "open") {
-        console.log("✅ WA connected!");
+        console.log("✅ WhatsApp Connected!");
+        console.log("🔐 Session tersimpan di folder ./auth");
+        console.log("💡 Anda tidak perlu scan QR/pairing lagi selama file auth tidak dihapus\n");
+        isConnecting = false;
+        reconnectAttempts = 0;
       }
+      
       if (connection === "close") {
         const code = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = code !== DisconnectReason.loggedOut && code !== 401;
-        console.log("🔌 connection closed:", code, "reconnect:", shouldReconnect);
-        if (shouldReconnect) start();
+        console.log("🔌 Connection closed. Status code:", code);
+        console.log("🔄 Should reconnect:", shouldReconnect);
+        
+        if (code === DisconnectReason.loggedOut) {
+          console.log("⚠️ Anda telah logout. Hapus folder ./auth dan restart untuk login ulang.");
+          isConnecting = false;
+        }
+        
+        if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++;
+          console.log(`⏳ Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in 5 seconds...`);
+          isConnecting = true;
+          setTimeout(() => {
+            isConnecting = false;
+            start();
+          }, 5000);
+        } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.log("❌ Max reconnect attempts reached. Please restart the application.");
+          isConnecting = false;
+        }
       }
     } catch (e) {
-      console.error("connection.update error:", e);
+      console.error("❌ connection.update error:", e.message);
+      isConnecting = false;
     }
   });
 
   // Handle incoming messages (optional: just log, don't reply)
   sock.ev.on("messages.upsert", async ({ messages }) => {
-    if (!messages || !messages.length) return;
-    for (const m of messages) {
-      try {
-        if (m.key?.fromMe) continue;
-        const jid = m.key?.remoteJid;
-        const text = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
-        console.log(`[📨] Message from ${jid}: ${text}`);
-      } catch (e) {
-        console.error("message handler error:", e);
+    try {
+      if (!messages || !messages.length) return;
+      for (const m of messages) {
+        try {
+          if (m.key?.fromMe) continue;
+          const jid = m.key?.remoteJid;
+          
+          // Skip broadcast messages
+          if (jid === 'status@broadcast') continue;
+          
+          const text = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
+          if (text) {
+            console.log(`[📨] Message from ${jid}: ${text}`);
+          }
+        } catch (msgError) {
+          // Silent ignore per-message errors
+        }
       }
+    } catch (e) {
+      // Silent ignore message upsert errors to prevent "Invalid buffer" spam
     }
   });
 }
