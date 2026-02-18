@@ -25,6 +25,8 @@ class FrontController extends Controller
                 return redirect()->route('presensi.index');
             } else if ('TCD' == Auth::user()->role) {
                 return redirect()->route('report-agency-advertising');
+            } else if ('Internal' == Auth::user()->role) {
+                return redirect()->route('mitra-sbp');
             } else {
             return redirect('/admin/home');
             }

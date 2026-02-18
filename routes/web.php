@@ -190,6 +190,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::post('/logbook/update', [LogbookController::class, 'update'])->name('logbook.update');
     Route::post('/logbook/insert', [LogbookController::class, 'insert'])->name('logbook.insert');
     Route::post('/logbook/day', [LogbookController::class, 'insertDaily'])->name('logbook.day');
+    
     Route::get('/logbook-daily', [LogbookDailyController::class, 'index'])->name('logbook-daily.index');
     Route::get('logbook-daily/data', [LogbookDailyController::class, 'data'])->name('logbook-daily.data');
     Route::get('/logbook-daily/summary', [LogbookDailyController::class, 'summary'])->name('logbook-daily.summary');
@@ -198,26 +199,14 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('/logbook-daily/foto/{filePath}', [LogbookDailyController::class, 'getFoto'])->name('logbook-daily.foto')->where('filePath', '.*');
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
 
+    Route::get('logbook-event', [LogbookController::class, 'logbookEvent'])->name('logbook-event.index');
+    Route::get('logbook-event/data', [LogbookController::class, 'logbookEventData'])->name('logbook-event.data');
+
     // Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser/data', [ReportController::class, 'topupCanvasserData']);
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
-
-    Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
-    Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
-    Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
-    Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
-    Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
-    Route::get('report-saldo-sbp', [ReportController::class, 'reportSaldoSbp'])->name('report-saldo-sbp');
-    Route::get('report-saldo-sbp/data', [ReportController::class, 'reportSaldoSbpData'])->name('report-saldo-sbp.data');
-    Route::get('report-saldo-sbp/export', [ReportController::class, 'exportSaldoSbp'])->name('report-saldo-sbp.export');
-    Route::get('report-saldo-advertising', [ReportController::class, 'reportSaldoAdvertising'])->name('report-saldo-advertising');
-    Route::get('report-saldo-advertising/data', [ReportController::class, 'reportSaldoAdvertisingData'])->name('report-saldo-advertising.data');
-    Route::get('report-saldo-advertising/export', [ReportController::class, 'exportSaldoAdvertising'])->name('report-saldo-advertising.export');
-    Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
-    Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
-    Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
 
     // Panen Poin Routes
     Route::get('panen-poin/input', [PanenPoinController::class, 'index'])->name('panenpoin.index');
@@ -233,6 +222,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('panen-poin/list-akun', [PanenPoinController::class, 'listAkun'])->name('panenpoin.list-akun');
     Route::get('panen-poin/akun-data', [PanenPoinController::class, 'getAkunData'])->name('panenpoin.akun-data');
 
+    Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
     Route::get('/calendar/events', [CalendarController::class, 'events']);
@@ -248,6 +238,24 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD'])->group(function () {
     Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
     Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
     Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
+});
+
+
+Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
+    
+    Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
+    Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
+    Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
+    Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
+    Route::get('report-saldo-sbp', [ReportController::class, 'reportSaldoSbp'])->name('report-saldo-sbp');
+    Route::get('report-saldo-sbp/data', [ReportController::class, 'reportSaldoSbpData'])->name('report-saldo-sbp.data');
+    Route::get('report-saldo-sbp/export', [ReportController::class, 'exportSaldoSbp'])->name('report-saldo-sbp.export');
+    Route::get('report-saldo-advertising', [ReportController::class, 'reportSaldoAdvertising'])->name('report-saldo-advertising');
+    Route::get('report-saldo-advertising/data', [ReportController::class, 'reportSaldoAdvertisingData'])->name('report-saldo-advertising.data');
+    Route::get('report-saldo-advertising/export', [ReportController::class, 'exportSaldoAdvertising'])->name('report-saldo-advertising.export');
+    Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
+    Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
+    Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
 });
 
 // Routes untuk Presensi CVSR
