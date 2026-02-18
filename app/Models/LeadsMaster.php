@@ -31,6 +31,7 @@ class LeadsMaster extends Model
         'komitmen',
         'plan_min_topup',
         'remarks',
+        'flag_event',
     ];
     
     // Events untuk trigger summary update
