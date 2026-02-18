@@ -449,6 +449,17 @@
                 </li>
 
                 @endif
+                @if($isAdmin)
+                <li class="nav-header">EVENT RAMADHAN ONLY</li>
+                <li class="nav-item">
+                    <a href="{{ route('logbook-event.index') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logbook-event.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-mosque" style="color:#20c997;"></i>
+                        <p>Logbook Event Ramadhan</p>
+                    </a>
+                </li>
+                @endif
+
                 {{-- ===== PRESENSI: Hanya untuk CVSR dan Admin ===== --}}
                 @if($isCanv || $isAdmin)
                 <li class="nav-header">PRESENSI</li>

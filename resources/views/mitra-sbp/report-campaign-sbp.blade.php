@@ -86,6 +86,23 @@
             </select>
         </div>
         <div class="filter-group">
+            <label for="area_provinsi">Area Provinsi</label>
+            <select id="area_provinsi" class="form-control">
+                <option value="">Semua Area</option>
+                @foreach($areas as $area)
+                    <option value="{{ $area }}">{{ $area }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="regional">Regional</label>
+            <select id="regional" class="form-control">
+                <option value="">Semua Regional</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
             <label for="remark">Remark</label>
             <select id="remark" name="remark" class="form-control">
                 <option value="">Semua Remark</option>
@@ -182,112 +199,172 @@
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
 <script>
-    $(document).ready(function() {
-        function updateExportLink() {
-            var month = $('#month').val();
-            var remark = $('#remark').val();
-            var url = "{{ route('report-campaign-sbp.export') }}" + "?month=" + encodeURIComponent(month);
-            if (remark) {
-                url += "&remark=" + encodeURIComponent(remark);
-            }
-            $('#btnExportCampaign').attr('href', url);
+$(document).ready(function() {
+
+    // ==============================
+    // AREA → REGIONAL MAPPING
+    // ==============================
+    var areaRegionalMap = @json($areaRegionalMap);
+
+    // ==============================
+    // UPDATE EXPORT LINK
+    // ==============================
+    function updateExportLink() {
+        var month = $('#month').val();
+        var remark = $('#remark').val();
+        var area = $('#area_provinsi').val();
+        var regional = $('#regional').val();
+
+        var url = "{{ route('report-campaign-sbp.export') }}" + 
+                  "?month=" + encodeURIComponent(month);
+
+        if (remark) {
+            url += "&remark=" + encodeURIComponent(remark);
+        }
+        if (area) {
+            url += "&area_provinsi=" + encodeURIComponent(area);
+        }
+        if (regional) {
+            url += "&regional=" + encodeURIComponent(regional);
         }
 
-        function saveTableAsImage() {
-            html2canvas(document.getElementById('campaignTableWrap'), {
-                scale: 2,
-                allowTaint: true,
-                useCORS: true
-            }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'report-campaign-sbp-' + new Date().getTime() + '.png';
-                link.href = canvas.toDataURL();
-                link.click();
-            }).catch(err => {
-                console.error('Error capturing image:', err);
-                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+        $('#btnExportCampaign').attr('href', url);
+    }
+
+    // ==============================
+    // SAVE TABLE AS IMAGE
+    // ==============================
+    function saveTableAsImage() {
+        html2canvas(document.getElementById('campaignTableWrap'), {
+            scale: 2,
+            allowTaint: true,
+            useCORS: true
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'report-campaign-sbp-' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }).catch(err => {
+            console.error('Error capturing image:', err);
+            alert('Gagal menyimpan gambar. Silakan coba lagi.');
+        });
+    }
+
+    // ==============================
+    // INIT DATATABLE
+    // ==============================
+    var table = $('#campaignTable').DataTable({
+        processing: true,
+        serverSide: true,
+        responsive: true,
+        ajax: {
+            url: "{{ route('report-campaign-sbp.data') }}",
+            data: function(d) {
+                d.month = $('#month').val();
+                d.remark = $('#remark').val();
+                d.area_provinsi = $('#area_provinsi').val();
+                d.regional = $('#regional').val();
+            }
+        },
+        columns: [
+            { data: 'tanggal_iklan', name: 'b.tanggal_iklan' },
+            { data: 'email', name: 'b.email' },
+            { data: 'id_iklan', name: 'b.id_iklan' },
+            { data: 'nama_iklan', name: 'b.nama_iklan' },
+            { data: 'nama_instansi', name: 'b.nama_instansi' },
+            { data: 'area_provinsi', name: 'b.area_provinsi' },
+            { data: 'campaign_type', name: 'b.campaign_type' },
+            { data: 'inventory_type', name: 'b.inventory_type' },
+            { data: 'total', name: 'b.total' },
+            { data: 'success', name: 'b.success' },
+            { data: 'failed', name: 'b.failed' },
+            { data: 'balance_terpakai', name: 'b.balance_terpakai' },
+            {
+                data: 'pesan',
+                name: 'b.wording',
+                render: function(data) {
+                    if (!data) return '';
+                    var text = data.toString();
+                    if (text.length <= 50) return text;
+                    var shortText = text.substring(0, 50) + '...';
+                    return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
+                }
+            },
+            { data: 'campaign_status', name: 'b.campaign_status' },
+            { data: 'remark', name: 'a.remark' }
+        ],
+        order: [[0, 'desc']],
+        pageLength: 25,
+        lengthMenu: [
+            [10, 25, 50, 100, -1],
+            [10, 25, 50, 100, "Semua"]
+        ],
+        language: {
+            emptyTable: 'Tidak ada data untuk ditampilkan',
+            info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+            infoEmpty: 'Menampilkan 0 sampai 0 dari 0 data',
+            infoFiltered: '(disaring dari _MAX_ total data)',
+            lengthMenu: 'Tampilkan _MENU_ data',
+            search: 'Cari:',
+            zeroRecords: 'Data tidak ditemukan',
+            paginate: {
+                first: 'Pertama',
+                last: 'Terakhir',
+                next: 'Selanjutnya',
+                previous: 'Sebelumnya'
+            }
+        },
+        drawCallback: function(settings) {
+            var summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
+            $('#countMitraSbp').text(summary['Mitra SBP'] || 0);
+            $('#countAgency').text(summary['Agency'] || 0);
+            $('#countInternal').text(summary['Internal'] || 0);
+        }
+    });
+
+    // ==============================
+    // AREA CHANGE → UPDATE REGIONAL
+    // ==============================
+    $('#area_provinsi').on('change', function () {
+
+        var selectedArea = $(this).val();
+        var regionalSelect = $('#regional');
+
+        regionalSelect.empty();
+        regionalSelect.append('<option value="">Semua Regional</option>');
+
+        if (selectedArea && areaRegionalMap[selectedArea]) {
+            areaRegionalMap[selectedArea].forEach(function (regional) {
+                regionalSelect.append(
+                    '<option value="'+regional+'">'+regional+'</option>'
+                );
             });
         }
 
-        var table = $('#campaignTable').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            ajax: {
-                url: "{{ route('report-campaign-sbp.data') }}",
-                data: function(d) {
-                    d.month = $('#month').val();
-                    d.remark = $('#remark').val();
-                }
-            },
-            columns: [
-                { data: 'tanggal_iklan', name: 'b.tanggal_iklan' },
-                { data: 'email', name: 'b.email' },
-                { data: 'id_iklan', name: 'b.id_iklan' },
-                { data: 'nama_iklan', name: 'b.nama_iklan' },
-                { data: 'nama_instansi', name: 'b.nama_instansi' },
-                { data: 'area_provinsi', name: 'b.area_provinsi' },
-                { data: 'campaign_type', name: 'b.campaign_type' },
-                { data: 'inventory_type', name: 'b.inventory_type' },
-                { data: 'total', name: 'b.total' },
-                { data: 'success', name: 'b.success' },
-                { data: 'failed', name: 'b.failed' },
-                { data: 'balance_terpakai', name: 'b.balance_terpakai' },
-                {
-                    data: 'pesan',
-                    name: 'b.wording',
-                    render: function(data) {
-                        if (!data) return '';
-                        var text = data.toString();
-                        if (text.length <= 50) return text;
-                        var shortText = text.substring(0, 50) + '...';
-                        return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
-                    }
-                },
-                // { data: 'saldo_utama', name: 'su.saldo_utama' },
-                // { data: 'saldo_monet', name: 'su.saldo_monet' },
-                { data: 'campaign_status', name: 'b.campaign_status' },
-                { data: 'remark', name: 'a.remark' }
-            ],
-            order: [[0, 'desc']],
-            pageLength: 25,
-            lengthMenu: [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, "Semua"]
-            ],
-            language: {
-                emptyTable: 'Tidak ada data untuk ditampilkan',
-                info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
-                infoEmpty: 'Menampilkan 0 sampai 0 dari 0 data',
-                infoFiltered: '(disaring dari _MAX_ total data)',
-                lengthMenu: 'Tampilkan _MENU_ data',
-                search: 'Cari:',
-                zeroRecords: 'Data tidak ditemukan',
-                paginate: {
-                    first: 'Pertama',
-                    last: 'Terakhir',
-                    next: 'Selanjutnya',
-                    previous: 'Sebelumnya'
-                }
-            },
-            drawCallback: function(settings) {
-                var summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
-                $('#countMitraSbp').text(summary['Mitra SBP'] || 0);
-                $('#countAgency').text(summary['Agency'] || 0);
-                $('#countInternal').text(summary['Internal'] || 0);
-            }
-        });
-
-        $('#month, #remark').on('change', function() {
-            updateExportLink();
-            table.ajax.reload();
-        });
-
         updateExportLink();
-        $('#btnSaveCampaignImage').on('click', function() {
-            saveTableAsImage();
-        });
+        table.ajax.reload();
     });
+
+    // ==============================
+    // OTHER FILTER CHANGE
+    // ==============================
+    $('#month, #remark, #area_provinsi, #regional').on('change', function() {
+        updateExportLink();
+        table.ajax.reload();
+    });
+
+    // ==============================
+    // BUTTON ACTION
+    // ==============================
+    $('#btnSaveCampaignImage').on('click', function() {
+        saveTableAsImage();
+    });
+
+    // Init first load
+    updateExportLink();
+
+});
 </script>
 @endsection

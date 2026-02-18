@@ -48,7 +48,8 @@ class LeadsMasterController extends Controller
             ->select(
                 'dls.*'
             )
-            ->orderBy('dls.total_settlement_klien', 'desc');
+            ->orderBy('dls.total_settlement_klien', 'desc')
+            ->orderBy('dls.saldo_utama', 'desc');
 
         // 🔐 Filter berdasarkan role
         if (!auth()->user()->hasRole('Admin')) {
