@@ -203,6 +203,7 @@
                             <option value="cvsr">Canvasser</option>
                             <option value="PH">PowerHouse</option>
                             <option value="TCD">TCD</option>
+                            <option value="Internal">Internal</option>
                         </select>
                     </div>
                     
@@ -296,8 +297,10 @@
                             badgeClass = 'badge-success';
                         } else if (data === 'cvsr') {
                             badgeClass = 'badge-secondary';
-                        } else if (data === 'ph') {
+                        } else if (data === 'PH') {
                             badgeClass = 'badge-info';
+                        } else if (data === 'Internal') {
+                            badgeClass = 'badge-success';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;
                     }

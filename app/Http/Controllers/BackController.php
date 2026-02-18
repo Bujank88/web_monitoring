@@ -31,7 +31,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal',
         ]);
         $data = [
             'name' => $request->name,

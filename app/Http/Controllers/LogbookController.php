@@ -339,7 +339,169 @@ class LogbookController extends Controller
                 ]);
             print($logbook);
         }
+    }
+
+    /**
+     * Show the leads master view
+     */
+    public function logbookEvent()
+    {
+        logUserLogin();
+        return view('logbook.logbook-event', [
+            'canvassers' => User::orderBy('name')->where('role', 'cvsr')->get(),
+            'sources'    => LeadsSource::orderBy('name')->get(),
+            'regionals'  => DB::table('regional_provinces')
+                                ->select('regional')
+                                ->distinct()
+                                ->orderBy('regional')
+                                ->pluck('regional'),
+        ]);
+    }
+
+    /**
+     * Datatable server-side response
+     */
+    public function logbookEventData(Request $request)
+    {
+        $search = $request->input('search.value');
+        $month = now()->month;
+        $year  = now()->year;
+        // =======================
+        // BASE QUERY + JOIN LOGBOOK
+        // =======================
+        $query = LeadsMaster::query()
+            ->leftJoin('users', 'users.id', '=', 'leads_master.user_id')
+            ->join('logbook', 'logbook.leads_master_id', '=', 'leads_master.id')
+            ->leftJoin('report_balance_top_up', function ($join) use ($month, $year) {
+                    $join->whereRaw(
+                        'LOWER(report_balance_top_up.email_client) = LOWER(leads_master.email)'
+                    )
+                    ->whereMonth('report_balance_top_up.tgl_transaksi', $month)
+                    ->whereYear('report_balance_top_up.tgl_transaksi', $year);
+                })
+            ->whereRaw("LOWER(logbook.flag_event) = ?", ['ramadhan 2026'])
+            ->select([
+                'leads_master.id',
+                'users.name as user_name',
+                'leads_master.regional',
+                'leads_master.company_name',
+                'leads_master.myads_account',
+                'leads_master.mobile_phone',
+                'leads_master.data_type',
+                'logbook.created_at',
+                'logbook.komitmen',
+                'logbook.plan_min_topup',
+                'logbook.status',
+                DB::raw('SUM(report_balance_top_up.total_settlement_klien) as total_settlement_klien'),
+            ])
+            ->groupBy(
+                'leads_master.id',
+                'users.name',
+                'leads_master.regional',
+                'leads_master.company_name',
+                'leads_master.myads_account',
+                'leads_master.mobile_phone',
+                'leads_master.data_type',
+                'logbook.created_at',
+                'logbook.komitmen',
+                'logbook.plan_min_topup',
+                'logbook.status'
+            )
+        ->orderBy('leads_master.created_at', 'desc');
+
+        // =======================
+        // 🔐 FILTER ROLE
+        // =======================
+        if (!auth()->user()->hasRole('Admin')) {
+            $query->where('leads_master.user_id', auth()->id());
+        }
+
+        // =======================
+        // 🔍 FILTER DATATABLE
+        // =======================
+        if ($request->regional) {
+            $query->where('leads_master.regional', $request->regional);
+        }
+
+        if ($request->canvasser) {
+            $query->where('leads_master.user_id', $request->canvasser);
+        }        
+
+        if ($request->month) {
+            
+            $date = Carbon::createFromFormat('Y-m', $request->month);
+            
+            $start = $date->copy()->startOfMonth()->toDateTimeString(); // Contoh: 2023-10-01 00:00:00
+            $end = $date->copy()->endOfMonth()->toDateTimeString();     // Contoh: 2023-10-31 23:59:59
+
+            $query->whereBetween('logbook.created_at', [$start, $end]);
+        }
         
-        
+
+        // =======================
+        // DATATABLE RESPONSE
+        // =======================
+        return datatables()->of($query)
+            ->filter(function ($query) use ($request) {
+                    // Ambil value search dari input bawaan datatables
+                    $search = $request->input('search.value');
+                    
+                    if (!empty($search)) {
+                        $query->where(function($q) use ($search) {
+                            $searchTerm = "%" . strtolower($search) . "%";
+                            $q->whereRaw("LOWER(users.name) LIKE ?", [$searchTerm])
+                            ->orWhereRaw("LOWER(leads_master.regional) LIKE ?", [$searchTerm])
+                            ->orWhereRaw("LOWER(leads_master.company_name) LIKE ?", [$searchTerm])
+                            ->orWhereRaw("LOWER(leads_master.myads_account) LIKE ?", [$searchTerm])
+                            ->orWhereRaw("LOWER(leads_master.mobile_phone) LIKE ?", [$searchTerm]);
+                        });
+                    }
+                })
+            ->addColumn('user_name', function ($row) {
+                return $row->user_name ?? '-';
+            })
+
+            ->addColumn('regional', function ($row) {
+                return $row->regional ?? '-';
+            })
+
+            ->addColumn('company_name', function ($row) {
+                return $row->company_name ?? '-';
+            })
+
+            ->addColumn('myads_account', function ($row) {
+                return $row->myads_account ?? '-';
+            })
+
+            ->addColumn('mobile_phone', function ($row) {
+                return $row->mobile_phone ?? '-';
+            })
+
+            ->addColumn('data_type', function ($row) {
+                return $row->data_type ?? '-';
+            })
+
+            ->editColumn('created_at', function ($row) {
+                return $row->created_at->format('Y-m-d');
+            })
+
+            ->addColumn('komitmen', function ($row) {
+                return $row->komitmen ?? '-';
+            })
+
+            ->addColumn('plan_min_topup', function ($row) {
+                return $row->plan_min_topup
+                    ? number_format($row->plan_min_topup, 0, ',', '.')
+                    : '-';
+            })
+             ->addColumn('total_settlement_klien', function ($row) {
+                return $row->total_settlement_klien
+                    ? number_format($row->total_settlement_klien, 0, ',', '.')
+                    : '-';
+            })
+             ->addColumn('status', function ($row) {
+                return $row->status ?? '-';
+            }) 
+            ->make(true);
     }
 }
