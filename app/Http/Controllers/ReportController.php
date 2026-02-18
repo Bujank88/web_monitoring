@@ -500,13 +500,37 @@ public function topupCanvasserData(Request $request)
             $date = now()->subMonths($i);
             $value = $date->format('Y-m');
             $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $months[] = [
+                'value' => $value,
+                'label' => $label,
+                'selected' => $value === $month
+            ];
         }
+
+        // ✅ Mapping statis
+        $areaRegionalMap = [
+            'Area1' => ['SUMBAGSEL', 'SUMBAGUT', 'SUMBAGTENG'],
+            'Area2' => ['JAKARTA BANTEN', 'EASTERN JABOTABEK', 'JABAR'],
+            'Area3' => ['BALNUS', 'JATENG DIY', 'JATIM'],
+            'Area4' => ['KALIMANTAN', 'PUMA', 'SULAWESI'],
+            'HQ'    => ['HQ'],
+        ];
+
+        $areas = array_keys($areaRegionalMap);
 
         $pageTitle = 'Report Campaign SBP';
 
-        return view('mitra-sbp.report-campaign-sbp', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+        return view('mitra-sbp.report-campaign-sbp', compact(
+            'months',
+            'month',
+            'selectedRemark',
+            'pageTitle',
+            'areas',
+            'areaRegionalMap'
+        ));
     }
+
+
     public function reportSaldoSbp(Request $request)
     {
         logUserLogin();
@@ -521,10 +545,27 @@ public function topupCanvasserData(Request $request)
             $label = $date->translatedFormat('F Y');
             $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
         }
+        
+        // ✅ Mapping statis
+        $areaRegionalMap = [
+            'Area1' => ['SUMBAGSEL', 'SUMBAGUT', 'SUMBAGTENG'],
+            'Area2' => ['JAKARTA BANTEN', 'EASTERN JABOTABEK', 'JABAR'],
+            'Area3' => ['BALNUS', 'JATENG DIY', 'JATIM'],
+            'Area4' => ['KALIMANTAN', 'PUMA', 'SULAWESI'],
+            'HQ'    => ['HQ'],
+        ];
+
+        $areas = array_keys($areaRegionalMap);
 
         $pageTitle = 'Report Saldo SBP';
 
-        return view('mitra-sbp.report-saldo-sbp', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+        return view('mitra-sbp.report-saldo-sbp', compact(
+            'months', 
+            'month', 
+            'selectedRemark', 
+            'pageTitle',
+            'areas',
+            'areaRegionalMap'));
     }
     public function reportSaldoAdvertising(Request $request)
     {
@@ -575,8 +616,8 @@ public function topupCanvasserData(Request $request)
                 'id_user',
                 DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
                 DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
-                DB::raw('saldo_exp_utama as saldo_exp_utama'),
-                DB::raw('saldo_exp_monet as saldo_exp_monet')
+                DB::raw('saldo_exp_utama'),
+                DB::raw('saldo_exp_monet')
             );
 
 
@@ -600,6 +641,15 @@ public function topupCanvasserData(Request $request)
         if ($request->filled('remark')) {
             $baseQuery->where('a.remark', $request->remark);
         }
+
+        if ($request->filled('area')) {
+            $baseQuery->where('a.area', $request->area);
+        }
+
+        if ($request->filled('regional')) {
+            $baseQuery->where('a.regional', $request->regional);
+        }
+
 
         $summaryRows = (clone $baseQuery)
             ->select('a.remark', DB::raw('COUNT(*) as total'))
@@ -759,6 +809,14 @@ public function topupCanvasserData(Request $request)
             $baseQuery->where('a.remark', $request->remark);
         }
 
+        if ($request->filled('area_provinsi')) {
+            $baseQuery->where('a.area', $request->area_provinsi);
+        }
+
+        if ($request->filled('regional')) {
+            $baseQuery->where('a.regional', $request->regional);
+        }
+
         $query = (clone $baseQuery)
             ->select(
                 DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
@@ -882,16 +940,20 @@ public function topupCanvasserData(Request $request)
     public function exportCampaignSbp(Request $request)
     {
         try {
+
             $month = $request->get('month', now()->format('Y-m'));
             [$year, $monthNum] = explode('-', $month);
+
             $remark = $request->get('remark');
+            $area = $request->get('area_provinsi');
+            $regional = $request->get('regional');
 
             $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $remark);
 
             $query = DB::table('mitra_sbp as a')
                 ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
-                    $join->on('b.id_user', '=', 'su.id_user_key');
+                    $join->on('b.user_id', '=', 'su.id_user_key');
                 })
                 ->select(
                     DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
@@ -900,6 +962,8 @@ public function topupCanvasserData(Request $request)
                     'b.nama_iklan',
                     'b.nama_instansi',
                     'b.area_provinsi',
+                    'a.regional',
+                    'a.area',
                     'b.campaign_type',
                     'b.inventory_type',
                     'b.total',
@@ -915,8 +979,20 @@ public function topupCanvasserData(Request $request)
                 ->whereYear('b.tanggal_iklan', $year)
                 ->whereMonth('b.tanggal_iklan', $monthNum);
 
+            // ==============================
+            // FILTER
+            // ==============================
+
             if (!empty($remark)) {
                 $query->where('a.remark', $remark);
+            }
+
+            if (!empty($area)) {
+                $query->where('a.area', $area);
+            }
+
+            if (!empty($regional)) {
+                $query->where('a.regional', $regional);
             }
 
             $data = $query->orderBy('b.tanggal_iklan', 'desc')->get();
@@ -928,12 +1004,29 @@ public function topupCanvasserData(Request $request)
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
+            // ==============================
+            // TITLE
+            // ==============================
             $titleRemark = $remark ?: 'Semua';
-            $sheet->setCellValue('A1', 'REPORT CAMPAIGN SBP - ' . strtoupper($titleRemark) . ' - ' . $month);
-            $sheet->mergeCells('A1:Q1');
+            $titleArea = $area ?: 'Semua Area';
+            $titleRegional = $regional ?: 'Semua Regional';
+
+            $sheet->setCellValue(
+                'A1',
+                'REPORT CAMPAIGN SBP - ' .
+                strtoupper($titleRemark) .
+                ' - ' . $titleArea .
+                ' - ' . $titleRegional .
+                ' - ' . $month
+            );
+
+            $sheet->mergeCells('A1:R1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
+            // ==============================
+            // HEADER
+            // ==============================
             $headers = [
                 'Tanggal Iklan',
                 'Email',
@@ -941,6 +1034,7 @@ public function topupCanvasserData(Request $request)
                 'Nama Iklan',
                 'Nama Instansi',
                 'Area Provinsi',
+                'Regional',
                 'Campaign Type',
                 'Inventory Type',
                 'Total',
@@ -953,9 +1047,10 @@ public function topupCanvasserData(Request $request)
                 'Campaign Status',
                 'Remark'
             ];
+
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:Q3')->applyFromArray([
+            $sheet->getStyle('A3:R3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -969,7 +1064,11 @@ public function topupCanvasserData(Request $request)
                 ]
             ]);
 
+            // ==============================
+            // DATA
+            // ==============================
             $rowNum = 4;
+
             foreach ($data as $row) {
                 $sheet->fromArray([
                     $row->tanggal_iklan,
@@ -978,6 +1077,7 @@ public function topupCanvasserData(Request $request)
                     $row->nama_iklan,
                     $row->nama_instansi,
                     $row->area_provinsi,
+                    $row->regional,
                     $row->campaign_type,
                     $row->inventory_type,
                     $row->total,
@@ -990,14 +1090,19 @@ public function topupCanvasserData(Request $request)
                     $row->campaign_status,
                     $row->remark,
                 ], null, 'A' . $rowNum);
+
                 $rowNum++;
             }
 
-            foreach (range('A', 'Q') as $col) {
+            foreach (range('A', 'R') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            $fileName = 'Report_Campaign_SBP_' . ($remark ?: 'Semua') . '_' . $month . '.xlsx';
+            $fileName = 'Report_Campaign_SBP_' .
+                ($remark ?: 'Semua') . '_' .
+                ($area ?: 'AllArea') . '_' .
+                ($regional ?: 'AllRegional') . '_' .
+                $month . '.xlsx';
 
             return response()->streamDownload(function () use ($spreadsheet) {
                 $writer = new Xlsx($spreadsheet);

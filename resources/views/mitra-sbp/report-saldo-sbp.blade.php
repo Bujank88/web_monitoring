@@ -46,14 +46,35 @@
     <div class="row">
         <div class="col-md-3">
             <div class="filter-group">
-            <label for="remark">Remark</label>
-            <select id="remark" name="remark" class="form-control">
-                <option value="">Semua Remark</option>
-                <option value="Mitra SBP">Mitra SBP</option>
-                <option value="Agency">Agency</option>
-                <option value="Internal">Internal</option>
-            </select>
+                <label for="remark">Remark</label>
+                <select id="remark" name="remark" class="form-control">
+                    <option value="">Semua Remark</option>
+                    <option value="Mitra SBP">Mitra SBP</option>
+                    <option value="Agency">Agency</option>
+                    <option value="Internal">Internal</option>
+                </select>
+            </div>
         </div>
+
+        <div class="col-md-3">
+            <div class="filter-group">
+                <label for="area">Area</label>
+                <select id="area" class="form-control">
+                    <option value="">Semua Area</option>
+                    @foreach($areas as $area)
+                        <option value="{{ $area }}">{{ $area }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="filter-group">
+                <label for="regional">Regional</label>
+                <select id="regional" class="form-control">
+                    <option value="">Semua Regional</option>
+                </select>
+            </div>
         </div>
     </div>
 </div>
@@ -96,11 +117,33 @@
 <script>
 $(function() {
 
+    // ============================
+    // Mapping Area → Regional
+    // ============================
+    var areaRegionalMap = @json($areaRegionalMap); // contoh: { "Area1": ["SUMBAGSEL", "SUMBAGUT"], ... }
+
+    function updateRegionalDropdown(area) {
+        var regionalSelect = $('#regional');
+        regionalSelect.empty().append('<option value="">Semua Regional</option>');
+
+        if (area && areaRegionalMap[area]) {
+            areaRegionalMap[area].forEach(function(r) {
+                regionalSelect.append('<option value="'+r+'">'+r+'</option>');
+            });
+        }
+    }
+
+    // ============================
+    // Format Rupiah
+    // ============================
     function formatRupiah(value) {
         var num = Number(value || 0);
         return 'Rp ' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
     }
 
+    // ============================
+    // Initialize DataTable
+    // ============================
     var table = $('#saldoTable').DataTable({
         processing: true,
         serverSide: true,
@@ -108,8 +151,9 @@ $(function() {
         ajax: {
             url: "{{ route('report-saldo-sbp.data') }}",
             data: function(d) {
-                d.month = $('#month').val();
-                    d.remark = $('#remark').val();
+                d.remark = $('#remark').val();
+                d.area = $('#area').val();
+                d.regional = $('#regional').val();
             }
         },
         columns: [
@@ -117,34 +161,10 @@ $(function() {
             { data: 'regional', name: 'a.regional' },
             { data: 'email_myads', name: 'a.email_myads' },
             { data: 'remark', name: 'a.remark' },
-            { 
-                data: 'saldo_utama',
-                name: 'b.saldo_utama',
-                render: function(data) {
-                    return data;
-                }
-            },
-            { 
-                data: 'saldo_monet',
-                name: 'b.saldo_monet',
-                render: function(data) {
-                    return data;
-                }
-            },
-            { 
-                data: 'saldo_exp_utama',
-                name: 'b.saldo_exp_utama',
-                render: function(data) {
-                    return data;
-                }
-            },
-            { 
-                data: 'saldo_exp_monet',
-                name: 'b.saldo_exp_monet',
-                render: function(data) {
-                    return data;
-                }
-            }
+            { data: 'saldo_utama', name: 'b.saldo_utama', render: function(d){ return d; } },
+            { data: 'saldo_monet', name: 'b.saldo_monet', render: function(d){ return d; } },
+            { data: 'saldo_exp_utama', name: 'b.saldo_exp_utama', render: function(d){ return d; } },
+            { data: 'saldo_exp_monet', name: 'b.saldo_exp_monet', render: function(d){ return d; } }
         ],
         order: [[4, 'desc']],
         pageLength: 25,
@@ -153,14 +173,22 @@ $(function() {
             search: 'Cari:',
             lengthMenu: 'Tampilkan _MENU_ data',
             info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
-            paginate: {
-                next: 'Next',
-                previous: 'Prev'
-            }
+            paginate: { next: 'Next', previous: 'Prev' }
         }
     });
-    $('#remark').on('change', function() {
-        // updateExportLink();
+
+    // ============================
+    // Filter Change
+    // ============================
+    $('#remark, #area, #regional').on('change', function() {
+        table.ajax.reload();
+    });
+
+    // ============================
+    // Update Regional when Area changes
+    // ============================
+    $('#area').on('change', function() {
+        updateRegionalDropdown($(this).val());
         table.ajax.reload();
     });
 
