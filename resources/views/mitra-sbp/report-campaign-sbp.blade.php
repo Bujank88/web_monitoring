@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Report Campaign SBP @endsection
+@section('title') Report Campaign @endsection
 
 @section('css')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap4.min.css">
@@ -150,7 +150,7 @@
         <div class="card">
             <div class="card-header bg-danger d-flex justify-content-between align-items-center">
                 <h3 class="card-title text-white mb-0">
-                    <i class="fas fa-bullhorn mr-2"></i>Report Campaign SBP
+                    <i class="fas fa-bullhorn mr-2"></i>Report Campaign
                 </h3>
                 <div class="btn-actions">
                     <button type="button" class="btn btn-success btn-sm" id="btnSaveCampaignImage">
