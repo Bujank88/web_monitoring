@@ -518,7 +518,7 @@ public function topupCanvasserData(Request $request)
 
         $areas = array_keys($areaRegionalMap);
 
-        $pageTitle = 'Report Campaign SBP';
+        $pageTitle = 'Report Campaign';
 
         return view('mitra-sbp.report-campaign-sbp', compact(
             'months',
@@ -557,7 +557,7 @@ public function topupCanvasserData(Request $request)
 
         $areas = array_keys($areaRegionalMap);
 
-        $pageTitle = 'Report Saldo SBP';
+        $pageTitle = 'Report Saldo';
 
         return view('mitra-sbp.report-saldo-sbp', compact(
             'months', 
