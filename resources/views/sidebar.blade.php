@@ -106,14 +106,14 @@
                         <a href="{{ route('report-campaign-sbp') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
-                            <p>Report Campaign SBP</p>
+                            <p>Report Campaign</p>
                         </a>
                     </li> 
                     <li class="nav-item">
                         <a href="{{ route('report-saldo-sbp') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-saldo-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
-                            <p>Report Saldo SBP</p>
+                            <p>Report Saldo</p>
                         </a>
                     </li>
                     </ul>
