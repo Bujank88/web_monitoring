@@ -22,7 +22,7 @@ class LeadsMasterController extends Controller
     {
         logUserLogin();
         return view('leads-master.index', [
-            'canvassers' => Cache::remember('users_list_leads', 3600, fn() => User::orderBy('name')->get()),
+            'canvassers' => Cache::remember('users_list_leads', 3600, fn() => User::whereIn('role', ['cvsr', 'PH'])->orderBy('name')->get()),
             'sources'    => Cache::remember('sources_list_leads', 3600, fn() => LeadsSource::orderBy('name')->get()),
             'regionals'  => Cache::remember('regionals_list_leads', 3600, fn() => 
                 DB::table('regional_provinces')

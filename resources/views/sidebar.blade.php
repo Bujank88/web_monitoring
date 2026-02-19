@@ -449,7 +449,7 @@
                 </li>
 
                 @endif
-                @if($isAdmin)
+                @if($isAdmin || $isCanv || $isPH)
                 <li class="nav-header">EVENT RAMADHAN ONLY</li>
                 <li class="nav-item">
                     <a href="{{ route('logbook-event.index') }}"
