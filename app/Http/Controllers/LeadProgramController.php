@@ -77,6 +77,7 @@ class LeadProgramController extends Controller
                 ->whereRaw("rp.tgl_transaksi <= ?", [$endDate . ' 23:59:59'])
                 ->whereNotNull('rp.email_client')
                 ->whereNotNull('rp.total_settlement_klien')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->orderBy('rp.tgl_transaksi', 'desc')
                 ->get();
 
@@ -1074,6 +1075,7 @@ class LeadProgramController extends Controller
                 ->whereDate('rp.tgl_transaksi', '<=', $endDate)
                 ->whereNotNull('rp.email_client')
                 ->whereNotNull('rp.total_settlement_klien')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client')
                 ->orderBy('total_settlement_klien', 'desc');
 
