@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') {{ $pageTitle ?? 'Report Saldo SBP' }} @endsection
+@section('title') {{ $pageTitle ?? 'Report Saldo' }} @endsection
 
 @section('css')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap4.min.css">
@@ -42,7 +42,7 @@
 @section('content')
 
 <div class="filter-card">
-    <h5><i class="fas fa-filter"></i> FILTER REPORT SALDO SBP</h5>
+    <h5><i class="fas fa-filter"></i> FILTER REPORT SALDO</h5>
     <div class="row">
         <div class="col-md-3">
             <div class="filter-group">
@@ -83,7 +83,7 @@
     <div class="card-header bg-danger d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
             <i class="fas fa-wallet mr-2"></i>
-            {{ $pageTitle ?? 'Report Saldo SBP' }}
+            {{ $pageTitle ?? 'Report Saldo' }}
         </h5>
         <div class="btn-actions">
             <button type="button" class="btn btn-success btn-sm" id="btnSaveSaldoImage">
