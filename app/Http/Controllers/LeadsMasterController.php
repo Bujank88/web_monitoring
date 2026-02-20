@@ -145,7 +145,16 @@ class LeadsMasterController extends Controller
 
                 return $btn;
             })
-            ->rawColumns(['aksi', 'status', 'data_type'])
+            ->addColumn('rekomendasi', function ($row) {
+                $saldo = $row->saldo_utama ?? 0;
+
+                if ($saldo >= 1000000) {
+                    return '<span class="badge badge-warning">Push Campaign</span>';
+                }
+
+                return '<span class="badge badge-danger">Push Topup</span>';
+            })
+            ->rawColumns(['aksi', 'status', 'data_type', 'rekomendasi'])
             ->make(true);
     }
 

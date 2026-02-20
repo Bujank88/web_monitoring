@@ -220,6 +220,7 @@
                         <th>Tanggal</th>
                         <th>Total Settlement ({{now()->translatedFormat('F Y')}})</th>
                         <th>Saldo Utama</th>
+                        <th>Rekomendasi</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
@@ -358,6 +359,7 @@ $(function () {
             { data: 'created_at', searchable: false },
             { data: 'total_settlement_klien', searchable: false },
             { data: 'saldo_utama', searchable: false },
+            { data: 'rekomendasi', searchable: false },
             { data: 'aksi', orderable: false, searchable: false }
         ]
     });
