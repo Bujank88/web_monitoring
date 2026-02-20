@@ -266,7 +266,7 @@ $(function () {
 
     let table = $('#leadsMasterTable').DataTable({
         processing: true,
-        serverSide: true,
+        // serverSide: true,
         searching: true,
         responsive: true,
         ajax: {
@@ -284,17 +284,17 @@ $(function () {
             }
         },
         columns: [
-            { data: 'user_name', searchable: true },
-            { data: 'regional', searchable: true },
-            { data: 'company_name', searchable: true },
-            { data: 'myads_account', searchable: true },
-            { data: 'mobile_phone', searchable: true },
-            { data: 'data_type' },
-            { data: 'created_at' },
-            { data: 'komitmen' },
-            { data: 'plan_min_topup' },
-            { data: 'status' },
-            { data: 'total_settlement_klien' }
+            { data: 'user_name', searchable: true, orderable: true },
+            { data: 'regional', searchable: true, orderable: true },
+            { data: 'company_name', searchable: true, orderable: true },
+            { data: 'myads_account', searchable: true, orderable: true },
+            { data: 'mobile_phone', searchable: true, orderable: true },
+            { data: 'data_type', orderable: true },
+            { data: 'created_at', orderable: true },
+            { data: 'komitmen', orderable: true },
+            { data: 'plan_min_topup', orderable: true },
+            { data: 'status', orderable: true },
+            { data: 'total_settlement_klien', orderable: true }
         ],
         drawCallback: function(settings) {
             const summary = (settings.json && settings.json.summary) ? settings.json.summary : {};

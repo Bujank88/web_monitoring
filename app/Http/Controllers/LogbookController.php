@@ -379,7 +379,10 @@ class LogbookController extends Controller
                     ->whereMonth('report_balance_top_up.tgl_transaksi', $month)
                     ->whereYear('report_balance_top_up.tgl_transaksi', $year);
                 })
-            ->whereRaw("LOWER(COALESCE(leads_master.flag_event, '')) = ?", ['ramadhan 2026'])
+            ->where(function ($q) {
+                $q->whereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%leads ramadhan 2026%'])
+                ->orWhereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%existing ramadhan 2026%']);
+            })
             ->select([
                 'leads_master.id',
                 'users.name as user_name',
