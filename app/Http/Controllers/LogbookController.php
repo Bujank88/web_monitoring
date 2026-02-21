@@ -62,6 +62,7 @@ class LogbookController extends Controller
                 'leads_master.myads_account',
                 'leads_master.mobile_phone',
                 'leads_master.data_type',
+                'leads_master.flag_event',
                 'logbook.created_at',
                 'logbook.komitmen',
                 'logbook.plan_min_topup',
@@ -76,6 +77,7 @@ class LogbookController extends Controller
                 'leads_master.myads_account',
                 'leads_master.mobile_phone',
                 'leads_master.data_type',
+                'leads_master.flag_event',
                 'logbook.created_at',
                 'logbook.komitmen',
                 'logbook.plan_min_topup',
@@ -364,8 +366,11 @@ class LogbookController extends Controller
     public function logbookEventData(Request $request)
     {
         $search = $request->input('search.value');
-        $month = now()->month;
-        $year  = now()->year;
+        $selectedMonth = $request->month
+            ? Carbon::createFromFormat('Y-m', $request->month)
+            : now();
+        $month = (int) $selectedMonth->month;
+        $year  = (int) $selectedMonth->year;
         // =======================
         // BASE QUERY + JOIN LOGBOOK
         // =======================
@@ -379,7 +384,10 @@ class LogbookController extends Controller
                     ->whereMonth('report_balance_top_up.tgl_transaksi', $month)
                     ->whereYear('report_balance_top_up.tgl_transaksi', $year);
                 })
-            ->whereRaw("LOWER(COALESCE(leads_master.flag_event, '')) = ?", ['ramadhan 2026'])
+            ->where(function ($q) {
+                $q->whereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%leads ramadhan 2026%'])
+                ->orWhereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%existing ramadhan 2026%']);
+            })
             ->select([
                 'leads_master.id',
                 'users.name as user_name',
@@ -392,6 +400,7 @@ class LogbookController extends Controller
                 'logbook.komitmen',
                 'logbook.plan_min_topup',
                 'logbook.status',
+                'leads_master.flag_event',
                 DB::raw('SUM(report_balance_top_up.total_settlement_klien) as total_settlement_klien'),
             ])
             ->groupBy(
@@ -405,9 +414,10 @@ class LogbookController extends Controller
                 'logbook.created_at',
                 'logbook.komitmen',
                 'logbook.plan_min_topup',
-                'logbook.status'
+                'logbook.status',
+                'leads_master.flag_event'
             )
-        ->orderBy('leads_master.created_at', 'desc');
+        ->orderBy('report_balance_top_up.total_settlement_klien', 'asc');
 
         // =======================
         // 🔐 FILTER ROLE
@@ -428,12 +438,8 @@ class LogbookController extends Controller
         }        
 
         if ($request->month) {
-            
-            $date = Carbon::createFromFormat('Y-m', $request->month);
-            
-            $start = $date->copy()->startOfMonth()->toDateTimeString(); // Contoh: 2023-10-01 00:00:00
-            $end = $date->copy()->endOfMonth()->toDateTimeString();     // Contoh: 2023-10-31 23:59:59
-
+            $start = $selectedMonth->copy()->startOfMonth()->toDateTimeString();
+            $end = $selectedMonth->copy()->endOfMonth()->toDateTimeString();
             $query->whereBetween('logbook.created_at', [$start, $end]);
         }
         
@@ -441,56 +447,59 @@ class LogbookController extends Controller
         $summaryRows = (clone $query)->get();
 
         $summary = [
-            'count' => [
-                'new_leads' => 0,
-                'leads' => 0,
-                'eksisting' => 0,
+            'summary_1' => [
+                'existing_count' => 0,
+                'existing_realisasi_count' => 0,
+                'leads_count' => 0,
+                'leads_to_eksisting_count' => 0,
             ],
-            'rupiah' => [
-                'new_leads' => ['plan' => 0, 'realisasi' => 0, 'gap' => 0],
-                'eksisting_non_new' => ['plan' => 0, 'realisasi' => 0, 'gap' => 0],
-            ],
-            'eksisting_akun' => [
-                'count' => 0,
+            'summary_2' => [
                 'plan' => 0,
                 'realisasi' => 0,
+                'gap' => 0,
+            ],
+            'summary_3' => [
+                'plan' => 0,
+                'realisasi' => 0,
+                'gap' => 0,
             ],
         ];
 
         foreach ($summaryRows as $row) {
-            $komitmen = strtolower(trim((string) ($row->komitmen ?? '')));
+            $flagEvent = strtolower(trim((string) ($row->flag_event ?? '')));
             $dataType = strtolower(trim((string) ($row->data_type ?? '')));
-
-            $isNewLeads = ($komitmen === 'new leads');
-            $bucket = $isNewLeads ? 'new_leads' : 'eksisting_non_new';
-
             $plan = (float) ($row->plan_min_topup ?? 0);
             $realisasi = (float) ($row->total_settlement_klien ?? 0);
 
-            if ($komitmen === 'new leads') {
-                $summary['count']['new_leads']++;
-            }
-            if ($dataType === 'leads') {
-                $summary['count']['leads']++;
-            }
-            if ($dataType === 'eksisting akun') {
-                $summary['count']['eksisting']++;
+            $isLeadsRamadhan = str_contains($flagEvent, 'leads ramadhan 2026');
+            $isExistingRamadhan = str_contains($flagEvent, 'existing ramadhan 2026');
+            $isEksistingAkun = ($dataType === 'eksisting akun');
+
+            if ($isExistingRamadhan) {
+                $summary['summary_1']['existing_count']++;
+                $summary['summary_3']['plan'] += $plan;
+                $summary['summary_3']['realisasi'] += $realisasi;
+
+                if ($realisasi > 0) {
+                    $summary['summary_1']['existing_realisasi_count']++;
+                }
             }
 
-            $summary['rupiah'][$bucket]['plan'] += $plan;
-            $summary['rupiah'][$bucket]['realisasi'] += $realisasi;
+            if ($isLeadsRamadhan) {
+                $summary['summary_1']['leads_count']++;
+                $summary['summary_2']['plan'] += $plan;
+                $summary['summary_2']['realisasi'] += $realisasi;
 
-            if ($dataType === 'eksisting akun') {
-                $summary['eksisting_akun']['count']++;
-                $summary['eksisting_akun']['plan'] += $plan;
-                $summary['eksisting_akun']['realisasi'] += $realisasi;
+                if ($isEksistingAkun) {
+                    $summary['summary_1']['leads_to_eksisting_count']++;
+                }
             }
         }
 
-        $summary['rupiah']['new_leads']['gap'] =
-            $summary['rupiah']['new_leads']['realisasi'] - $summary['rupiah']['new_leads']['plan'];
-        $summary['rupiah']['eksisting_non_new']['gap'] =
-            $summary['rupiah']['eksisting_non_new']['realisasi'] - $summary['rupiah']['eksisting_non_new']['plan'];
+        $summary['summary_2']['gap'] =
+            $summary['summary_2']['realisasi'] - $summary['summary_2']['plan'];
+        $summary['summary_3']['gap'] =
+            $summary['summary_3']['realisasi'] - $summary['summary_3']['plan'];
 
         // =======================
         // DATATABLE RESPONSE
