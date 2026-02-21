@@ -497,6 +497,16 @@
                     </ul>
                 </li>
                 @endif
+                @if($isAdmin)
+                <li class="nav-header">Configuration</li>
+                <li class="nav-item">
+                    <a href="{{ route('configuration.mitra-sbp.index') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('configuration.mitra-sbp.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-database" style="color:#17a2b8;"></i>
+                        <p>Configuration Mitra SBP</p>
+                    </a>
+                </li>
+                @endif
                 @if($isAdmin || $isTreg || $isTsel ||$isCanv || $isPH)
                 <li class="nav-header">System Management</li>
                 @endif

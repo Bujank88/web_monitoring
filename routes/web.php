@@ -16,6 +16,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\LocationPresensiController;
+use App\Http\Controllers\MitraSbpController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -256,6 +257,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
     Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
     Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
     Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
+    Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
 });
 
 // Routes untuk Presensi CVSR
@@ -279,4 +281,13 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('location-presensi')->nam
     Route::put('/{id}', [LocationPresensiController::class, 'update'])->name('update');
     Route::delete('/{id}', [LocationPresensiController::class, 'destroy'])->name('destroy');
     Route::patch('/{id}/toggle-location-needed', [LocationPresensiController::class, 'toggleLocationNeeded'])->name('toggle-location-needed');
+});
+
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('configuration.')->group(function () {
+    Route::get('/mitra-sbp', [MitraSbpController::class, 'index'])->name('mitra-sbp.index');
+    Route::get('/mitra-sbp/create', [MitraSbpController::class, 'create'])->name('mitra-sbp.create');
+    Route::post('/mitra-sbp', [MitraSbpController::class, 'store'])->name('mitra-sbp.store');
+    Route::get('/mitra-sbp/{id}/edit', [MitraSbpController::class, 'edit'])->name('mitra-sbp.edit');
+    Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
+    Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
