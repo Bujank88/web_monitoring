@@ -449,6 +449,9 @@ class LeadProgramController extends Controller
 
             \Log::info("Total Canvassers found: " . $canvasers->count());
             $canvaserIds = $canvasers->pluck('id')->all();
+            $logbookPeriod = $monthDate ? $monthDate->copy() : Carbon::now();
+            $logbookMonth = (int) $logbookPeriod->month;
+            $logbookYear = (int) $logbookPeriod->year;
 
             $today = $monthDate ? $monthDate->copy()->endOfMonth() : Carbon::now();
             $todayDate = $today->format('Y-m-d');
@@ -520,6 +523,8 @@ class LeadProgramController extends Controller
             $leadStats = DB::table('logbook as lb')
                 ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
                 ->whereIn('lm.user_id', $canvaserIds)
+                ->where('lb.bulan', $logbookMonth)
+                ->where('lb.tahun', $logbookYear)
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',

@@ -1504,6 +1504,129 @@ public function topupCanvasserData(Request $request)
             return redirect()->back()->with('error', 'Gagal export Mitra SBP');
         }
     }
+
+    private function getPerformanceExportDataByRemark(string $month, string $remark)
+    {
+        $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
+        $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+
+        return DB::table('mitra_sbp as a')
+            ->leftJoin('report_balance_top_up as b', function ($join) use ($startDate, $endDate) {
+                $join->on('a.email_myads', '=', 'b.email_client')
+                    ->whereBetween('b.tgl_transaksi', [$startDate, $endDate]);
+            })
+            ->where('a.remark', $remark)
+            ->groupBy(
+                'a.remark',
+                'a.area',
+                'a.regional',
+                'a.email_myads',
+                'b.user_id'
+            )
+            ->select(
+                'a.remark',
+                'a.area',
+                'a.regional',
+                'a.email_myads',
+                'b.user_id',
+                DB::raw('SUM(COALESCE(b.total_settlement_klien, 0)) as total_settlement_klien')
+            )
+            ->get();
+    }
+
+    private function fillPerformanceExportSheet($sheet, string $title, $data): void
+    {
+        $sheet->setTitle($title);
+
+        $headers = [
+            'Remark',
+            'Area',
+            'Regional',
+            'Email MyAds',
+            'User ID',
+            'Total Settlement Klien'
+        ];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $sheet->getStyle('A1:F1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF']
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '28A745']
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER
+            ]
+        ]);
+
+        $rowNum = 2;
+        foreach ($data as $row) {
+            $sheet->fromArray([
+                $row->remark,
+                $row->area,
+                $row->regional,
+                $row->email_myads,
+                $row->user_id ?? '-',
+                $row->total_settlement_klien,
+            ], null, 'A' . $rowNum);
+            $rowNum++;
+        }
+
+        if ($rowNum > 2) {
+            $sheet->getStyle('F2:F' . ($rowNum - 1))
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(15);
+        $sheet->getColumnDimension('B')->setWidth(18);
+        $sheet->getColumnDimension('C')->setWidth(18);
+        $sheet->getColumnDimension('D')->setWidth(30);
+        $sheet->getColumnDimension('E')->setWidth(12);
+        $sheet->getColumnDimension('F')->setWidth(22);
+    }
+
+    public function exportPerformanceAll(Request $request)
+    {
+        try {
+            $month = $request->get('month'); // format: YYYY-MM
+            if (!$month) {
+                return redirect()->back()->with('error', 'Filter bulan wajib diisi');
+            }
+
+            $sheetConfigs = [
+                ['title' => 'Mitra SBP', 'remark' => 'Mitra SBP'],
+                ['title' => 'Agency', 'remark' => 'Agency'],
+                ['title' => 'Internal', 'remark' => 'Internal'],
+            ];
+
+            $spreadsheet = new Spreadsheet();
+            $spreadsheet->removeSheetByIndex(0);
+
+            foreach ($sheetConfigs as $idx => $config) {
+                $data = $this->getPerformanceExportDataByRemark($month, $config['remark']);
+
+                $sheet = $spreadsheet->createSheet($idx);
+                $this->fillPerformanceExportSheet($sheet, $config['title'], $data);
+            }
+
+            $spreadsheet->setActiveSheetIndex(0);
+
+            $fileName = 'Export_Performance_All_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Performance All Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export Performance All');
+        }
+    }
+
     public function exportAgency()
     {
         try {
