@@ -157,36 +157,37 @@
     <div class="col-md-4 mb-3">
         <div class="card border-left-primary h-100">
             <div class="card-header bg-primary text-white py-2">
-                <strong>Summary Jumlah Akun (Komitmen)</strong>
+                <strong>(Existing vs Topup) & (Leads vs New Akun)</strong>
             </div>
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span>New Leads (Prospect)</span><strong id="sumCountNewLeads">0</strong></div>
-                <div class="d-flex justify-content-between"><span>Leads</span><strong id="sumCountLeads">0</strong></div>
-                <div class="d-flex justify-content-between"><span>Eksisting</span><strong id="sumCountEksisting">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Jumlah Existing Ramadhan 2026</span><strong id="sumExistingCount">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Existing yang Realisasi Topup</span><strong id="sumExistingRealisasiCount">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Jumlah Leads Ramadhan 2026</span><strong id="sumLeadsCount">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Leads Jadi New Akun</span><strong id="sumLeadsToEksistingCount">0</strong></div>
             </div>
         </div>
     </div>
     <div class="col-md-4 mb-3">
         <div class="card border-left-success h-100">
             <div class="card-header bg-success text-white py-2">
-                <strong>Summary Rupiah New Leads</strong>
+                <strong>New Akun</strong>
             </div>
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span>Plan New Leads</span><strong id="sumPlanNewLeads">Rp 0</strong></div>
-                <div class="d-flex justify-content-between"><span>Realisasi New Leads</span><strong id="sumRealNewLeads">Rp 0</strong></div>
-                <div class="d-flex justify-content-between"><span>Gap New Leads</span><strong id="sumGapNewLeads">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Plan Min Topup New Akun</span><strong id="sumLeadsPlan">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Realisasi Topup New Akun</span><strong id="sumLeadsRealisasi">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Gap New Akun</span><strong id="sumLeadsGap">Rp 0</strong></div>
             </div>
         </div>
     </div>
     <div class="col-md-4 mb-3">
         <div class="card border-left-info h-100">
             <div class="card-header bg-info text-white py-2">
-                <strong>Summary Rupiah Eksisting (Non New Leads)</strong>
+                <strong>Existing Akun</strong>
             </div>
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span>Plan Eksisting (Non New Leads)</span><strong id="sumPlanEksistingNonNew">Rp 0</strong></div>
-                <div class="d-flex justify-content-between"><span>Realisasi Eksisting (Non New Leads)</span><strong id="sumRealEksistingNonNew">Rp 0</strong></div>
-                <div class="d-flex justify-content-between"><span>Gap Eksisting (Non New Leads)</span><strong id="sumGapEksistingNonNew">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Plan Min Topup Existing Akun</span><strong id="sumExistingPlan">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Realisasi Topup Existing Akun</span><strong id="sumExistingRealisasi">Rp 0</strong></div>
+                <div class="d-flex justify-content-between"><span>Gap Existing Akun</span><strong id="sumExistingGap">Rp 0</strong></div>
             </div>
         </div>
     </div>
@@ -304,18 +305,21 @@ $(function () {
                 return 'Rp ' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
             }
 
-            const count = summary.count || {};
-            $('#sumCountNewLeads').text(count.new_leads || 0);
-            $('#sumCountLeads').text(count.leads || 0);
-            $('#sumCountEksisting').text(count.eksisting || 0);
+            const summary1 = summary.summary_1 || {};
+            $('#sumExistingCount').text(summary1.existing_count || 0);
+            $('#sumExistingRealisasiCount').text(summary1.existing_realisasi_count || 0);
+            $('#sumLeadsCount').text(summary1.leads_count || 0);
+            $('#sumLeadsToEksistingCount').text(summary1.leads_to_eksisting_count || 0);
 
-            const rupiah = summary.rupiah || {};
-            $('#sumPlanNewLeads').text(toRupiah((rupiah.new_leads || {}).plan));
-            $('#sumRealNewLeads').text(toRupiah((rupiah.new_leads || {}).realisasi));
-            $('#sumGapNewLeads').text(toRupiah((rupiah.new_leads || {}).gap));
-            $('#sumPlanEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).plan));
-            $('#sumRealEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).realisasi));
-            $('#sumGapEksistingNonNew').text(toRupiah((rupiah.eksisting_non_new || {}).gap));
+            const summary2 = summary.summary_2 || {};
+            $('#sumLeadsPlan').text(toRupiah(summary2.plan));
+            $('#sumLeadsRealisasi').text(toRupiah(summary2.realisasi));
+            $('#sumLeadsGap').text(toRupiah(summary2.gap));
+
+            const summary3 = summary.summary_3 || {};
+            $('#sumExistingPlan').text(toRupiah(summary3.plan));
+            $('#sumExistingRealisasi').text(toRupiah(summary3.realisasi));
+            $('#sumExistingGap').text(toRupiah(summary3.gap));
         }
     });
 
