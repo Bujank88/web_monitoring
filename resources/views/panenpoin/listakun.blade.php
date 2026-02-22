@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Daftar Akun Panen Poin @endsection
+@section('title') List Akun Panen Poin @endsection
 
 @section('css')
 <!-- DataTables CSS -->

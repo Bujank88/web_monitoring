@@ -427,7 +427,7 @@
                                     class="nav-link {{ request()->routeIs('panenpoin.list-akun') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
-                                        <p>Daftar Akun</p>
+                                        <p>List Akun</p>
                                     </a>
                                 </li>
                             </ul>

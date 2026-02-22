@@ -4,8 +4,6 @@
 <!-- Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-<!-- DataTables Responsive CSS -->
-<link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css" rel="stylesheet"/>
 
 <style>
     .btn-ref {
@@ -364,6 +362,31 @@
     .gap-2 {
         gap: 8px;
     }
+
+    /* Horizontal Scroll for Tables on Mobile */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+
+    .table-responsive table {
+        margin-bottom: 0 !important;
+    }
+
+    @media (max-width: 768px) {
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .table {
+            width: 100% !important;
+            min-width: 1200px;
+            white-space: nowrap;
+        }
+    }
 </style>
 @endsection
 
@@ -559,8 +582,6 @@
 <!-- Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<!-- DataTables Responsive JS -->
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script>
     $(document).ready(function() {
 
@@ -568,10 +589,10 @@
         var table = $('#dailyTopupTable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
             ordering: false,
             paging: false,
             searching: false,
+            autoWidth: false,
             ajax: {
                 url: "{{ route('daily_topup_data') }}",
                 type: "GET",
@@ -763,10 +784,10 @@
         var tableByProvince = $('#dailyTopupByProvinceTable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
             searching: true,
             pageLength: 25,
             lengthChange: true,
+            autoWidth: false,
             ajax: {
                 url: "{{ route('daily_topup_by_province_data') }}",
                 type: "GET",
