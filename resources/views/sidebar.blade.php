@@ -19,6 +19,7 @@
                 $isPH = $user->role === 'PH';
                 $isTcd = $user->role === 'TCD';
                 $isInternal = $user->role === 'Internal';
+                $isB2b = $user->role === 'b2b';
                 @endphp
 
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -33,6 +34,8 @@
                 <span class="badge badge-secondary">TCD</span>
                 @elseif($isInternal)
                 <span class="badge badge-success">Internal</span>
+                @elseif($isB2b)
+                <span class="badge badge-primary">B2B</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
                 @elseif($isTreg)
@@ -66,6 +69,56 @@
                             <p>Report Agency Advertising</p>
                         </a>
                     </li>
+                    </ul>
+                </li>
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isB2b)
+                <li class="nav-header">PROGRAM CAMPAIGN</li>
+                <li class="nav-item {{ request()->routeIs('amlevelup.*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('amlevelup.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-medal" style="color:#f39c12;"></i>
+                        <p>
+                            Program AM Level UP
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('amlevelup.index') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.index') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
+                                <p>Input Data</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('amlevelup.report') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.report') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="fas fa-chart-bar nav-icon" style="color:#ffc107;"></i>
+                                <p>Report Poin</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('amlevelup.list-akun') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.list-akun') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
+                                <p>Daftar Akun</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 <li class="nav-header">System Management</li>
@@ -364,8 +417,8 @@
                 </li>
                 @endif --}}
                 @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
-                <li class="nav-item {{ (request()->routeIs('panenpoin.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoin.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
+                <li class="nav-item {{ (request()->routeIs('panenpoin.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoin.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-layer-group"></i>
                         <p>
                             Program Campaign
@@ -425,6 +478,64 @@
                                 <li class="nav-item">
                                     <a href="{{ route('panenpoin.list-akun') }}"
                                     class="nav-link {{ request()->routeIs('panenpoin.list-akun') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
+                                        <p>Daftar Akun</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Program AM Level UP -->
+                        <li class="nav-item {{ request()->routeIs('amlevelup.*') ? 'menu-open' : '' }} ml-2">
+                            <a href="#" class="nav-link {{ request()->routeIs('amlevelup.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-medal" style="color:#f39c12;"></i>
+                                <p>
+                                    Program AM Level UP
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ route('amlevelup.index') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.index') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
+                                        <p>Input Data</p>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a href="{{ route('amlevelup.report') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.report') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-chart-bar nav-icon" style="color:#ffc107;"></i>
+                                        <p>Report Poin</p>
+                                    </a>
+                                </li>
+
+                                {{-- <li class="nav-item">
+                                    <a href="{{ route('amlevelup.report-canvasser') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.report-canvasser') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-users nav-icon" style="color:#17a2b8;"></i>
+                                        <p>Report Canvasser</p>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a href="{{ route('amlevelup.report-ph') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.report-ph') ? 'active' : '' }}"
+                                    style="padding-left: 45px;">
+                                        <i class="fas fa-user-shield nav-icon" style="color:#6f42c1;"></i>
+                                        <p>Report Powerhouse</p>
+                                    </a>
+                                </li> --}}
+
+                                <li class="nav-item">
+                                    <a href="{{ route('amlevelup.list-akun') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.list-akun') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
                                         <p>Daftar Akun</p>
