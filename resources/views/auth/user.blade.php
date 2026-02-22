@@ -204,6 +204,7 @@
                             <option value="PH">PowerHouse</option>
                             <option value="TCD">TCD</option>
                             <option value="Internal">Internal</option>
+                            <option value="b2b">B2B</option>
                         </select>
                     </div>
                     
@@ -301,6 +302,8 @@
                             badgeClass = 'badge-info';
                         } else if (data === 'Internal') {
                             badgeClass = 'badge-success';
+                        } else if (data === 'b2b') {
+                            badgeClass = 'badge-primary';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;
                     }

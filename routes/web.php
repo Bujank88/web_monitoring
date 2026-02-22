@@ -12,6 +12,7 @@ use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
+use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
 use App\Http\Controllers\PresensiController;
@@ -233,6 +234,23 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('/calendar/download', [CalendarController::class, 'download']);
 
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
+});
+
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
+    // AM Level UP Routes
+    Route::get('am-level-up/input', [AmLevelUpController::class, 'index'])->name('amlevelup.index');
+    Route::post('am-level-up/store', [AmLevelUpController::class, 'store'])->name('amlevelup.store');
+    Route::get('am-level-up/report', [AmLevelUpController::class, 'report'])->name('amlevelup.report');
+    Route::get('am-level-up/report-data', [AmLevelUpController::class, 'getReportData'])->name('amlevelup.report-data');
+    Route::get('am-level-up/report-canvasser', [AmLevelUpController::class, 'reportCanvasser'])->name('amlevelup.report-canvasser');
+    Route::get('am-level-up/report-canvasser-data', [AmLevelUpController::class, 'getReportCanvasserData'])->name('amlevelup.report-canvasser-data');
+    Route::get('am-level-up/report-ph', [AmLevelUpController::class, 'reportPowerhouse'])->name('amlevelup.report-ph');
+    Route::get('am-level-up/report-ph-data', [AmLevelUpController::class, 'getReportPowerhouseData'])->name('amlevelup.report-ph-data');
+    Route::get('am-level-up/export', [AmLevelUpController::class, 'export'])->name('amlevelup.export');
+    Route::get('am-level-up/refresh-summary', [AmLevelUpController::class, 'refreshSummaryPanenPoin'])->name('amlevelup.refresh');
+    Route::get('am-level-up/list-akun', [AmLevelUpController::class, 'listAkun'])->name('amlevelup.list-akun');
+    Route::get('am-level-up/akun-data', [AmLevelUpController::class, 'getAkunData'])->name('amlevelup.akun-data');
+    Route::get('am-level-up/akun-detail/{id}', [AmLevelUpController::class, 'getAkunDetail'])->name('amlevelup.akun-detail');
 });
 
 Route::middleware(['auth', 'checkrole:Admin,PH,TCD'])->group(function () {

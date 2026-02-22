@@ -31,7 +31,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b',
         ]);
         $data = [
             'name' => $request->name,
@@ -90,6 +90,10 @@ class BackController extends Controller
                     return redirect()->route('presensi.index');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
+                case 'Internal':
+                    return redirect()->route('mitra-sbp');
+                case 'b2b':
+                    return redirect()->route('amlevelup.index');
                 default:
                     return redirect()->route('home'); // fallback
             }

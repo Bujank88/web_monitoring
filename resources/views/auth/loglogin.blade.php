@@ -250,6 +250,7 @@
                                     <option value="Tsel">Tsel</option>
                                     <option value="cvsr">Canvasser</option>
                                     <option value="Treg">Treg</option>
+                                    <option value="b2b">B2B</option>
                                     <option value="TL">TL</option>
                                     <option value="User">User</option>
                                 </select>
@@ -341,6 +342,10 @@
                             displayText = 'Canvasser';
                         }
                         else if (data === 'Treg') badge = 'badge-info';
+                        else if (data === 'b2b') {
+                            badge = 'badge-primary';
+                            displayText = 'B2B';
+                        }
                         
                         return '<span class="badge ' + badge + '">' + displayText + '</span>';
                     }
