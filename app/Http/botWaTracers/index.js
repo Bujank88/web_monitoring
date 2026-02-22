@@ -23,6 +23,36 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 let lastReconnectTime = 0;
 const RECONNECT_DELAY = 5000; // 5 detik minimum antar reconnect
 
+// Helper: Check if WA is ready to send messages
+function isWAReady() {
+  if (!globalSock) {
+    console.log('[WA-READY-CHECK] globalSock is null');
+    return false;
+  }
+  if (isConnecting) {
+    console.log('[WA-READY-CHECK] Still connecting');
+    return false;
+  }
+  if (!globalSock.user) {
+    console.log('[WA-READY-CHECK] Socket not authenticated (no user)');
+    return false;
+  }
+  console.log('[WA-READY-CHECK] ✅ Ready to send');
+  return true;
+}
+
+// Helper: Wait for connection to be ready with timeout
+async function waitForReady(maxWaitMs = 10000) {
+  const startTime = Date.now();
+  while (!isWAReady()) {
+    if (Date.now() - startTime > maxWaitMs) {
+      throw new Error('Timeout waiting for WhatsApp connection');
+    }
+    await sleep(500);
+  }
+  return true;
+}
+
 // Auth method: 'qr' atau 'pairing'
 // Set via env: AUTH_METHOD=pairing atau AUTH_METHOD=qr
 const AUTH_METHOD = process.env.AUTH_METHOD || 'qr';
@@ -49,8 +79,11 @@ const MIN_GAP = 2200; // ms minimal jeda antar pesan per JID
 
 // ---- Helper kirim WA =====
 async function sendWAMessage(phone, message) {
-  if (!globalSock || isConnecting) {
-    throw new Error('WhatsApp not connected or still connecting');
+  // Check if ready, wait up to 10 seconds
+  try {
+    await waitForReady(10000);
+  } catch (e) {
+    throw new Error('WhatsApp not ready: ' + e.message);
   }
   
   let jid = phone;
@@ -79,8 +112,11 @@ async function sendWAMessage(phone, message) {
 
 // ---- Helper cari grup berdasarkan nama =====
 async function findGroupByName(groupName) {
-  if (!globalSock || isConnecting) {
-    throw new Error('WhatsApp not connected or still connecting');
+  // Check if ready, wait up to 10 seconds
+  try {
+    await waitForReady(10000);
+  } catch (e) {
+    throw new Error('WhatsApp not ready: ' + e.message);
   }
   
   try {
@@ -107,8 +143,11 @@ async function findGroupByName(groupName) {
 
 // ---- Helper kirim ke grup dengan support Group ID =====
 async function sendWAMessageToGroup(groupNameOrId, message, mediaBuffer = null, mediaMimeType = null) {
-  if (!globalSock) {
-    throw new Error('WhatsApp not connected');
+  // Check if ready, wait up to 10 seconds
+  try {
+    await waitForReady(10000);
+  } catch (e) {
+    throw new Error('WhatsApp not ready: ' + e.message);
   }
   
   let groupId = null;
@@ -158,22 +197,24 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  const isReady = globalSock && !isConnecting;
+  const ready = isWAReady();
   res.json({ 
-    status: isReady ? 'ok' : 'not-ready',
-    wa_connected: isReady,
+    status: ready ? 'ok' : 'not-ready',
+    wa_connected: globalSock ? true : false,
+    is_authenticated: globalSock?.user ? true : false,
     is_connecting: isConnecting,
     reconnect_attempts: reconnectAttempts,
+    user_jid: globalSock?.user?.id || null,
     timestamp: new Date().toISOString()
   });
 });
 
 app.get('/api/groups', async (req, res) => {
   try {
-    if (!globalSock) {
+    if (!isWAReady()) {
       return res.status(503).json({ 
         success: false, 
-        error: 'WhatsApp not connected. Please scan QR code first.' 
+        error: 'WhatsApp not ready. Please wait for connection.' 
       });
     }
     
@@ -215,10 +256,10 @@ app.post('/api/send-wa', async (req, res) => {
       });
     }
     
-    if (!globalSock) {
+    if (!isWAReady()) {
       return res.status(503).json({ 
         success: false, 
-        error: 'WhatsApp not connected. Please scan QR code first.' 
+        error: 'WhatsApp not ready. Please wait for connection or scan QR/pairing code.' 
       });
     }
     
@@ -363,17 +404,28 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
         try {
           const cleanedBase64 = cleanBase64(foto_base64);
-          const buffer = Buffer.from(cleanedBase64, 'base64');
-          const mediaType = foto_mime || 'image/png';
           
-          console.log(`[PRESENSI-API] Sending photo with caption to personal ${jid}`);
-          await globalSock.sendMessage(jid, {
-            image: buffer,
-            caption: message,
-            mimetype: mediaType
-          });
+          // Check size before sending
+          const sizeInMB = (cleanedBase64.length * 0.75) / 1024 / 1024;
+          console.log(`[PRESENSI-API] Image size estimate: ${sizeInMB.toFixed(2)} MB`);
+          
+          if (sizeInMB > 10) {
+            console.warn('[PRESENSI-API] Image too large, sending text only');
+            await globalSock.sendMessage(jid, { text: message + '\n\n⚠️ Foto terlalu besar untuk dikirim via WA' });
+          } else {
+            const buffer = Buffer.from(cleanedBase64, 'base64');
+            const mediaType = foto_mime || 'image/png';
+            
+            console.log(`[PRESENSI-API] Sending photo with caption to personal ${jid}`);
+            await globalSock.sendMessage(jid, {
+              image: buffer,
+              caption: message,
+              mimetype: mediaType
+            });
+          }
         } catch (photoError) {
           console.error('[PRESENSI-API] Error sending photo:', photoError.message);
+          console.error('[PRESENSI-API] Error stack:', photoError.stack);
           // Fallback: kirim text jika foto gagal
           console.log(`[PRESENSI-API] Fallback: sending text message to personal ${jid}`);
           await globalSock.sendMessage(jid, { text: message });
@@ -386,12 +438,16 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       sentTo.push({ type: 'personal', target: jid, status: 'sent' });
     } catch (personalError) {
       console.error('[PRESENSI-API] Error sending to personal:', personalError.message);
+      console.error('[PRESENSI-API] Error stack:', personalError.stack);
       hasError = true;
       sentTo.push({ type: 'personal', target: jid, status: 'failed', error: personalError.message });
     }
     
     // Kirim ke grup "All MyAds canvasser Team"
     try {
+      // Add delay before sending to group (avoid rate limit)
+      await sleep(1000);
+      
       // Prioritas: gunakan GROUP_ID jika tersedia, fallback ke GROUP_NAME
       const groupId = process.env.WA_GROUP_ID;
       const groupName = process.env.WA_GROUP_NAME || 'All MyAds Canvasser Team';
@@ -400,13 +456,24 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       if ((action === 'clockIn' || action === 'clockOut') && foto_base64 && foto_mime) {
         try {
           const cleanedBase64 = cleanBase64(foto_base64);
-          const buffer = Buffer.from(cleanedBase64, 'base64');
-          const mediaType = foto_mime || 'image/png';
           
-          console.log(`[PRESENSI-API] Sending photo with caption to group`);
-          await sendWAMessageToGroup(groupTarget, message, buffer, mediaType);
+          // Check size before sending
+          const sizeInMB = (cleanedBase64.length * 0.75) / 1024 / 1024;
+          console.log(`[PRESENSI-API] Image size for group: ${sizeInMB.toFixed(2)} MB`);
+          
+          if (sizeInMB > 10) {
+            console.warn('[PRESENSI-API] Image too large for group, sending text only');
+            await sendWAMessageToGroup(groupTarget, message + '\n\n⚠️ Foto terlalu besar untuk dikirim via WA');
+          } else {
+            const buffer = Buffer.from(cleanedBase64, 'base64');
+            const mediaType = foto_mime || 'image/png';
+            
+            console.log(`[PRESENSI-API] Sending photo with caption to group`);
+            await sendWAMessageToGroup(groupTarget, message, buffer, mediaType);
+          }
         } catch (groupPhotoError) {
           console.error('[PRESENSI-API] Error sending photo to group:', groupPhotoError.message);
+          console.error('[PRESENSI-API] Error stack:', groupPhotoError.stack);
           // Fallback: kirim text ke grup
           console.log(`[PRESENSI-API] Fallback: sending text message to group`);
           await sendWAMessageToGroup(groupTarget, message);
@@ -419,6 +486,7 @@ app.post('/api/send-wa-presensi', async (req, res) => {
       sentTo.push({ type: 'group', target: groupTarget, status: 'sent' });
     } catch (groupError) {
       console.error('[PRESENSI-API] Error sending to group:', groupError.message);
+      console.error('[PRESENSI-API] Error stack:', groupError.stack);
       // Tidak fatal - personal sudah terkirim, grup optional
       const groupId = process.env.WA_GROUP_ID;
       const groupName = process.env.WA_GROUP_NAME || 'All MyAds canvasser Team';
@@ -472,10 +540,10 @@ app.post('/api/send-wa-logbook', async (req, res) => {
       });
     }
     
-    if (!globalSock) {
+    if (!isWAReady()) {
       return res.status(503).json({ 
         success: false, 
-        error: 'WhatsApp not connected. Please scan QR code first.' 
+        error: 'WhatsApp not ready. Please wait for connection or scan QR/pairing code.' 
       });
     }
     
@@ -564,16 +632,25 @@ app.post('/api/send-wa-logbook', async (req, res) => {
       return cleaned;
     };
     
-    // 1️⃣ Kirim ke personal number
+    // 1️⃣ Kirim ke personal number dengan retry
     try {
-      if (foto_base64 && foto_mime) {
-        const cleanedBase64 = cleanBase64(foto_base64);
-        const imageBuffer = Buffer.from(cleanedBase64, 'base64');
-        await globalSock.sendMessage(jid, {
-          image: imageBuffer,
-          caption: caption,
-          mimetype: foto_mime
-        });
+      // Check base64 size untuk avoid memory issues
+      if (foto_base64) {
+        const sizeInMB = (foto_base64.length * 0.75) / 1024 / 1024; // rough estimate
+        console.log(`[LOGBOOK-API] Image size estimate: ${sizeInMB.toFixed(2)} MB`);
+        if (sizeInMB > 10) {
+          console.warn('[LOGBOOK-API] Image too large, sending text only');
+          // Send as text only if too large
+          await globalSock.sendMessage(jid, { text: caption + '\n\n⚠️ Foto terlalu besar untuk dikirim via WA' });
+        } else {
+          const cleanedBase64 = cleanBase64(foto_base64);
+          const imageBuffer = Buffer.from(cleanedBase64, 'base64');
+          await globalSock.sendMessage(jid, {
+            image: imageBuffer,
+            caption: caption,
+            mimetype: foto_mime
+          });
+        }
       } else {
         await globalSock.sendMessage(jid, { text: caption });
       }
@@ -585,20 +662,30 @@ app.post('/api/send-wa-logbook', async (req, res) => {
       console.log(`[LOGBOOK-API] ✅ Message sent to personal: ${jid}`);
     } catch (personalError) {
       console.error('[LOGBOOK-API] Error sending to personal:', personalError.message);
+      console.error('[LOGBOOK-API] Error stack:', personalError.stack);
       hasError = true;
     }
     
-    // 2️⃣ Kirim ke grup (jika ada group_id)
+    // 2️⃣ Kirim ke grup (jika ada group_id) dengan retry
     if (group_id) {
       try {
+        // Wait a bit before sending to group (avoid rate limit)
+        await sleep(1000);
+        
         if (foto_base64 && foto_mime) {
-          const cleanedBase64 = cleanBase64(foto_base64);
-          const imageBuffer = Buffer.from(cleanedBase64, 'base64');
-          await globalSock.sendMessage(group_id, {
-            image: imageBuffer,
-            caption: caption,
-            mimetype: foto_mime
-          });
+          const sizeInMB = (foto_base64.length * 0.75) / 1024 / 1024;
+          if (sizeInMB > 10) {
+            console.warn('[LOGBOOK-API] Image too large for group, sending text only');
+            await globalSock.sendMessage(group_id, { text: caption + '\n\n⚠️ Foto terlalu besar untuk dikirim via WA' });
+          } else {
+            const cleanedBase64 = cleanBase64(foto_base64);
+            const imageBuffer = Buffer.from(cleanedBase64, 'base64');
+            await globalSock.sendMessage(group_id, {
+              image: imageBuffer,
+              caption: caption,
+              mimetype: foto_mime
+            });
+          }
         } else {
           await globalSock.sendMessage(group_id, { text: caption });
         }
@@ -610,6 +697,7 @@ app.post('/api/send-wa-logbook', async (req, res) => {
         console.log(`[LOGBOOK-API] ✅ Message sent to group: ${group_id}`);
       } catch (groupError) {
         console.error('[LOGBOOK-API] Error sending to group:', groupError.message);
+        console.error('[LOGBOOK-API] Error stack:', groupError.stack);
         // Tidak set hasError karena group adalah optional
       }
     }
@@ -741,28 +829,41 @@ async function start() {
         console.log("🔐 Session tersimpan di folder ./auth");
         console.log("💡 Anda tidak perlu scan QR/pairing lagi selama file auth tidak dihapus\n");
         isConnecting = false;
-        reconnectAttempts = 0;
+        reconnectAttempts = 0; // Reset counter
+        lastReconnectTime = 0; // Reset time
+        console.log(`👤 Logged in as: ${sock.user?.id || 'Unknown'}`);
+        console.log(`📱 Phone: ${sock.user?.name || 'Unknown'}\n`);
       }
       
       if (connection === "close") {
         const code = lastDisconnect?.error?.output?.statusCode;
+        const reason = lastDisconnect?.error?.output?.payload?.error || 'Unknown';
         const shouldReconnect = code !== DisconnectReason.loggedOut && code !== 401;
-        console.log("🔌 Connection closed. Status code:", code);
+        console.log("🔌 Connection closed. Status code:", code, "| Reason:", reason);
         console.log("🔄 Should reconnect:", shouldReconnect);
+        
+        // Null out the socket to prevent "Connection Closed" errors
+        globalSock = null;
         
         if (code === DisconnectReason.loggedOut) {
           console.log("⚠️ Anda telah logout. Hapus folder ./auth dan restart untuk login ulang.");
           isConnecting = false;
+          return; // Don't try to reconnect
         }
         
         if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
           reconnectAttempts++;
-          console.log(`⏳ Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in 5 seconds...`);
+          const delay = Math.min(5000 * reconnectAttempts, 30000); // Exponential backoff, max 30s
+          console.log(`⏳ Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${delay/1000} seconds...`);
           isConnecting = true;
           setTimeout(() => {
+            console.log(`🔄 Starting reconnection attempt ${reconnectAttempts}...`);
             isConnecting = false;
-            start();
-          }, 5000);
+            start().catch(err => {
+              console.error('❌ Reconnect failed:', err.message);
+              isConnecting = false;
+            });
+          }, delay);
         } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
           console.log("❌ Max reconnect attempts reached. Please restart the application.");
           isConnecting = false;
@@ -770,6 +871,7 @@ async function start() {
       }
     } catch (e) {
       console.error("❌ connection.update error:", e.message);
+      console.error("Error stack:", e.stack);
       isConnecting = false;
     }
   });
