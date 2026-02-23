@@ -881,7 +881,7 @@ public function topupCanvasserData(Request $request)
     private function campaignSbpEmailSubquery($year, $monthNum, $remark = null)
     {
         $users = DB::table('mitra_sbp as ms')
-            ->join('data_campaign_seasonal as dc', 'ms.email_myads', '=', 'dc.email')
+            ->join('view_data_campaign_all as dc', 'ms.email_myads', '=', 'dc.email')
             ->whereYear('dc.tanggal_iklan', $year)
             ->whereMonth('dc.tanggal_iklan', $monthNum);
 
@@ -908,7 +908,7 @@ public function topupCanvasserData(Request $request)
     private function campaignAgencyAdvertisingUserSubquery($year, $monthNum, $remark = null)
     {
         $users = DB::table('agency_advertising as aa')
-            ->join('data_campaign_seasonal as dc', 'aa.email_myads', '=', 'dc.email')
+            ->join('view_data_campaign_all as dc', 'aa.email_myads', '=', 'dc.email')
             ->whereYear('dc.tanggal_iklan', $year)
             ->whereMonth('dc.tanggal_iklan', $monthNum);
 
@@ -940,7 +940,7 @@ public function topupCanvasserData(Request $request)
         $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
 
         $baseQuery = DB::table('mitra_sbp as a')
-            ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+            ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
             ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                 $join->on('b.user_id', '=', 'su.id_user_key');
             })
@@ -1017,7 +1017,7 @@ public function topupCanvasserData(Request $request)
         $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
 
         $baseQuery = DB::table('agency_advertising as a')
-            ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+            ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
             ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                 $join->on('b.user_id', '=', 'su.id_user_key');
             })
@@ -1093,7 +1093,7 @@ public function topupCanvasserData(Request $request)
             $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $remark);
 
             $query = DB::table('mitra_sbp as a')
-                ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+                ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                     $join->on('b.user_id', '=', 'su.id_user_key');
                 })
@@ -1267,7 +1267,7 @@ public function topupCanvasserData(Request $request)
             $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $remark);
 
             $query = DB::table('agency_advertising as a')
-                ->join('data_campaign_seasonal as b', 'a.email_myads', '=', 'b.email')
+                ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                     $join->on('b.user_id', '=', 'su.id_user_key');
                 })
