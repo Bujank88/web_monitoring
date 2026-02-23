@@ -546,6 +546,13 @@ public function topupCanvasserData(Request $request)
             $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
         }
         
+        $lastUpdated = DB::table('saldo_users')->max('updated_at');
+
+        // Optional: format langsung di controller
+        if ($lastUpdated) {
+            $lastUpdated = Carbon::parse($lastUpdated)->format('d F Y, H:i:s');
+        }
+
         // ✅ Mapping statis
         $areaRegionalMap = [
             'Area1' => ['SUMBAGSEL', 'SUMBAGUT', 'SUMBAGTENG'],
@@ -565,7 +572,9 @@ public function topupCanvasserData(Request $request)
             'selectedRemark', 
             'pageTitle',
             'areas',
-            'areaRegionalMap'));
+            'areaRegionalMap',
+            'lastUpdated' // ⬅️ kirim ke view
+            ));
     }
     public function reportSaldoAdvertising(Request $request)
     {

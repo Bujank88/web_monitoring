@@ -115,6 +115,22 @@
     </div>
 </div>
 
+<!-- Last Updated Info -->
+<div class="row">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <small class="text-muted">
+                    <i class="fas fa-clock"></i> Last updated: @if($lastUpdated)
+    {{ $lastUpdated }} WIB
+@else
+    -
+@endif
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('js')
