@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\AkunAmLevelUp;
 use App\Models\Sector;
 use App\Models\LeadsMaster;
+use App\Models\B2BAmPointSummary;
+use App\Models\B2BClient;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -1240,4 +1242,71 @@ class AmLevelUpController extends Controller
         
         return 'user_am_level_up';
     }
+
+    public function summaryReportB2B()
+    {
+        $users = User::where('role', 'b2b')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return view('amlevelup.summary', compact('users'));
+    }
+
+    public function summaryReportB2BData(Request $request)
+    {
+        $userId = $request->user_id;
+
+        $query = User::where('role', 'b2b');
+
+        if ($userId) {
+            $query->where('id', $userId);
+        }
+
+        $users = $query->get();
+
+        $rows = $users->map(function ($user) {
+
+            $summary = B2BAmPointSummary::where('user_id', $user->id)
+                ->latest('period_month')
+                ->first();
+
+            $clientCount = $summary->client_count ?? 0;
+            $totalTopup = $summary->total_topup ?? 0;
+            $totalPoint = $summary->point_rounded ?? 0;
+            $redeem = $summary->total_redeem_point ?? 0;
+            $sisa = max($totalPoint - $redeem, 0);
+
+            return [
+                'nama_user' => $user->name,
+                'jumlah_klien' => $clientCount,
+                'total_topup' => number_format($totalTopup, 0, ',', '.'),
+                'total_poin' => $totalPoint,
+                'redeem_poin' => $redeem,
+                'sisa_poin' => $sisa,
+                'action' => '<a href="'.route('amlevelup.clients',['user_id'=>$user->id]).'" 
+                                class="btn btn-sm btn-primary">
+                                Lihat Klien
+                             </a>'
+            ];
+        });
+
+        return response()->json([
+            'data' => $rows
+        ]);
+    }
+
+    public function reportB2BClients(Request $request)
+    {
+        $userId = $request->user_id;
+
+        $clients = B2BClient::with('user')
+            ->when($userId, function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->get();
+
+        return view('amlevelup.clients', compact('clients'));
+    }
+
 }

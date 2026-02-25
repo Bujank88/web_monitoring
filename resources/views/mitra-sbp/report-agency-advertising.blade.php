@@ -73,10 +73,10 @@
 
 @section('content')
 <div class="filter-card">
-    <h5><i class="fas fa-filter"></i> FILTER REPORT CAMPAIGN</h5>
+    <h5><i class="fas fa-filter"></i> CAMPAIGN REPORT FILTER</h5>
     <div class="filter-row">
         <div class="filter-group">
-            <label for="month">Bulan</label>
+            <label for="month">Month</label>
             <select id="month" name="month" class="form-control">
                 @foreach ($months as $m)
                 <option value="{{ $m['value'] }}" {{ $m['selected'] ? 'selected' : '' }}>
@@ -118,7 +118,7 @@
             <!-- <div class="col-lg col-md-6 col-6 mb-2">
                 <div class="card border-left-danger">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Saldo Utama</div>
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Main Balance</div>
                         <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSaldoUtama">Rp 0</div>
                     </div>
                 </div>
@@ -126,7 +126,7 @@
             <div class="col-lg col-md-6 col-12 mb-2">
                 <div class="card border-left-info">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Saldo Monet</div>
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Monet Balance</div>
                         <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSaldoMonet">Rp 0</div>
                     </div>
                 </div>
@@ -156,21 +156,21 @@
                     <table id="campaignTable" class="table table-bordered table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Tanggal Iklan</th>
+                                <th>Ad Date</th>
                                 <th>Email</th>
-                                <th>ID Iklan</th>
-                                <th>Nama Iklan</th>
-                                <th>Nama Instansi</th>
-                                <th>Area Provinsi</th>
+                                <th>Ad ID</th>
+                                <th>Ad Name</th>
+                                <th>Institution Name</th>
+                                <th>Province Area</th>
                                 <th>Campaign Type</th>
                                 <th>Inventory Type</th>
                                 <th>Total</th>
                                 <th>Success</th>
                                 <th>Failed</th>
-                                <th>Balance Terpakai</th>
-                                <th>Pesan</th>
-                                <!-- <th>Sisa Saldo Utama</th>
-                                <th>Sisa Saldo Monet</th> -->
+                                <th>Used Balance</th>
+                                <th>Message</th>
+                                <!-- <th>Remaining Main Balance</th>
+                                <th>Remaining Monet Balance</th> -->
                                 <th>Campaign Status</th>
                                 <th>Remark</th>
                             </tr>
@@ -214,7 +214,7 @@
                 link.click();
             }).catch(err => {
                 console.error('Error capturing image:', err);
-                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+                alert('Failed to save image. Please try again.');
             });
         }
 
@@ -270,18 +270,18 @@
                 [10, 25, 50, 100, "Semua"]
             ],
             language: {
-                emptyTable: 'Tidak ada data untuk ditampilkan',
-                info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
-                infoEmpty: 'Menampilkan 0 sampai 0 dari 0 data',
-                infoFiltered: '(disaring dari _MAX_ total data)',
-                lengthMenu: 'Tampilkan _MENU_ data',
-                search: 'Cari:',
-                zeroRecords: 'Data tidak ditemukan',
+                emptyTable: 'No data available',
+                info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                infoEmpty: 'Showing 0 to 0 of 0 entries',
+                infoFiltered: '(filtered from _MAX_ total entries)',
+                lengthMenu: 'Show _MENU_ entries',
+                search: 'Search:',
+                zeroRecords: 'No matching records found',
                 paginate: {
-                    first: 'Pertama',
-                    last: 'Terakhir',
-                    next: 'Selanjutnya',
-                    previous: 'Sebelumnya'
+                    first: 'First',
+                    last: 'Last',
+                    next: 'Next',
+                    previous: 'Previous'
                 }
             },
             drawCallback: function(settings) {
