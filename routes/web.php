@@ -251,6 +251,15 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
     Route::get('am-level-up/list-akun', [AmLevelUpController::class, 'listAkun'])->name('amlevelup.list-akun');
     Route::get('am-level-up/akun-data', [AmLevelUpController::class, 'getAkunData'])->name('amlevelup.akun-data');
     Route::get('am-level-up/akun-detail/{id}', [AmLevelUpController::class, 'getAkunDetail'])->name('amlevelup.akun-detail');
+    
+    Route::get('/am-level-up/summary', [AmLevelUpController::class, 'summaryReportB2B'])
+    ->name('amlevelup.summary');
+    
+    Route::get('/am-level-up/summary-data', [AmLevelUpController::class, 'summaryReportB2BData'])
+        ->name('amlevelup.summary-data');
+
+    Route::get('/am-level-up/clients', [AmLevelUpController::class, 'reportB2BClients'])
+        ->name('amlevelup.clients');
 });
 
 Route::middleware(['auth', 'checkrole:Admin,PH,TCD'])->group(function () {

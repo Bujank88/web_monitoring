@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') {{ $pageTitle ?? 'Report Saldo Agency Advertising' }} @endsection
+@section('title') {{ $pageTitle ?? 'Agency Advertising Balance Report' }} @endsection
 
 @section('css')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap4.min.css">
@@ -62,7 +62,7 @@
     <div class="card-header bg-danger text-white">
         <h5 class="mb-0">
             <i class="fas fa-wallet mr-2"></i>
-            {{ $pageTitle ?? 'Report Saldo Agency Advertising' }}
+            {{ $pageTitle ?? 'Agency Advertising Balance Report' }}
         </h5>
     </div>
 
@@ -73,10 +73,10 @@
                     <tr>
                         <th>Email</th>
                         <th>Remark</th>
-                        <th>Saldo Utama</th>
-                        <th>Saldo Monet</th>
-                        <th>Saldo Exp Utama</th>
-                        <th>Saldo Exp Monet</th>
+                        <th>Main Balance</th>
+                        <th>Monet Balance</th>
+                        <th>Main Expiry Balance</th>
+                        <th>Monet Expiry Balance</th>
                     </tr>
                 </thead>
             </table>
@@ -145,13 +145,13 @@ $(function() {
         order: [[4, 'desc']],
         pageLength: 25,
         language: {
-            emptyTable: 'Tidak ada data',
-            search: 'Cari:',
-            lengthMenu: 'Tampilkan _MENU_ data',
-            info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+            emptyTable: 'No data available',
+            search: 'Search:',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ entries',
             paginate: {
                 next: 'Next',
-                previous: 'Prev'
+                previous: 'Previous'
             }
         }
     });
