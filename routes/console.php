@@ -19,7 +19,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
+// // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
     \Log::info('=== RETRY SEND PRESENSI NOTIFICATIONS STARTED ===');
     
@@ -175,7 +175,7 @@ Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
 })->everyTwoMinutes()->name('refreshDetailLeadsSummary');
 
-// ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
+// // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {
     \Log::info('=== RETRY SEND LOGBOOK NOTIFICATIONS STARTED ===');
     

@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Daftar Akun Panen Poin @endsection
+@section('title') List Akun Panen Poin @endsection
 
 @section('css')
 <!-- DataTables CSS -->
@@ -87,7 +87,7 @@
     <div class="col-12">
         <h4 class="mb-0">
             <i class="fas fa-user-check mr-2 text-primary"></i>
-            <strong>Daftar Akun Panen Poin yang Sudah Terdaftar</strong>
+            <strong>List Akun Panen Poin yang Sudah Terdaftar</strong>
         </h4>
     </div>
 </div>

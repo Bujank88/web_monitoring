@@ -54,8 +54,14 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'channels' => explode(',', (string) env('LOG_STACK', 'custom_daily')),
             'ignore_exceptions' => false,
+        ],
+
+        'custom_daily' => [
+            'driver' => 'custom',
+            'via' => \App\Logging\CustomDailyLogger::class,
+            'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'single' => [

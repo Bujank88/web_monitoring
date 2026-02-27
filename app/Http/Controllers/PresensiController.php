@@ -371,7 +371,7 @@ class PresensiController extends Controller
                 $postData['keterangan'] = $presensi->keterangan;
             }
 
-            $response = Http::timeout(15)->post($waBot . '/api/send-wa-presensi', $postData);
+            $response = Http::timeout(60)->post($waBot . '/api/send-wa-presensi', $postData);
 
             if ($response->successful()) {
                 $this->markSendSuccess($presensi, $action);
