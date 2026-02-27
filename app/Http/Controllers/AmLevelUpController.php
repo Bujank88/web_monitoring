@@ -1267,27 +1267,32 @@ class AmLevelUpController extends Controller
 
         $rows = $users->map(function ($user) {
 
-            $summary = B2BAmPointSummary::where('user_id', $user->id)
+            // 🔹 1️⃣ Total Topup Akumulasi Semua Bulan
+            $totalTopup = B2BAmPointSummary::where('user_id', $user->id)
+                ->sum('total_topup');
+
+            // 🔹 2️⃣ Ambil Data Bulan Terakhir
+            $lastMonth = B2BAmPointSummary::where('user_id', $user->id)
                 ->latest('period_month')
                 ->first();
 
-            $clientCount = $summary->client_count ?? 0;
-            $totalTopup = $summary->total_topup ?? 0;
-            $totalPoint = $summary->point_rounded ?? 0;
-            $redeem = $summary->total_redeem_point ?? 0;
+            $clientCount = $lastMonth->client_count ?? 0;
+            $totalPoint  = $lastMonth->point_rounded ?? 0;
+            $redeem      = $lastMonth->total_redeem_point ?? 0;
+
             $sisa = max($totalPoint - $redeem, 0);
 
             return [
-                'nama_user' => $user->name,
+                'nama_user'    => $user->name,
                 'jumlah_klien' => $clientCount,
-                'total_topup' => number_format($totalTopup, 0, ',', '.'),
-                'total_poin' => $totalPoint,
-                'redeem_poin' => $redeem,
-                'sisa_poin' => $sisa,
-                'action' => '<a href="'.route('amlevelup.clients',['user_id'=>$user->id]).'" 
-                                class="btn btn-sm btn-primary">
-                                Lihat Klien
-                             </a>'
+                'total_topup'  => number_format($totalTopup, 0, ',', '.'),
+                'total_poin'   => $totalPoint,
+                'redeem_poin'  => $redeem,
+                'sisa_poin'    => $sisa,
+                'action'       => '<a href="'.route('amlevelup.clients',['user_id'=>$user->id]).'" 
+                                    class="btn btn-sm btn-primary">
+                                    Lihat Klien
+                                </a>'
             ];
         });
 
@@ -1299,14 +1304,72 @@ class AmLevelUpController extends Controller
     public function reportB2BClients(Request $request)
     {
         $userId = $request->user_id;
+        $month  = $request->month; // format: 2026-02
 
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil Data Client + Filter User (AM)
+        |--------------------------------------------------------------------------
+        */
         $clients = B2BClient::with('user')
             ->when($userId, function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             })
             ->get();
 
-        return view('amlevelup.clients', compact('clients'));
+        /*
+        |--------------------------------------------------------------------------
+        | Query Topup (Case Insensitive Email)
+        |--------------------------------------------------------------------------
+        */
+         $topupQuery = DB::table('report_balance_top_up')
+        ->selectRaw("
+            LOWER(email_client) as email_client,
+            DATE_FORMAT(tgl_transaksi, '%Y-%m') as bulan,
+            SUM(total_settlement_klien) as total_topup,
+            FLOOR(SUM(total_settlement_klien) / 1000000) as total_point,
+            MAX(tgl_transaksi) as last_transaction_date
+        ")
+        ->whereDate('tgl_transaksi', '>', '2026-01-01')
+        ->groupBy(
+            DB::raw("LOWER(email_client)"),
+            DB::raw("DATE_FORMAT(tgl_transaksi, '%Y-%m')")
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filter Bulan Jika Dipilih
+        |--------------------------------------------------------------------------
+        */
+        if ($month) {
+            $parsedMonth = Carbon::parse($month);
+
+            $topupQuery->whereMonth('tgl_transaksi', $parsedMonth->month)
+                    ->whereYear('tgl_transaksi', $parsedMonth->year);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Eksekusi Query & Jadikan KeyBy Email
+        |--------------------------------------------------------------------------
+        */
+$topups = $topupQuery->get()
+        ->groupBy('email_client'); // supaya per email ada list bulanan
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil List User Untuk Dropdown Filter
+        |--------------------------------------------------------------------------
+        */
+        $users = User::where('role', 'b2b')->orderBy('name')->get();
+
+        return view('amlevelup.clients', compact(
+            'clients',
+            'topups',
+            'users',
+            'userId',
+            'month'
+        ));
     }
 
 }

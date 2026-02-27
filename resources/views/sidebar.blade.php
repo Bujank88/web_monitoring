@@ -98,27 +98,27 @@
                         </p>
                     </a>
                     <ul class="nav nav-treeview">
-                        <li class="nav-item">
+                        {{-- <li class="nav-item">
                             <a href="{{ route('amlevelup.index') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('amlevelup.index') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
                                 <p>Input Data</p>
                             </a>
-                        </li>
+                        </li> --}}
                         <li class="nav-item">
-                            <a href="{{ route('amlevelup.report') }}"
-                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <a href="{{ route('amlevelup.summary') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.summary') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="fas fa-chart-bar nav-icon" style="color:#ffc107;"></i>
                                 <p>Report Poin</p>
                             </a>
                         </li>
-                        <li class="nav-item">
+                        {{-- <li class="nav-item">
                             <a href="{{ route('amlevelup.list-akun') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('amlevelup.list-akun') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
                                 <p>Daftar Akun</p>
                             </a>
-                        </li>
+                        </li> --}}
                     </ul>
                 </li>
                 <li class="nav-header">System Management</li>
@@ -485,7 +485,8 @@
                                 </li>
                             </ul>
                         </li>
-
+                        
+                        @if($isAdmin)
                         <!-- Program AM Level UP -->
                         <li class="nav-item {{ request()->routeIs('amlevelup.*') ? 'menu-open' : '' }} ml-2">
                             <a href="#" class="nav-link {{ request()->routeIs('amlevelup.*') ? 'active' : '' }}">
@@ -497,18 +498,18 @@
                             </a>
 
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
+                                {{-- <li class="nav-item">
                                     <a href="{{ route('amlevelup.index') }}"
                                     class="nav-link {{ request()->routeIs('amlevelup.index') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
                                         <p>Input Data</p>
                                     </a>
-                                </li>
+                                </li> --}}
 
                                 <li class="nav-item">
-                                    <a href="{{ route('amlevelup.report') }}"
-                                    class="nav-link {{ request()->routeIs('amlevelup.report') ? 'active' : '' }}"
+                                    <a href="{{ route('amlevelup.summary') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.summary') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-chart-bar nav-icon" style="color:#ffc107;"></i>
                                         <p>Report Poin</p>
@@ -534,15 +535,16 @@
                                 </li> --}}
 
                                 <li class="nav-item">
-                                    <a href="{{ route('amlevelup.list-akun') }}"
-                                    class="nav-link {{ request()->routeIs('amlevelup.list-akun') ? 'active' : '' }}"
+                                    <a href="{{ route('amlevelup.clients') }}"
+                                    class="nav-link {{ request()->routeIs('amlevelup.clients') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
-                                        <p>Daftar Akun</p>
+                                        <p>Daftar Client</p>
                                     </a>
                                 </li>
                             </ul>
                         </li>
+                        @endif
 
                         <!-- Program Canvasser Voucher -->
                         <li class="nav-item {{ request()->routeIs('admin.monitoring.canvasser_voucher') ? 'menu-open' : '' }} ml-2">
