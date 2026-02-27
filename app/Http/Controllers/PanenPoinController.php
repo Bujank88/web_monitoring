@@ -595,11 +595,11 @@ class PanenPoinController extends Controller
                     
                 
                 // Hitung total poin yang sudah di-redeem dari table prize_redeem (bulan ini)
-                $totalPoinRedeem = DB::table('prize_redeems')
-                    ->where('user_id', $canvasser->id)
-                    ->whereMonth('created_at', Carbon::now()->month)
-                    ->whereYear('created_at', Carbon::now()->year)
-                    ->sum('point_used') ?? 0;
+                // $totalPoinRedeem = DB::table('prize_redeems')
+                //     ->where('user_id', $canvasser->id)
+                //     ->whereMonth('created_at', Carbon::now()->month)
+                //     ->whereYear('created_at', Carbon::now()->year)
+                //     ->sum('point_used') ?? 0;
                 
                 // Update or Insert ke summary table
                 foreach ($clientEmails as $client) {
@@ -610,10 +610,21 @@ class PanenPoinController extends Controller
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     
                     $totalpackagePoint = $packagePoint[$email] ?? 0;
+
                     if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
                         continue;
                     }
-                    
+                    $userPoin = AkunPanenPoin::whereRaw('LOWER(TRIM(email_client)) = ?', [$email])->first();
+                    $totalPoinRedeem = 0;
+
+                    if ($userPoin) {
+                        $totalPoinRedeem = DB::table('prize_redeems')
+                            ->where('user_id', $userPoin->id)
+                            ->whereMonth('created_at', Carbon::now()->month)
+                            ->whereYear('created_at', Carbon::now()->year)
+                            ->sum('point_used') ?? 0;
+                    }
+
                     $poinBulanIni = floor($totalSettlement / 250000);
                     $poinAkumulasi = $poinSisaBulanLalu; // Gunakan poin sisa bulan lalu
                     $totalPoin = $poinBulanIni + $poinAkumulasi;
