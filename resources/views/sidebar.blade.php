@@ -619,6 +619,13 @@
                         <p>Configuration Mitra SBP</p>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="{{ route('report-balance-top-up') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('report-balance-top-up') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-wallet" style="color:#79c0ff;"></i>
+                        <p>Report Balance Top Up</p>
+                    </a>
+                </li>
                 @endif
                 @if($isAdmin || $isTreg || $isTsel ||$isCanv || $isPH)
                 <li class="nav-header">System Management</li>

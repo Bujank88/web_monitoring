@@ -576,6 +576,99 @@ public function topupCanvasserData(Request $request)
             'lastUpdated' // ⬅️ kirim ke view
             ));
     }
+    public function reportBalanceTopUp()
+    {
+        logUserLogin();
+
+        return view('report.report-balance-top-up');
+    }
+
+    public function reportBalanceTopUpData(Request $request)
+    {
+        $query = DB::table('report_balance_top_up as rb')
+            ->leftJoin('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+            ->select(
+                'rb.email_client',
+                'rb.company_name',
+                DB::raw('CAST(COALESCE(rb.amount, 0) AS DECIMAL(15,2)) as amount'),
+                DB::raw('CAST(COALESCE(rb.discount_voucer, 0) AS DECIMAL(15,2)) as discount_voucher'),
+                DB::raw('CAST(COALESCE(rb.total_settlement_klien, 0) AS DECIMAL(15,2)) as total_settlement'),
+                'rb.payment_method_name',
+                'rb.paid_date',
+                'rb.tgl_transaksi',
+                'dv.voucher_code'
+            );
+
+        // Wajib filter tanggal agar query tetap cepat pada data besar.
+        if (!$request->filled('start_date') || !$request->filled('end_date')) {
+            $query->whereRaw('1 = 0');
+        } else {
+            try {
+                $startDate = Carbon::parse($request->start_date)->startOfDay();
+                $endDate = Carbon::parse($request->end_date)->endOfDay();
+                $query->whereBetween('rb.tgl_transaksi', [$startDate, $endDate]);
+            } catch (\Exception $e) {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        // Filter email/name: cari email kandidat di leads_master dulu,
+        // lalu pakai email tersebut untuk memfilter report_balance_top_up.
+        if ($request->filled('email') || $request->filled('name')) {
+            $email = $request->filled('email')
+                ? preg_replace('/\s+/', '', strtolower(trim($request->email)))
+                : null;
+            $name = $request->filled('name')
+                ? '%' . strtolower(trim($request->name)) . '%'
+                : null;
+
+            $leadEmailSubQuery = DB::table('leads_master as lm')
+                ->selectRaw('DISTINCT LOWER(TRIM(lm.email))')
+                ->whereNotNull('lm.email')
+                ->where('lm.email', '!=', '');
+
+            if ($email) {
+                $leadEmailSubQuery->whereRaw('LOWER(REPLACE(TRIM(lm.email), " ", "")) = ?', [$email]);
+            }
+
+            if ($name) {
+                $leadEmailSubQuery->where(function ($q) use ($name) {
+                    $q->whereRaw('LOWER(COALESCE(lm.company_name, "")) LIKE ?', [$name])
+                        ->orWhereRaw('LOWER(COALESCE(lm.nama, "")) LIKE ?', [$name]);
+                });
+            }
+
+            $query->whereIn(DB::raw('LOWER(TRIM(rb.email_client))'), $leadEmailSubQuery);
+        }
+
+        $query->orderByDesc('rb.paid_date');
+
+        return datatables()->of($query)
+            ->editColumn('amount', function ($row) {
+                return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
+            })
+            ->editColumn('discount_voucher', function ($row) {
+                return 'Rp ' . number_format((float) $row->discount_voucher, 0, ',', '.');
+            })
+            ->editColumn('total_settlement', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_settlement, 0, ',', '.');
+            })
+            ->editColumn('paid_date', function ($row) {
+                return $row->paid_date
+                    ? Carbon::parse($row->paid_date)->format('d-m-Y H:i:s')
+                    : '-';
+            })
+            ->editColumn('tgl_transaksi', function ($row) {
+                return $row->tgl_transaksi
+                    ? Carbon::parse($row->tgl_transaksi)->format('d-m-Y H:i:s')
+                    : '-';
+            })
+            ->editColumn('voucher_code', function ($row) {
+                return $row->voucher_code ?: '-';
+            })
+            ->make(true);
+    }
+
     public function reportSaldoAdvertising(Request $request)
     {
         logUserLogin();
