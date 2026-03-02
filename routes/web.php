@@ -287,6 +287,11 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
     Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
 });
 
+Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::get('report-balance-top-up', [ReportController::class, 'reportBalanceTopUp'])->name('report-balance-top-up');
+    Route::get('report-balance-top-up/data', [ReportController::class, 'reportBalanceTopUpData'])->name('report-balance-top-up.data');
+});
+
 // Routes untuk Presensi CVSR
 Route::middleware(['auth', 'checkrole:cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
     Route::get('/', [PresensiController::class, 'index'])->name('index');
