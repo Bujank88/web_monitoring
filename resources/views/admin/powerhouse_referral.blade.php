@@ -260,7 +260,7 @@
 
     /* Kolom Insentif */
     .table tbody tr td:nth-child(8) {
-        background: linear-gradient(135deg, #c8e6c9 0%, #81c784 100%);
+        /* background: linear-gradient(135deg, #c8e6c9 0%, #81c784 100%); */
         color: #2e7d32;
         font-weight: 600;
         font-size: 12px;
@@ -502,7 +502,48 @@
     /* Gap utility class */
     .gap-2 {
         gap: 8px;
-    }</style>
+    }
+
+    /* Match Report Canvasser grouped-table style */
+    #powerHousePerformanceTable {
+        border: 0.5px solid #ccc;
+        box-shadow: none;
+    }
+
+    #powerHousePerformanceTable th,
+    #powerHousePerformanceTable td {
+        border: 0.5px solid #ccc !important;
+    }
+
+    #powerHousePerformanceTable tbody tr:nth-child(odd) {
+        background-color: #f2f2f2;
+    }
+
+    #powerHousePerformanceTable tbody tr:nth-child(even) {
+        background-color: #ffffff;
+    }
+
+    #powerHousePerformanceTable tbody td:nth-child(3),
+    #powerHousePerformanceTable tbody td:nth-child(4) {
+        background-color: #d1e7dd;
+        font-weight: 600;
+    }
+
+    #powerHousePerformanceTable tbody td:nth-child(5),
+    #powerHousePerformanceTable tbody td:nth-child(6),
+    #powerHousePerformanceTable tbody td:nth-child(7) {
+        background-color: #f8d7da;
+        font-weight: 600;
+    }
+
+    #powerHousePerformanceTable tbody td:nth-child(8),
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10),
+    #powerHousePerformanceTable tbody td:nth-child(11) {
+        background-color: #d3ffcd;
+        font-weight: 600;
+    }
+</style>
 @endsection
 
 @section('content')
@@ -542,6 +583,10 @@
 
     $startDate = request('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
     $endDate   = request('end_date', Carbon::now()->format('Y-m-d'));
+    $momRefDate = Carbon::today();
+    $prevSameDay = $momRefDate->copy()->subMonthNoOverflow();
+    $prevMonthEndDay = $momRefDate->copy()->subMonthNoOverflow()->endOfMonth()->day;
+    $prevRemainingStartDay = $prevSameDay->day + 1;
 @endphp
 
 <div class="row mb-3">
@@ -591,7 +636,7 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span id="displayedStartDatePH">{{ $startDate }}</span> s/d <span id="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -616,6 +661,61 @@
                                 <td id="totalTopUp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalPoin" style="text-align: center; padding: 12px;">0</td>
                                 <td style="text-align: center; padding: 12px;">-</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report PowerHouse Deal Top Up & MOM -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card" id="powerHousePerformanceCard">
+            <div class="card-header bg-gradient-info text-white">
+                <h4 class="mb-0"><i class="fas fa-chart-line"></i> Report PowerHouse Deal Top Up & MOM</h4>
+            </div>
+            <div class="card-body">
+                <div id="capturePowerHousePerformanceTable" class="table-responsive">
+                    <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr style="background-color: #e8eaf6; font-weight: bold;">
+                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span id="displayedStartDatePH">{{ $startDate }}</span> s/d <span id="displayedEndDatePH">{{ $endDate }}</span></th>
+                            </tr>
+                            <tr>
+                                <th rowspan="2" style="text-align: center; width: 5%;">No</th>
+                                <th rowspan="2" style="text-align: center;">Team PowerHouse</th>
+                                <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
+                                <th colspan="3" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
+                                <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
+                            </tr>
+                            <tr>
+                                <th style="text-align: center; background-color: #d1e7dd;">New Akun</th>
+                                <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
+                                <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
+                                <th id="momHeaderPrevPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $prevSameDay->day }} {{ $prevSameDay->translatedFormat('M') }}</th>
+                                <th id="momHeaderCurrentPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $momRefDate->day }} {{ $momRefDate->translatedFormat('M') }}</th>
+                                <th id="momHeaderPrevRemaining" style="text-align: center; background-color: #d3ffcd;">{{ $prevRemainingStartDay }} &ndash; {{ $prevMonthEndDay }} {{ $prevSameDay->translatedFormat('M') }}</th>
+                                <th style="text-align: center; background-color: #d3ffcd;">Gap (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
+                                <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td id="totalDealTopupNewAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalTopUpExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalTopUpPerformance" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalMomPrevPartial" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalMomCurrentPartial" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalMomPrevRemaining" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalMomGap" style="text-align: center; padding: 12px;">0</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -705,6 +805,40 @@
             }
         });
 
+        var performanceTable = $('#powerHousePerformanceTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            paging: false,
+            searching: false,
+            info: false,
+            ajax: {
+                url: "{{ route('powerhouse_deal_topup_mom_data') }}",
+                type: 'GET',
+                data: function(d) {
+                    d.start_date = $('#startDatePH').val();
+                    d.end_date = $('#endDatePH').val();
+                }
+            },
+            columns: [
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
+                { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
+                { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
+                { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
+                { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
+                { data: 'total_topup', name: 'total_topup', className: 'text-center' },
+                { data: 'mom_prev_partial', name: 'mom_prev_partial', className: 'text-center' },
+                { data: 'mom_current_partial', name: 'mom_current_partial', className: 'text-center' },
+                { data: 'mom_prev_remaining', name: 'mom_prev_remaining', className: 'text-center' },
+                { data: 'mom_gap', name: 'mom_gap', className: 'text-center' }
+            ],
+            order: [[1, 'asc']],
+            drawCallback: function() {
+                calculatePerformanceTotals();
+            }
+        });
+
         // Handle month filter change
         // $('#filterMonthPH').on('change', function() {
         //     // Update label bulan yang ditampilkan dengan text dari selected option
@@ -725,6 +859,8 @@
             }
 
             table.ajax.reload();
+            performanceTable.ajax.reload();
+            updateMomHeaders();
         });
 
         $('#endDatePH').on('change', function () {
@@ -739,6 +875,8 @@
             }
 
             table.ajax.reload();
+            performanceTable.ajax.reload();
+            updateMomHeaders();
         });
 
         $('#btnExportPowerHouse').on('click', function (e) {
@@ -779,7 +917,7 @@
                 
                 // Column 6: Jumlah Visit
                 totalVisit += parseInt(cells.eq(3).text().trim()) || 0;
-                
+
                 // Column 7: Top Up (extract number from Rp text)
                 const topupText = cells.eq(6).text().trim();
                 const topupMatch = topupText.match(/[\d.,]+/);
@@ -807,6 +945,82 @@
             
             $('#totalPoin').text(totalPoin);
         }
+
+        function calculatePerformanceTotals() {
+            let totalDealTopupNewAkun = 0;
+            let totalDealTopupExistingAkun = 0;
+            let totalTopUpNewAkunRp = 0;
+            let totalTopUpExistingAkunRp = 0;
+            let totalTopup = 0;
+            let totalMomPrevPartial = 0;
+            let totalMomCurrentPartial = 0;
+            let totalMomPrevRemaining = 0;
+            let totalMomGap = 0;
+
+            const parseNumber = (text) => {
+                if (!text) return 0;
+                const normalized = text.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.-]/g, '');
+                return parseFloat(normalized) || 0;
+            };
+
+            $('#powerHousePerformanceTable tbody tr').each(function() {
+                const cells = $(this).find('td');
+
+                totalDealTopupNewAkun += parseInt(cells.eq(2).text().trim()) || 0;
+                totalDealTopupExistingAkun += parseInt(cells.eq(3).text().trim()) || 0;
+
+                totalTopUpNewAkunRp += parseNumber(cells.eq(4).text().trim());
+                totalTopUpExistingAkunRp += parseNumber(cells.eq(5).text().trim());
+                totalTopup += parseNumber(cells.eq(6).text().trim());
+
+                totalMomPrevPartial += parseNumber(cells.eq(7).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(8).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(9).text().trim());
+                totalMomGap += parseNumber(cells.eq(10).text().trim());
+            });
+
+            $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
+            $('#totalDealTopupExistingAkun').text(totalDealTopupExistingAkun);
+            $('#totalTopUpNewAkunRp').text(Math.floor(totalTopUpNewAkunRp).toLocaleString('id-ID'));
+            $('#totalTopUpExistingAkunRp').text(Math.floor(totalTopUpExistingAkunRp).toLocaleString('id-ID'));
+            $('#totalTopUpPerformance').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
+            $('#totalMomPrevPartial').text(Math.floor(totalMomPrevPartial).toLocaleString('id-ID'));
+            $('#totalMomCurrentPartial').text(Math.floor(totalMomCurrentPartial).toLocaleString('id-ID'));
+            $('#totalMomPrevRemaining').text(Math.floor(totalMomPrevRemaining).toLocaleString('id-ID'));
+            $('#totalMomGap').text(Math.floor(totalMomGap).toLocaleString('id-ID'));
+        }
+
+        function getSubMonthNoOverflow(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = dateObj.getMonth();
+            const day = dateObj.getDate();
+            const targetMonthDate = new Date(year, month - 1, 1);
+            const lastDayTargetMonth = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() + 1, 0).getDate();
+            const safeDay = Math.min(day, lastDayTargetMonth);
+            return new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), safeDay);
+        }
+
+        function monthShortId(dateObj) {
+            return dateObj.toLocaleString('id-ID', { month: 'short' }).replace('.', '');
+        }
+
+        function updateMomHeaders() {
+            const momRef = new Date();
+            const prevSame = getSubMonthNoOverflow(momRef);
+            const prevEnd = new Date(prevSame.getFullYear(), prevSame.getMonth() + 1, 0);
+            const prevRemainingStart = prevSame.getDate() + 1;
+
+            $('#momHeaderPrevPartial').text(`1 – ${prevSame.getDate()} ${monthShortId(prevSame)}`);
+            $('#momHeaderCurrentPartial').text(`1 – ${momRef.getDate()} ${monthShortId(momRef)}`);
+
+            if (prevRemainingStart <= prevEnd.getDate()) {
+                $('#momHeaderPrevRemaining').text(`${prevRemainingStart} – ${prevEnd.getDate()} ${monthShortId(prevSame)}`);
+            } else {
+                $('#momHeaderPrevRemaining').text(`-`);
+            }
+        }
+
+        updateMomHeaders();
 
         // Handle Save Image Button
         document.getElementById('btnSavePowerHouseImage').addEventListener('click', function () {

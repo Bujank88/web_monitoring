@@ -121,6 +121,7 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
     // PowerHouse Referral
     Route::get('/powerhouse-referral', [FrontController::class, 'monitoringPowerHouseReferral'])->name('admin.monitoring.powerhouse_referral');
     Route::get('/get-powerhouse-voucher-data', [BackController::class, 'getPowerHouseVoucher'])->name('powerhouse_voucher_data');
+    Route::get('/get-powerhouse-deal-topup-mom-data', [BackController::class, 'getPowerHouseDealTopupMom'])->name('powerhouse_deal_topup_mom_data');
     Route::get('/export-powerhouse-voucher', [BackController::class, 'exportPowerHouseVoucher'])->name('export.powerhouse_voucher');
 
     Route::get('/monitor-voucher', [FrontController::class, 'botVoucher'])->name('admin.voucher');
