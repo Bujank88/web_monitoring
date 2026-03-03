@@ -588,6 +588,7 @@ public function topupCanvasserData(Request $request)
         $query = DB::table('report_balance_top_up as rb')
             ->leftJoin('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
             ->select(
+                'rb.no_invoice',
                 'rb.email_client',
                 'rb.company_name',
                 DB::raw('CAST(COALESCE(rb.amount, 0) AS DECIMAL(15,2)) as amount'),
@@ -644,6 +645,9 @@ public function topupCanvasserData(Request $request)
         $query->orderByDesc('rb.paid_date');
 
         return datatables()->of($query)
+            ->editColumn('no_invoice', function ($row) {
+                return $row->no_invoice ?: '-';
+            })
             ->editColumn('amount', function ($row) {
                 return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
             })

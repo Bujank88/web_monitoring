@@ -79,6 +79,7 @@
             <table id="balanceTopupTable" class="table table-bordered table-hover" style="width:100%">
                 <thead>
                     <tr>
+                        <th>No Invoice</th>
                         <th>Email</th>
                         <th>Company Name</th>
                         <th>Tanggal Transaksi</th>
@@ -117,6 +118,7 @@ $(function () {
             }
         },
         columns: [
+            { data: 'no_invoice', name: 'rb.no_invoice' },
             { data: 'email_client', name: 'rb.email_client' },
             { data: 'company_name', name: 'rb.company_name' },
             { data: 'tgl_transaksi', name: 'rb.tgl_transaksi' },
@@ -127,7 +129,7 @@ $(function () {
             { data: 'paid_date', name: 'rb.paid_date' },
             { data: 'voucher_code', name: 'dv.voucher_code' }
         ],
-        order: [[7, 'desc']],
+        order: [[8, 'desc']],
         pageLength: 25,
         language: {
             emptyTable: 'Silakan isi minimal 1 filter untuk menampilkan data.',
