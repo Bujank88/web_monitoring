@@ -636,7 +636,7 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span id="displayedStartDatePH">{{ $startDate }}</span> s/d <span id="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -682,7 +682,7 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span id="displayedStartDatePH">{{ $startDate }}</span> s/d <span id="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
@@ -861,6 +861,7 @@
             table.ajax.reload();
             performanceTable.ajax.reload();
             updateMomHeaders();
+            updateFilterPeriodHeader();
         });
 
         $('#endDatePH').on('change', function () {
@@ -877,6 +878,7 @@
             table.ajax.reload();
             performanceTable.ajax.reload();
             updateMomHeaders();
+            updateFilterPeriodHeader();
         });
 
         $('#btnExportPowerHouse').on('click', function (e) {
@@ -1021,6 +1023,15 @@
         }
 
         updateMomHeaders();
+
+        function updateFilterPeriodHeader() {
+            const startVal = $('#startDatePH').val() || '-';
+            const endVal = $('#endDatePH').val() || '-';
+            $('.displayedStartDatePH').text(startVal);
+            $('.displayedEndDatePH').text(endVal);
+        }
+
+        updateFilterPeriodHeader();
 
         // Handle Save Image Button
         document.getElementById('btnSavePowerHouseImage').addEventListener('click', function () {

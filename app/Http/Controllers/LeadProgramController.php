@@ -34,11 +34,6 @@ class LeadProgramController extends Controller
                 ->pluck('email_myads')
                 ->toArray();
 
-            $b2bEmails = DB::table('mitra_sbp')
-                ->where('remark', 'B2B')
-                ->pluck('email_myads')
-                ->toArray();
-
             $advertisingEmails = DB::table('mitra_sbp')
                 ->where('remark', 'Agency Advertising')
                 ->pluck('email_myads')
@@ -65,13 +60,15 @@ class LeadProgramController extends Controller
             $topupData = DB::table('report_balance_top_up as rp')
                 ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
                 ->leftJoin('leads_master as lm', 'lm.email', '=', 'rp.email_client')
+                ->leftJoin('b2b_clients as bc', DB::raw('LOWER(bc.myads_account)'), '=', DB::raw('LOWER(rp.email_client)'))
                 ->select(
                     DB::raw("DATE(rp.tgl_transaksi) as tanggal"),
                     'rp.email_client as email',
                     'rp.user_id as id_user',
                     DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2)) as total_settlement"),
                     'm.remark',
-                    'lm.user_id as leads_user_id'
+                    'lm.user_id as leads_user_id',
+                    'bc.id as b2b_client_id'
                 )
                 ->whereRaw("rp.tgl_transaksi >= ?", [$startDate])
                 ->whereRaw("rp.tgl_transaksi <= ?", [$endDate . ' 23:59:59'])
@@ -114,6 +111,11 @@ class LeadProgramController extends Controller
                 if (!empty($leadsUserId) && in_array($leadsUserId, $canvasserUserIds)) {
                     $groupedData[$date]['canvasser']['settlement'] += $settlement;
                     $groupedData[$date]['canvasser']['users'][] = $userId;
+                }
+                // PRIORITY 2: Jika email terdaftar di b2b_clients, masukkan ke channel B2B
+                elseif (!empty($row->b2b_client_id)) {
+                    $groupedData[$date]['b2b']['settlement'] += $settlement;
+                    $groupedData[$date]['b2b']['users'][] = $userId;
                 }
                 // PRIORITY 2: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
                 // HANYA jika tidak ada di leads_master sebagai cvsr
