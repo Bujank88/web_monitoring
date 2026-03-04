@@ -157,6 +157,7 @@
                         <thead>
                             <tr>
                                 <th>Ad Date</th>
+                                <th>Broadcast Date</th>
                                 <th>Email</th>
                                 <th>Ad ID</th>
                                 <th>Ad Name</th>
@@ -167,6 +168,9 @@
                                 <th>Total</th>
                                 <th>Success</th>
                                 <th>Failed</th>
+                                <th>Delivered</th>
+                                <th>Read</th>
+                                <th>Click</th>
                                 <th>Used Balance</th>
                                 <th>Message</th>
                                 <!-- <th>Remaining Main Balance</th>
@@ -236,6 +240,7 @@
             },
             columns: [
                 { data: 'tanggal_iklan', name: 'b.created_at' },
+                { data: 'broadcast_date', name: 'b.broadcast_date' },
                 { data: 'email', name: 'a.email_myads' },
                 { data: 'id_iklan', name: 'b.id_iklan' },
                 { data: 'nama_iklan', name: 'b.nama_iklan' },
@@ -246,6 +251,9 @@
                 { data: 'total', name: 'b.total' },
                 { data: 'success', name: 'b.sukses' },
                 { data: 'failed', name: 'b.gagal' },
+                { data: 'delivered', name: 'b.delivered' },
+                { data: 'read', name: 'b.read' },
+                { data: 'click', name: 'b.click' },
                 { data: 'balance_terpakai', name: 'b.balance_terpakai' },
                 {
                     data: 'pesan',
