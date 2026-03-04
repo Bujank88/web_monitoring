@@ -978,9 +978,9 @@ public function topupCanvasserData(Request $request)
     private function campaignSbpEmailSubquery($year, $monthNum, $remark = null)
     {
         $users = DB::table('mitra_sbp as ms')
-            ->join('view_data_campaign_all as dc', 'ms.email_myads', '=', 'dc.email')
-            ->whereYear('dc.tanggal_iklan', $year)
-            ->whereMonth('dc.tanggal_iklan', $monthNum);
+            ->join('myads_request_soadb as dc', 'ms.reg_id', '=', 'dc.user_id')
+            ->whereYear('dc.created_at', $year)
+            ->whereMonth('dc.created_at', $monthNum);
 
         if (!empty($remark)) {
             $users->where('ms.remark', $remark);
@@ -1005,9 +1005,9 @@ public function topupCanvasserData(Request $request)
     private function campaignAgencyAdvertisingUserSubquery($year, $monthNum, $remark = null)
     {
         $users = DB::table('agency_advertising as aa')
-            ->join('view_data_campaign_all as dc', 'aa.email_myads', '=', 'dc.email')
-            ->whereYear('dc.tanggal_iklan', $year)
-            ->whereMonth('dc.tanggal_iklan', $monthNum);
+            ->join('myads_request_soadb as dc', 'aa.reg_id', '=', 'dc.user_id')
+            ->whereYear('dc.created_at', $year)
+            ->whereMonth('dc.created_at', $monthNum);
 
         // if (!empty($remark)) {
         //     $users->where('aa.remark', $remark);
@@ -1037,12 +1037,12 @@ public function topupCanvasserData(Request $request)
         $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
 
         $baseQuery = DB::table('mitra_sbp as a')
-            ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
             ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                 $join->on('b.user_id', '=', 'su.id_user_key');
             })
-            ->whereYear('b.tanggal_iklan', $year)
-            ->whereMonth('b.tanggal_iklan', $monthNum);
+            ->whereYear('b.created_at', $year)
+            ->whereMonth('b.created_at', $monthNum);
 
         if ($request->filled('remark')) {
             $baseQuery->where('a.remark', $request->remark);
@@ -1058,22 +1058,22 @@ public function topupCanvasserData(Request $request)
 
         $query = (clone $baseQuery)
             ->select(
-                DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
-                'b.email',
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'a.email_myads as email',
                 'b.id_iklan',
                 'b.nama_iklan',
-                'b.nama_instansi',
+                'b.nama_brand as nama_instansi',
                 'b.area_provinsi',
-                'b.campaign_type',
-                'b.inventory_type',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
                 'b.total',
-                'b.success',
-                'b.failed',
+                'b.sukses as success',
+                'b.gagal as failed',
                 DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                 DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
-                'b.wording as pesan',
-                'b.campaign_status',
+                'b.pesan as pesan',
+                'b.status as campaign_status',
                 'a.remark'
             );
 
@@ -1114,12 +1114,12 @@ public function topupCanvasserData(Request $request)
         $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $request->get('remark'));
 
         $baseQuery = DB::table('agency_advertising as a')
-            ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
             ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                 $join->on('b.user_id', '=', 'su.id_user_key');
             })
-            ->whereYear('b.tanggal_iklan', $year)
-            ->whereMonth('b.tanggal_iklan', $monthNum);
+            ->whereYear('b.created_at', $year)
+            ->whereMonth('b.created_at', $monthNum);
 
         // if ($request->filled('remark')) {
         //     $baseQuery->where('a.remark', $request->remark);
@@ -1127,28 +1127,28 @@ public function topupCanvasserData(Request $request)
 
         $query = (clone $baseQuery)
             ->select(
-                DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
-                'b.email',
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'a.email_myads as email',
                 'b.id_iklan',
                 'b.nama_iklan',
-                'b.nama_instansi',
+                'b.nama_brand as nama_instansi',
                 'b.area_provinsi',
-                'b.campaign_type',
-                'b.inventory_type',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
                 'b.total',
-                'b.success',
-                'b.failed',
+                'b.sukses as success',
+                'b.gagal as failed',
                 DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                 DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
-                'b.wording as pesan',
-                'b.campaign_status',
+                'b.pesan as pesan',
+                'b.status as campaign_status',
                 'a.remark'
             );
 
         $summaryRow = (clone $baseQuery)
-            ->selectRaw('SUM(CAST(COALESCE(b.success, 0) AS UNSIGNED)) as success_total')
-            ->selectRaw('SUM(CAST(COALESCE(b.failed, 0) AS UNSIGNED)) as failed_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.sukses, 0) AS UNSIGNED)) as success_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.gagal, 0) AS UNSIGNED)) as failed_total')
             ->selectRaw('SUM(CAST(COALESCE(b.total, 0) AS UNSIGNED)) as total_campaign')
             ->selectRaw('SUM(COALESCE(su.saldo_utama, 0)) as saldo_utama_total')
             ->selectRaw('SUM(COALESCE(su.saldo_monet, 0)) as saldo_monet_total')
@@ -1190,33 +1190,33 @@ public function topupCanvasserData(Request $request)
             $saldoUsersSub = $this->campaignSbpSaldoUsersSubquery($year, $monthNum, $remark);
 
             $query = DB::table('mitra_sbp as a')
-                ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
+                ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                     $join->on('b.user_id', '=', 'su.id_user_key');
                 })
                 ->select(
-                    DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
-                    'b.email',
+                    DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'a.email_myads as email',
                     'b.id_iklan',
                     'b.nama_iklan',
-                    'b.nama_instansi',
+                    'b.nama_brand as nama_instansi',
                     'b.area_provinsi',
                     'a.regional',
                     'a.area',
-                    'b.campaign_type',
-                    'b.inventory_type',
+                    'b.tipe_iklan as campaign_type',
+                    'b.tipe_inventori as inventory_type',
                     'b.total',
-                    'b.success',
-                    'b.failed',
+                    'b.sukses as success',
+                    'b.gagal as failed',
                     'b.balance_terpakai',
                     DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                     DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
-                    'b.wording as pesan',
-                    'b.campaign_status',
+                    'b.pesan as pesan',
+                    'b.status as campaign_status',
                     'a.remark'
                 )
-                ->whereYear('b.tanggal_iklan', $year)
-                ->whereMonth('b.tanggal_iklan', $monthNum);
+                ->whereYear('b.created_at', $year)
+                ->whereMonth('b.created_at', $monthNum);
 
             // ==============================
             // FILTER
@@ -1234,7 +1234,7 @@ public function topupCanvasserData(Request $request)
                 $query->where('a.regional', $regional);
             }
 
-            $data = $query->orderBy('b.tanggal_iklan', 'desc')->get();
+            $data = $query->orderByRaw('COALESCE(b.broadcast_date, b.created_at) DESC')->get();
 
             if ($data->isEmpty()) {
                 return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
@@ -1364,37 +1364,37 @@ public function topupCanvasserData(Request $request)
             $saldoUsersSub = $this->campaignAgencyAdvertisingSaldoUsersSubquery($year, $monthNum, $remark);
 
             $query = DB::table('agency_advertising as a')
-                ->join('view_data_campaign_all as b', 'a.email_myads', '=', 'b.email')
+                ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
                 ->leftJoinSub($saldoUsersSub, 'su', function ($join) {
                     $join->on('b.user_id', '=', 'su.id_user_key');
                 })
                 ->select(
-                    DB::raw('DATE(b.tanggal_iklan) as tanggal_iklan'),
-                    'b.email',
+                    DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'a.email_myads as email',
                     'b.id_iklan',
                     'b.nama_iklan',
-                    'b.nama_instansi',
+                    'b.nama_brand as nama_instansi',
                     'b.area_provinsi',
-                    'b.campaign_type',
-                    'b.inventory_type',
+                    'b.tipe_iklan as campaign_type',
+                    'b.tipe_inventori as inventory_type',
                     'b.total',
-                    'b.success',
-                    'b.failed',
+                    'b.sukses as success',
+                    'b.gagal as failed',
                     'b.balance_terpakai',
                     DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                     DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
-                    'b.wording as pesan',
-                    'b.campaign_status',
+                    'b.pesan as pesan',
+                    'b.status as campaign_status',
                     'a.remark'
                 )
-                ->whereYear('b.tanggal_iklan', $year)
-                ->whereMonth('b.tanggal_iklan', $monthNum);
+                ->whereYear('b.created_at', $year)
+                ->whereMonth('b.created_at', $monthNum);
 
             if (!empty($remark)) {
                 $query->where('a.remark', $remark);
             }
 
-            $data = $query->orderBy('b.tanggal_iklan', 'desc')->get();
+            $data = $query->orderByRaw('COALESCE(b.broadcast_date, b.created_at) DESC')->get();
 
             if ($data->isEmpty()) {
                 return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
@@ -1986,3 +1986,6 @@ public function topupCanvasserData(Request $request)
         }
     }
 }
+
+
+
