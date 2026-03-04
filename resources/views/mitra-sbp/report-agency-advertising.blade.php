@@ -235,21 +235,21 @@
                 }
             },
             columns: [
-                { data: 'tanggal_iklan', name: 'b.tanggal_iklan' },
-                { data: 'email', name: 'b.email' },
+                { data: 'tanggal_iklan', name: 'b.created_at' },
+                { data: 'email', name: 'a.email_myads' },
                 { data: 'id_iklan', name: 'b.id_iklan' },
                 { data: 'nama_iklan', name: 'b.nama_iklan' },
-                { data: 'nama_instansi', name: 'b.nama_instansi' },
+                { data: 'nama_instansi', name: 'b.nama_brand' },
                 { data: 'area_provinsi', name: 'b.area_provinsi' },
-                { data: 'campaign_type', name: 'b.campaign_type' },
-                { data: 'inventory_type', name: 'b.inventory_type' },
+                { data: 'campaign_type', name: 'b.tipe_iklan' },
+                { data: 'inventory_type', name: 'b.tipe_inventori' },
                 { data: 'total', name: 'b.total' },
-                { data: 'success', name: 'b.success' },
-                { data: 'failed', name: 'b.failed' },
+                { data: 'success', name: 'b.sukses' },
+                { data: 'failed', name: 'b.gagal' },
                 { data: 'balance_terpakai', name: 'b.balance_terpakai' },
                 {
                     data: 'pesan',
-                    name: 'b.wording',
+                    name: 'b.pesan',
                     render: function(data) {
                         if (!data) return '';
                         var text = data.toString();
@@ -260,7 +260,7 @@
                 },
                 // { data: 'saldo_utama', name: 'su.saldo_utama' },
                 // { data: 'saldo_monet', name: 'su.saldo_monet' },
-                { data: 'campaign_status', name: 'b.campaign_status' },
+                { data: 'campaign_status', name: 'b.status' },
                 { data: 'remark', name: 'a.remark' }
             ],
             order: [[0, 'desc']],
@@ -306,3 +306,4 @@
     });
 </script>
 @endsection
+
