@@ -1059,6 +1059,7 @@ public function topupCanvasserData(Request $request)
         $query = (clone $baseQuery)
             ->select(
                 DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
                 'a.email_myads as email',
                 'b.id_iklan',
                 'b.nama_iklan',
@@ -1069,6 +1070,9 @@ public function topupCanvasserData(Request $request)
                 'b.total',
                 'b.sukses as success',
                 'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
                 DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                 DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
@@ -1128,6 +1132,7 @@ public function topupCanvasserData(Request $request)
         $query = (clone $baseQuery)
             ->select(
                 DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
                 'a.email_myads as email',
                 'b.id_iklan',
                 'b.nama_iklan',
@@ -1138,6 +1143,9 @@ public function topupCanvasserData(Request $request)
                 'b.total',
                 'b.sukses as success',
                 'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
                 DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                 DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
@@ -1196,6 +1204,7 @@ public function topupCanvasserData(Request $request)
                 })
                 ->select(
                     DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'b.broadcast_date',
                     'a.email_myads as email',
                     'b.id_iklan',
                     'b.nama_iklan',
@@ -1208,6 +1217,9 @@ public function topupCanvasserData(Request $request)
                     'b.total',
                     'b.sukses as success',
                     'b.gagal as failed',
+                    'b.delivered',
+                    'b.read',
+                    'b.click',
                     'b.balance_terpakai',
                     DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                     DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
@@ -1259,7 +1271,7 @@ public function topupCanvasserData(Request $request)
                 ' - ' . $month
             );
 
-            $sheet->mergeCells('A1:R1');
+            $sheet->mergeCells('A1:V1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -1268,6 +1280,7 @@ public function topupCanvasserData(Request $request)
             // ==============================
             $headers = [
                 'Tanggal Iklan',
+                'Broadcast Date',
                 'Email',
                 'ID Iklan',
                 'Nama Iklan',
@@ -1279,6 +1292,9 @@ public function topupCanvasserData(Request $request)
                 'Total',
                 'Success',
                 'Failed',
+                'Delivered',
+                'Read',
+                'Click',
                 'Balance Terpakai',
                 'Sisa Saldo Utama',
                 'Sisa Saldo Monet',
@@ -1289,7 +1305,7 @@ public function topupCanvasserData(Request $request)
 
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:R3')->applyFromArray([
+            $sheet->getStyle('A3:V3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -1311,6 +1327,7 @@ public function topupCanvasserData(Request $request)
             foreach ($data as $row) {
                 $sheet->fromArray([
                     $row->tanggal_iklan,
+                    $row->broadcast_date,
                     $row->email,
                     $row->id_iklan,
                     $row->nama_iklan,
@@ -1322,6 +1339,9 @@ public function topupCanvasserData(Request $request)
                     $row->total,
                     $row->success,
                     $row->failed,
+                    $row->delivered,
+                    $row->read,
+                    $row->click,
                     $row->balance_terpakai,
                     $row->saldo_utama,
                     $row->saldo_monet,
@@ -1333,7 +1353,7 @@ public function topupCanvasserData(Request $request)
                 $rowNum++;
             }
 
-            foreach (range('A', 'R') as $col) {
+            foreach (range('A', 'V') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -1370,6 +1390,7 @@ public function topupCanvasserData(Request $request)
                 })
                 ->select(
                     DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'b.broadcast_date',
                     'a.email_myads as email',
                     'b.id_iklan',
                     'b.nama_iklan',
@@ -1380,6 +1401,9 @@ public function topupCanvasserData(Request $request)
                     'b.total',
                     'b.sukses as success',
                     'b.gagal as failed',
+                    'b.delivered',
+                    'b.read',
+                    'b.click',
                     'b.balance_terpakai',
                     DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama'),
                     DB::raw('COALESCE(su.saldo_monet, 0) as saldo_monet'),
@@ -1405,12 +1429,13 @@ public function topupCanvasserData(Request $request)
 
             $titleRemark = $remark ?: 'Semua';
             $sheet->setCellValue('A1', 'REPORT CAMPAIGN AGENCY ADVERTISING - ' . strtoupper($titleRemark) . ' - ' . $month);
-            $sheet->mergeCells('A1:Q1');
+            $sheet->mergeCells('A1:U1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $headers = [
                 'Tanggal Iklan',
+                'Broadcast Date',
                 'Email',
                 'ID Iklan',
                 'Nama Iklan',
@@ -1421,6 +1446,9 @@ public function topupCanvasserData(Request $request)
                 'Total',
                 'Success',
                 'Failed',
+                'Delivered',
+                'Read',
+                'Click',
                 'Balance Terpakai',
                 'Sisa Saldo Utama',
                 'Sisa Saldo Monet',
@@ -1430,7 +1458,7 @@ public function topupCanvasserData(Request $request)
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:Q3')->applyFromArray([
+            $sheet->getStyle('A3:U3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -1448,6 +1476,7 @@ public function topupCanvasserData(Request $request)
             foreach ($data as $row) {
                 $sheet->fromArray([
                     $row->tanggal_iklan,
+                    $row->broadcast_date,
                     $row->email,
                     $row->id_iklan,
                     $row->nama_iklan,
@@ -1458,6 +1487,9 @@ public function topupCanvasserData(Request $request)
                     $row->total,
                     $row->success,
                     $row->failed,
+                    $row->delivered,
+                    $row->read,
+                    $row->click,
                     $row->balance_terpakai,
                     $row->saldo_utama,
                     $row->saldo_monet,
@@ -1468,7 +1500,7 @@ public function topupCanvasserData(Request $request)
                 $rowNum++;
             }
 
-            foreach (range('A', 'Q') as $col) {
+            foreach (range('A', 'U') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -1986,6 +2018,4 @@ public function topupCanvasserData(Request $request)
         }
     }
 }
-
-
 
