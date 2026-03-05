@@ -585,12 +585,66 @@ public function topupCanvasserData(Request $request)
 
     public function reportBalanceTopUpData(Request $request)
     {
+        $leadOwnerSubQuery = DB::table('leads_master as lm')
+            ->leftJoin('users as ulm', 'ulm.id', '=', 'lm.user_id')
+            ->selectRaw('LOWER(TRIM(lm.email)) as email_key')
+            ->selectRaw('MAX(ulm.name) as lead_owner_name')
+            ->selectRaw('MAX(lm.company_name) as lead_company_name')
+            ->selectRaw('MAX(lm.nama) as lead_contact_name')
+            ->whereNotNull('lm.email')
+            ->where('lm.email', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+        $mitraOwnerSubQuery = DB::table('mitra_sbp as ms')
+            ->selectRaw('LOWER(TRIM(ms.email_myads)) as email_key')
+            ->selectRaw('MAX(ms.remark) as mitra_owner_name')
+            ->whereNotNull('ms.email_myads')
+            ->where('ms.email_myads', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(ms.email_myads))'));
+
+        $b2bOwnerSubQuery = DB::table('b2b_clients as bc')
+            ->leftJoin('users as ubc_by_id', 'ubc_by_id.id', '=', 'bc.user_id')
+            ->leftJoin('users as ubc_by_email', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(ubc_by_email.email))'),
+                    '=',
+                    DB::raw('LOWER(TRIM(bc.myads_account))')
+                );
+            })
+            ->selectRaw('LOWER(TRIM(bc.myads_account)) as email_key')
+            ->selectRaw('MAX(COALESCE(ubc_by_id.name, ubc_by_email.name)) as b2b_owner_name')
+            ->whereNotNull('bc.myads_account')
+            ->where('bc.myads_account', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(bc.myads_account))'));
+
         $query = DB::table('report_balance_top_up as rb')
             ->leftJoin('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+            ->leftJoinSub($leadOwnerSubQuery, 'lo', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(rb.email_client))'),
+                    '=',
+                    'lo.email_key'
+                );
+            })
+            ->leftJoinSub($mitraOwnerSubQuery, 'mo', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(rb.email_client))'),
+                    '=',
+                    'mo.email_key'
+                );
+            })
+            ->leftJoinSub($b2bOwnerSubQuery, 'bo', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(rb.email_client))'),
+                    '=',
+                    'bo.email_key'
+                );
+            })
             ->select(
                 'rb.no_invoice',
                 'rb.email_client',
                 'rb.company_name',
+                DB::raw('COALESCE(CONCAT(lo.lead_owner_name, " (Canvasser)"), mo.mitra_owner_name, concat(bo.b2b_owner_name, " (B2B)"), "-") as owner_name'),
                 DB::raw('CAST(COALESCE(rb.amount, 0) AS DECIMAL(15,2)) as amount'),
                 DB::raw('CAST(COALESCE(rb.discount_voucer, 0) AS DECIMAL(15,2)) as discount_voucher'),
                 DB::raw('CAST(COALESCE(rb.total_settlement_klien, 0) AS DECIMAL(15,2)) as total_settlement'),
@@ -613,33 +667,21 @@ public function topupCanvasserData(Request $request)
             }
         }
 
-        // Filter email/name: cari email kandidat di leads_master dulu,
-        // lalu pakai email tersebut untuk memfilter report_balance_top_up.
-        if ($request->filled('email') || $request->filled('name')) {
-            $email = $request->filled('email')
-                ? preg_replace('/\s+/', '', strtolower(trim($request->email)))
-                : null;
-            $name = $request->filled('name')
-                ? '%' . strtolower(trim($request->name)) . '%'
-                : null;
+        if ($request->filled('email')) {
+            $email = preg_replace('/\s+/', '', strtolower(trim($request->email)));
+            $query->whereRaw('LOWER(REPLACE(TRIM(rb.email_client), " ", "")) = ?', [$email]);
+        }
 
-            $leadEmailSubQuery = DB::table('leads_master as lm')
-                ->selectRaw('DISTINCT LOWER(TRIM(lm.email))')
-                ->whereNotNull('lm.email')
-                ->where('lm.email', '!=', '');
-
-            if ($email) {
-                $leadEmailSubQuery->whereRaw('LOWER(REPLACE(TRIM(lm.email), " ", "")) = ?', [$email]);
-            }
-
-            if ($name) {
-                $leadEmailSubQuery->where(function ($q) use ($name) {
-                    $q->whereRaw('LOWER(COALESCE(lm.company_name, "")) LIKE ?', [$name])
-                        ->orWhereRaw('LOWER(COALESCE(lm.nama, "")) LIKE ?', [$name]);
-                });
-            }
-
-            $query->whereIn(DB::raw('LOWER(TRIM(rb.email_client))'), $leadEmailSubQuery);
+        if ($request->filled('name')) {
+            $name = '%' . strtolower(trim($request->name)) . '%';
+            $query->where(function ($q) use ($name) {
+                $q->whereRaw('LOWER(COALESCE(lo.lead_owner_name, "")) LIKE ?', [$name])
+                    ->orWhereRaw('LOWER(COALESCE(mo.mitra_owner_name, "")) LIKE ?', [$name])
+                    ->orWhereRaw('LOWER(COALESCE(bo.b2b_owner_name, "")) LIKE ?', [$name])
+                    ->orWhereRaw('LOWER(COALESCE(lo.lead_company_name, "")) LIKE ?', [$name])
+                    ->orWhereRaw('LOWER(COALESCE(lo.lead_contact_name, "")) LIKE ?', [$name])
+                    ->orWhereRaw('LOWER(COALESCE(rb.company_name, "")) LIKE ?', [$name]);
+            });
         }
 
         $query->orderByDesc('rb.paid_date');
@@ -647,6 +689,9 @@ public function topupCanvasserData(Request $request)
         return datatables()->of($query)
             ->editColumn('no_invoice', function ($row) {
                 return $row->no_invoice ?: '-';
+            })
+            ->editColumn('owner_name', function ($row) {
+                return $row->owner_name ?: '-';
             })
             ->editColumn('amount', function ($row) {
                 return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
