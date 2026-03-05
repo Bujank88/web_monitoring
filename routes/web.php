@@ -176,6 +176,8 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
     
 });
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
+    Route::view('faq-l0', 'faq.l0')->name('faq-l0');
+
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');

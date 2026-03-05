@@ -55,8 +55,8 @@
             <input type="date" id="filter_end_date" class="form-control">
         </div>
         <div class="col-md-3">
-            <label for="filter_name">Name (LIKE)</label>
-            <input type="text" id="filter_name" class="form-control" placeholder="Masukkan name/company">
+            <label for="filter_name">Name/Owner (LIKE)</label>
+            <input type="text" id="filter_name" class="form-control" placeholder="Masukkan name/owner/company">
         </div>
     </div>
     <div class="mt-3">
@@ -81,6 +81,7 @@
                     <tr>
                         <th>No Invoice</th>
                         <th>Email</th>
+                        <th>Pemilik</th>
                         <th>Company Name</th>
                         <th>Tanggal Transaksi</th>
                         <th>Amount</th>
@@ -120,6 +121,7 @@ $(function () {
         columns: [
             { data: 'no_invoice', name: 'rb.no_invoice' },
             { data: 'email_client', name: 'rb.email_client' },
+            { data: 'owner_name', name: 'owner_name' },
             { data: 'company_name', name: 'rb.company_name' },
             { data: 'tgl_transaksi', name: 'rb.tgl_transaksi' },
             { data: 'amount', name: 'amount' },
@@ -129,7 +131,7 @@ $(function () {
             { data: 'paid_date', name: 'rb.paid_date' },
             { data: 'voucher_code', name: 'dv.voucher_code' }
         ],
-        order: [[8, 'desc']],
+        order: [[9, 'desc']],
         pageLength: 25,
         language: {
             emptyTable: 'Silakan isi minimal 1 filter untuk menampilkan data.',

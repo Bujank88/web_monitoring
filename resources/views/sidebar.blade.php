@@ -288,6 +288,15 @@
                         <p>New/Eksisting Akun</p>
                     </a>
                 </li>         
+                @if($isAdmin || $isCanv || $isPH)
+                <li class="nav-item">
+                    <a href="{{ route('faq-l0') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('faq-l0') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-circle-question" style="color:#20c997;"></i>
+                        <p>FAQ L0</p>
+                    </a>
+                </li>
+                @endif
                 @if(!$isCanv)
                 <li class="nav-item">
                     <a href="{{ route('calendar') }}"
