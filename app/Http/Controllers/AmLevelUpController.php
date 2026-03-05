@@ -691,7 +691,6 @@ class AmLevelUpController extends Controller
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     
                     $totalpackagePoint = $packagePoint[$email] ?? 0;
-                    \Log::info("Email: {$email}, Package Point: " . ($packagePoint[$email] ?? 0));
                     if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
                         continue;
                     }
