@@ -1318,6 +1318,16 @@ class BackController extends Controller
             ];
         }
 
+        $result = collect($result)
+            ->sort(function ($a, $b) {
+                if ($a['total_topup'] === $b['total_topup']) {
+                    return strcmp($a['team_powerhouse'], $b['team_powerhouse']);
+                }
+                return $b['total_topup'] <=> $a['total_topup'];
+            })
+            ->values()
+            ->all();
+
         return DataTables::of($result)
             ->addIndexColumn()
             ->editColumn('top_up_new_akun_rp', function ($row) {

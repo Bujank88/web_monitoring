@@ -756,6 +756,7 @@
             paging: false,
             searching: false,
             info: false,
+            ordering: false,
             ajax: {
                 url: "{{ route('powerhouse_voucher_data') }}",
                 type: 'GET',
@@ -776,7 +777,6 @@
                 { data: 'poin', name: 'poin', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
-            order: [[1, 'asc']],
             rowCallback: function(row, data, index) {
                 // Highlight poin cells dengan warna biru gradient untuk nilai > 0
                 var poinCell = $('td', row).eq(7);
@@ -812,6 +812,7 @@
             paging: false,
             searching: false,
             info: false,
+            ordering: false,
             ajax: {
                 url: "{{ route('powerhouse_deal_topup_mom_data') }}",
                 type: 'GET',
@@ -833,7 +834,6 @@
                 { data: 'mom_prev_remaining', name: 'mom_prev_remaining', className: 'text-center' },
                 { data: 'mom_gap', name: 'mom_gap', className: 'text-center' }
             ],
-            order: [[1, 'asc']],
             drawCallback: function() {
                 calculatePerformanceTotals();
             }
