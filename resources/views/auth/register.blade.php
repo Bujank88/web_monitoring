@@ -60,6 +60,9 @@
                             <option value="">-- Pilih Role --</option>
                             <option value="Admin">Admin</option>
                             <option value="Tsel">Tsel</option>
+                            <option value="TCD">TCD</option>
+                            <option value="Internal">Internal</option>
+                            <option value="b2b">B2B</option>
                         </select>
                     </div>
 

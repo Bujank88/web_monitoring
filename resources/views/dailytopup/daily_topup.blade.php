@@ -4,8 +4,6 @@
 <!-- Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-<!-- DataTables Responsive CSS -->
-<link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css" rel="stylesheet"/>
 
 <style>
     .btn-ref {
@@ -364,6 +362,31 @@
     .gap-2 {
         gap: 8px;
     }
+
+    /* Horizontal Scroll for Tables on Mobile */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+
+    .table-responsive table {
+        margin-bottom: 0 !important;
+    }
+
+    @media (max-width: 768px) {
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .table {
+            width: 100% !important;
+            min-width: 1200px;
+            white-space: nowrap;
+        }
+    }
 </style>
 @endsection
 
@@ -434,27 +457,33 @@
                         <thead class="thead-light">
                             <tr>
                                 <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">Tanggal</th>
-                                <th colspan="12" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="16" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
-                                <th colspan="2" class="text-center" style="background-color: #fff3cd;">Mitra SBP</th>
                                 <th colspan="2" class="text-center" style="background-color: #d1ecf1;">Canvasser</th>
-                                <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
-                                <th colspan="2" class="text-center" style="background-color: #e2e3e5;">Agency</th>
+                                <th colspan="2" class="text-center" style="background-color: #fff3cd;">Mitra SBP</th>
+                                <th colspan="2" class="text-center" style="background-color: #e2e3e5;">Agency Indihome</th>
                                 <th colspan="2" class="text-center" style="background-color: #fcc271;">Internal</th>
+                                <th colspan="2" class="text-center" style="background-color: #eef7d9;">Agency Advertising</th>
+                                <th colspan="2" class="text-center" style="background-color: #d4edea;">B2B</th>
+                                <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
                                 <th colspan="2" class="text-center" style="background-color: #f62b3c; color: white;">Total</th>
                             </tr>
                             <tr>
-                                <th class="text-center" style="background-color: #fff3cd;">user_id</th>
-                                <th class="text-center" style="background-color: #fff3cd;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #d1ecf1;">user_id</th>
                                 <th class="text-center" style="background-color: #d1ecf1;">Total Settlement</th>
-                                <th class="text-center" style="background-color: #d4edda;">user_id</th>
-                                <th class="text-center" style="background-color: #d4edda;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #fff3cd;">user_id</th>
+                                <th class="text-center" style="background-color: #fff3cd;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #e2e3e5;">user_id</th>
                                 <th class="text-center" style="background-color: #e2e3e5;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #fcc271;">user_id</th>
                                 <th class="text-center" style="background-color: #fcc271;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #eef7d9;">user_id</th>
+                                <th class="text-center" style="background-color: #eef7d9;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #d4edea;">user_id</th>
+                                <th class="text-center" style="background-color: #d4edea;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #d4edda;">user_id</th>
+                                <th class="text-center" style="background-color: #d4edda;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #f62b3c; color: white;">User Id</th>
                                 <th class="text-center" style="background-color: #f62b3c; color: white;">Settlement</th>
                             </tr>
@@ -491,7 +520,7 @@
                         <thead class="thead-light">
                             <tr>
                                 <th colspan="5" class="text-center" style="background-color: #d1ecf1; font-weight: 700; padding: 12px;">
-                                    Report Daily TopUp Per Province | Bulan: <span id="displayedMonthByProvince">January 2026</span>
+                                    Report Daily TopUp Per Province | Bulan: <span id="displayedMonthByProvince">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span>
                                 </th>
                             </tr>
                             <tr>
@@ -553,8 +582,6 @@
 <!-- Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<!-- DataTables Responsive JS -->
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script>
     $(document).ready(function() {
 
@@ -562,10 +589,10 @@
         var table = $('#dailyTopupTable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
             ordering: false,
             paging: false,
             searching: false,
+            autoWidth: false,
             ajax: {
                 url: "{{ route('daily_topup_data') }}",
                 type: "GET",
@@ -594,20 +621,6 @@
                     }
                 },
                 {
-                    data: 'mitra_sbp_user',
-                    render: function(data, type, row) {
-                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
-                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
-                    }
-                },
-                {
-                    data: 'mitra_sbp_settle',
-                    render: function(data, type, row) {
-                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
-                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
-                    }
-                },
-                {
                     data: 'canvasser_user',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
@@ -623,19 +636,20 @@
                     }
                 },
                 {
-                    data: 'self_service_user',
+                    data: 'mitra_sbp_user',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
                     }
                 },
                 {
-                    data: 'self_service_settle',
+                    data: 'mitra_sbp_settle',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
                     }
                 },
+                
 
                 {
                     data: 'agency_user',
@@ -660,6 +674,48 @@
                 },
                 {
                     data: 'internal_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'advertising_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'advertising_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'b2b_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'b2b_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'self_service_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'self_service_settle',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
                         return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
@@ -728,10 +784,10 @@
         var tableByProvince = $('#dailyTopupByProvinceTable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
             searching: true,
             pageLength: 25,
             lengthChange: true,
+            autoWidth: false,
             ajax: {
                 url: "{{ route('daily_topup_by_province_data') }}",
                 type: "GET",

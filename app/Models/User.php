@@ -48,6 +48,23 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * Relationship: User memiliki satu lokasi presensi (untuk CVSR)
+     */
+    public function locationPresensi()
+    {
+        return $this->hasOne(LocationPresensiCvsr::class);
+    }
+
+    /**
+     * Relationship: User memiliki banyak presensi
+     */
+    public function presensi()
+    {
+        return $this->hasMany(Presensi::class);
+    }
+
     public function hasRole($roles)
     {
         if (is_array($roles)) {

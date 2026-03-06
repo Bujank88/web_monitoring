@@ -187,6 +187,27 @@ class PanenPoinController extends Controller
         }
         return view('panenpoin.reportpoin', compact('months'));
     }
+
+    // Tampilkan halaman report canvasser (ringkasan)
+    public function reportCanvasser()
+    {
+        logUserLogin();
+        $months = [];
+
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        return view('panenpoin.report-canvasser-panenpoin', compact('months'));
+    }
     
     // Get data untuk DataTable
     public function getReportData(Request $request)
@@ -209,6 +230,102 @@ class PanenPoinController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    // Get data ringkasan per canvasser
+    public function getReportCanvasserData(Request $request)
+    {
+        \Log::info('=== GET REPORT CANVASSER DATA CALLED ===');
+        \Log::info('User: ' . Auth::user()->name);
+        \Log::info('Request URI: ' . $request->getRequestUri());
+        \Log::info('Filter Tanggal: ' . $request->tanggal);
+
+        try {
+            $query = $this->buildReportByRole('cvsr', $request->tanggal);
+
+            return datatables()->of($query)->addIndexColumn()->make(true);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in getReportCanvasserData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Tampilkan halaman report powerhouse
+    public function reportPowerhouse()
+    {
+        logUserLogin();
+        $months = [];
+
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        return view('panenpoin.report-ph-panenpoin', compact('months'));
+    }
+
+    // Get data ringkasan per powerhouse
+    public function getReportPowerhouseData(Request $request)
+    {
+        \Log::info('=== GET REPORT POWERHOUSE DATA CALLED ===');
+        \Log::info('User: ' . Auth::user()->name);
+        \Log::info('Request URI: ' . $request->getRequestUri());
+        \Log::info('Filter Tanggal: ' . $request->tanggal);
+
+        try {
+            $query = $this->buildReportByRole('PH', $request->tanggal);
+
+            return datatables()->of($query)->addIndexColumn()->make(true);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in getReportPowerhouseData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Build report query by role (include zero)
+    private function buildReportByRole(string $role, $tanggal = null)
+    {
+        $query = DB::table('users')
+            ->select(
+                'users.id as user_id',
+                'users.name as nama_canvasser',
+                DB::raw('COALESCE(COUNT(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.id END), 0) as jumlah_terdaftar'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL AND (COALESCE(summary_panen_poin.poin, 0) > 0 OR COALESCE(summary_panen_poin.poin_package, 0) > 0) THEN 1 ELSE 0 END), 0) as jumlah_akun_punya_poin'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.poin ELSE 0 END), 0) as jumlah_poin')
+            )
+            ->where('users.role', $role)
+            ->leftJoin('summary_panen_poin', function ($join) use ($tanggal) {
+                $join->on('summary_panen_poin.user_id', '=', 'users.id');
+
+                if ($tanggal) {
+                    $date = Carbon::parse($tanggal);
+                    $join->whereMonth('summary_panen_poin.created_at', $date->month)
+                         ->whereYear('summary_panen_poin.created_at', $date->year);
+                }
+            })
+            ->leftJoin('akun_panen_poin', 'summary_panen_poin.email_client', '=', 'akun_panen_poin.email_client')
+            ->leftJoin('mitra_sbp', 'summary_panen_poin.email_client', '=', 'mitra_sbp.email_myads')
+            ->groupBy('users.id', 'users.name')
+            ->orderByRaw('COALESCE(SUM(CASE WHEN akun_panen_poin.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin.poin ELSE 0 END), 0) DESC');
+
+        // Filter berdasarkan role: kalau cvsr/PH, hanya tampilkan data dia sendiri
+        if (Auth::user()->role === $role) {
+            $query->where('users.id', Auth::id());
+            \Log::info("Filtering by User ID: " . Auth::id() . " (Role {$role})");
+        }
+
+        return $query;
+    }
     
     // Hitung data panen poin (ambil dari summary table)
     private function calculatePanenPoinData($tanggal = null)
@@ -225,8 +342,9 @@ class PanenPoinController extends Controller
                     'summary_panen_poin.poin_bulan_ini',
                     'summary_panen_poin.poin_akumulasi',
                     'summary_panen_poin.poin',
+                    'summary_panen_poin.poin_package',
                     DB::raw('COALESCE(summary_panen_poin.poin_redeem, 0) as poin_redeem'),
-                    DB::raw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) as poin_sisa'),
+                    DB::raw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0) + COALESCE(summary_panen_poin.poin_package, 0)) as poin_sisa'),
                     'summary_panen_poin.remark',
                     'summary_panen_poin.bulan'
                 )
@@ -267,7 +385,7 @@ class PanenPoinController extends Controller
                 \Log::info("Filtering by Remark: " . request()->remark);
             }
             
-            $result = $query->orderByRaw('(summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) DESC')
+            $result = $query->orderByRaw('(summary_panen_poin.poin_package + summary_panen_poin.poin - COALESCE(summary_panen_poin.poin_redeem, 0)) DESC')
                 ->get()
                 ->map(function($item) {
                     return [
@@ -279,6 +397,7 @@ class PanenPoinController extends Controller
                         'total_settlement_raw' => $item->total_settlement_raw,
                         'poin_bulan_ini' => $item->poin_bulan_ini,
                         'poin_akumulasi' => $item->poin_akumulasi,
+                        'poin_package' => $item->poin_package,
                         'poin' => $item->poin,
                         'poin_redeem' => $item->poin_redeem,
                         'poin_sisa' => $item->poin_sisa,
@@ -461,12 +580,26 @@ class PanenPoinController extends Controller
                     $previousMonthPoints[strtolower(trim($prev->email_client))] = $prev->poin_sisa;
                 }
                 
+                $packagePoint = DB::table('data_paket_seasonal as a')
+                    ->join('panen_poin_package as b', function ($join) {
+                        $join->on(
+                            DB::raw('LOWER(TRIM(a.name))'),
+                            '=',
+                            DB::raw('LOWER(TRIM(b.code))')
+                        );
+                    })
+                    ->selectRaw('LOWER(TRIM(email)) as email, SUM(COALESCE(b.point, 0)) as point')
+                    ->groupBy(DB::raw('LOWER(TRIM(a.email))'))
+                    ->pluck('point', 'email')
+                    ->toArray();
+                    
+                
                 // Hitung total poin yang sudah di-redeem dari table prize_redeem (bulan ini)
-                $totalPoinRedeem = DB::table('prize_redeems')
-                    ->where('user_id', $canvasser->id)
-                    ->whereMonth('created_at', Carbon::now()->month)
-                    ->whereYear('created_at', Carbon::now()->year)
-                    ->sum('point_used') ?? 0;
+                // $totalPoinRedeem = DB::table('prize_redeems')
+                //     ->where('user_id', $canvasser->id)
+                //     ->whereMonth('created_at', Carbon::now()->month)
+                //     ->whereYear('created_at', Carbon::now()->year)
+                //     ->sum('point_used') ?? 0;
                 
                 // Update or Insert ke summary table
                 foreach ($clientEmails as $client) {
@@ -476,17 +609,29 @@ class PanenPoinController extends Controller
                     // Ambil poin sisa dari bulan sebelumnya
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     
+                    $totalpackagePoint = $packagePoint[$email] ?? 0;
+
                     if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
                         continue;
                     }
-                    
+                    $userPoin = AkunPanenPoin::whereRaw('LOWER(TRIM(email_client)) = ?', [$email])->first();
+                    $totalPoinRedeem = 0;
+
+                    if ($userPoin) {
+                        $totalPoinRedeem = DB::table('prize_redeems')
+                            ->where('user_id', $userPoin->id)
+                            ->whereMonth('created_at', Carbon::now()->month)
+                            ->whereYear('created_at', Carbon::now()->year)
+                            ->sum('point_used') ?? 0;
+                    }
+
                     $poinBulanIni = floor($totalSettlement / 250000);
                     $poinAkumulasi = $poinSisaBulanLalu; // Gunakan poin sisa bulan lalu
                     $totalPoin = $poinBulanIni + $poinAkumulasi;
                     $poinSisa = $totalPoin - $totalPoinRedeem;
                     
                     // Tentukan remark berdasarkan poin_sisa
-                    $remark = $this->calculateRemark($poinSisa);
+                    $remark = $this->calculateRemark($poinSisa + $totalpackagePoint);
                     
                     // Cek apakah data sudah ada
                     $existing = DB::table('summary_panen_poin')
@@ -507,6 +652,7 @@ class PanenPoinController extends Controller
                         'poin_akumulasi' => $poinAkumulasi,
                         'poin' => $totalPoin,
                         'poin_redeem' => $totalPoinRedeem,
+                        'poin_package' => $totalpackagePoint,
                         'remark' => $remark,
                         'bulan' => Carbon::now()->locale('id')->translatedFormat('F Y'),
                         'updated_at' => now()

@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'wa_bot' => [
+        'url' => env('WA_BOT_URL', 'https://wa-bot.panenpoin-myads.com'),
+        'phone' => env('WA_BOT_PHONE', '082115558574'),
+    ],
+
 ];

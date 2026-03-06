@@ -12,8 +12,12 @@ use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
+use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
+use App\Http\Controllers\PresensiController;
+use App\Http\Controllers\LocationPresensiController;
+use App\Http\Controllers\MitraSbpController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -117,6 +121,7 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
     // PowerHouse Referral
     Route::get('/powerhouse-referral', [FrontController::class, 'monitoringPowerHouseReferral'])->name('admin.monitoring.powerhouse_referral');
     Route::get('/get-powerhouse-voucher-data', [BackController::class, 'getPowerHouseVoucher'])->name('powerhouse_voucher_data');
+    Route::get('/get-powerhouse-deal-topup-mom-data', [BackController::class, 'getPowerHouseDealTopupMom'])->name('powerhouse_deal_topup_mom_data');
     Route::get('/export-powerhouse-voucher', [BackController::class, 'exportPowerHouseVoucher'])->name('export.powerhouse_voucher');
 
     Route::get('/monitor-voucher', [FrontController::class, 'botVoucher'])->name('admin.voucher');
@@ -171,6 +176,8 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
     
 });
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
+    Route::view('faq-l0', 'faq.l0')->name('faq-l0');
+
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
@@ -188,10 +195,17 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::post('/logbook/update', [LogbookController::class, 'update'])->name('logbook.update');
     Route::post('/logbook/insert', [LogbookController::class, 'insert'])->name('logbook.insert');
     Route::post('/logbook/day', [LogbookController::class, 'insertDaily'])->name('logbook.day');
+    
     Route::get('/logbook-daily', [LogbookDailyController::class, 'index'])->name('logbook-daily.index');
     Route::get('logbook-daily/data', [LogbookDailyController::class, 'data'])->name('logbook-daily.data');
     Route::get('/logbook-daily/summary', [LogbookDailyController::class, 'summary'])->name('logbook-daily.summary');
     Route::get('/logbook-daily/refresh', [LogbookDailyController::class, 'refreshLogbookDaily']);
+    Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
+    Route::get('/logbook-daily/foto/{filePath}', [LogbookDailyController::class, 'getFoto'])->name('logbook-daily.foto')->where('filePath', '.*');
+    Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
+
+    Route::get('logbook-event', [LogbookController::class, 'logbookEvent'])->name('logbook-event.index');
+    Route::get('logbook-event/data', [LogbookController::class, 'logbookEventData'])->name('logbook-event.data');
 
     // Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
@@ -199,19 +213,21 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
 
-    Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
-    Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
-
     // Panen Poin Routes
     Route::get('panen-poin/input', [PanenPoinController::class, 'index'])->name('panenpoin.index');
     Route::post('panen-poin/store', [PanenPoinController::class, 'store'])->name('panenpoin.store');
     Route::get('panen-poin/report', [PanenPoinController::class, 'report'])->name('panenpoin.report');
     Route::get('panen-poin/report-data', [PanenPoinController::class, 'getReportData'])->name('panenpoin.report-data');
+    Route::get('panen-poin/report-canvasser', [PanenPoinController::class, 'reportCanvasser'])->name('panenpoin.report-canvasser');
+    Route::get('panen-poin/report-canvasser-data', [PanenPoinController::class, 'getReportCanvasserData'])->name('panenpoin.report-canvasser-data');
+    Route::get('panen-poin/report-ph', [PanenPoinController::class, 'reportPowerhouse'])->name('panenpoin.report-ph');
+    Route::get('panen-poin/report-ph-data', [PanenPoinController::class, 'getReportPowerhouseData'])->name('panenpoin.report-ph-data');
     Route::get('panen-poin/export', [PanenPoinController::class, 'export'])->name('panenpoin.export');
     Route::get('panen-poin/refresh-summary', [PanenPoinController::class, 'refreshSummaryPanenPoin'])->name('panenpoin.refresh');
     Route::get('panen-poin/list-akun', [PanenPoinController::class, 'listAkun'])->name('panenpoin.list-akun');
     Route::get('panen-poin/akun-data', [PanenPoinController::class, 'getAkunData'])->name('panenpoin.akun-data');
 
+    Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
     Route::get('/calendar/events', [CalendarController::class, 'events']);
@@ -221,4 +237,92 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('/calendar/download', [CalendarController::class, 'download']);
 
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
+});
+
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
+    // AM Level UP Routes
+    Route::get('am-level-up/input', [AmLevelUpController::class, 'index'])->name('amlevelup.index');
+    Route::post('am-level-up/store', [AmLevelUpController::class, 'store'])->name('amlevelup.store');
+    Route::get('am-level-up/report', [AmLevelUpController::class, 'report'])->name('amlevelup.report');
+    Route::get('am-level-up/report-data', [AmLevelUpController::class, 'getReportData'])->name('amlevelup.report-data');
+    Route::get('am-level-up/report-canvasser', [AmLevelUpController::class, 'reportCanvasser'])->name('amlevelup.report-canvasser');
+    Route::get('am-level-up/report-canvasser-data', [AmLevelUpController::class, 'getReportCanvasserData'])->name('amlevelup.report-canvasser-data');
+    Route::get('am-level-up/report-ph', [AmLevelUpController::class, 'reportPowerhouse'])->name('amlevelup.report-ph');
+    Route::get('am-level-up/report-ph-data', [AmLevelUpController::class, 'getReportPowerhouseData'])->name('amlevelup.report-ph-data');
+    Route::get('am-level-up/export', [AmLevelUpController::class, 'export'])->name('amlevelup.export');
+    Route::get('am-level-up/refresh-summary', [AmLevelUpController::class, 'refreshSummaryPanenPoin'])->name('amlevelup.refresh');
+    Route::get('am-level-up/list-akun', [AmLevelUpController::class, 'listAkun'])->name('amlevelup.list-akun');
+    Route::get('am-level-up/akun-data', [AmLevelUpController::class, 'getAkunData'])->name('amlevelup.akun-data');
+    Route::get('am-level-up/akun-detail/{id}', [AmLevelUpController::class, 'getAkunDetail'])->name('amlevelup.akun-detail');
+    
+    Route::get('/am-level-up/summary', [AmLevelUpController::class, 'summaryReportB2B'])
+    ->name('amlevelup.summary');
+    
+    Route::get('/am-level-up/summary-data', [AmLevelUpController::class, 'summaryReportB2BData'])
+        ->name('amlevelup.summary-data');
+
+    Route::get('/am-level-up/clients', [AmLevelUpController::class, 'reportB2BClients'])
+        ->name('amlevelup.clients');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,PH,TCD'])->group(function () {
+    Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
+    Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
+    Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
+});
+
+
+Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
+    
+    Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
+    Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
+    Route::get('report-campaign-sbp/data', [ReportController::class, 'reportCampaignSbpData'])->name('report-campaign-sbp.data');
+    Route::get('report-campaign-sbp/export', [ReportController::class, 'exportCampaignSbp'])->name('report-campaign-sbp.export');
+    Route::get('report-saldo-sbp', [ReportController::class, 'reportSaldoSbp'])->name('report-saldo-sbp');
+    Route::get('report-saldo-sbp/data', [ReportController::class, 'reportSaldoSbpData'])->name('report-saldo-sbp.data');
+    Route::get('report-saldo-sbp/export', [ReportController::class, 'exportSaldoSbp'])->name('report-saldo-sbp.export');
+    Route::get('report-saldo-advertising', [ReportController::class, 'reportSaldoAdvertising'])->name('report-saldo-advertising');
+    Route::get('report-saldo-advertising/data', [ReportController::class, 'reportSaldoAdvertisingData'])->name('report-saldo-advertising.data');
+    Route::get('report-saldo-advertising/export', [ReportController::class, 'exportSaldoAdvertising'])->name('report-saldo-advertising.export');
+    Route::get('export-mitra-sbp', [ReportController::class, 'exportMitraSBP'])->name('export.mitra-sbp');
+    Route::get('export-agency', [ReportController::class, 'exportAgency'])->name('export.agency');
+    Route::get('export-internal', [ReportController::class, 'exportInternal'])->name('export.internal');
+    Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
+});
+
+Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::get('report-balance-top-up', [ReportController::class, 'reportBalanceTopUp'])->name('report-balance-top-up');
+    Route::get('report-balance-top-up/data', [ReportController::class, 'reportBalanceTopUpData'])->name('report-balance-top-up.data');
+});
+
+// Routes untuk Presensi CVSR
+Route::middleware(['auth', 'checkrole:cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
+    Route::get('/', [PresensiController::class, 'index'])->name('index');
+    Route::post('/clock-in', [PresensiController::class, 'clockIn'])->name('clock_in');
+    Route::post('/clock-out', [PresensiController::class, 'clockOut'])->name('clock_out');
+    Route::post('/izin', [PresensiController::class, 'izin'])->name('izin');
+});
+
+// Routes untuk Riwayat Presensi (Admin dan CVSR)
+Route::middleware(['auth', 'checkrole:Admin,cvsr'])->prefix('presensi')->name('presensi.')->group(function () {
+    Route::get('/riwayat', [PresensiController::class, 'riwayat'])->name('riwayat');
+    Route::get('/foto/{filePath}', [PresensiController::class, 'getFoto'])->name('foto')->where('filePath', '.*');
+});
+
+// Routes untuk Kelola Lokasi Presensi CVSR (Hanya Admin)
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('location-presensi')->name('location-presensi.')->group(function () {
+    Route::get('/', [LocationPresensiController::class, 'index'])->name('index');
+    Route::post('/', [LocationPresensiController::class, 'store'])->name('store');
+    Route::put('/{id}', [LocationPresensiController::class, 'update'])->name('update');
+    Route::delete('/{id}', [LocationPresensiController::class, 'destroy'])->name('destroy');
+    Route::patch('/{id}/toggle-location-needed', [LocationPresensiController::class, 'toggleLocationNeeded'])->name('toggle-location-needed');
+});
+
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('configuration.')->group(function () {
+    Route::get('/mitra-sbp', [MitraSbpController::class, 'index'])->name('mitra-sbp.index');
+    Route::get('/mitra-sbp/create', [MitraSbpController::class, 'create'])->name('mitra-sbp.create');
+    Route::post('/mitra-sbp', [MitraSbpController::class, 'store'])->name('mitra-sbp.store');
+    Route::get('/mitra-sbp/{id}/edit', [MitraSbpController::class, 'edit'])->name('mitra-sbp.edit');
+    Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
+    Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });

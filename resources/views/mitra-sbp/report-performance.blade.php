@@ -2,20 +2,90 @@
 
 @section('title', 'Report Performance')
 
+@section('css')
+<style>
+    .performance-filter-wrap {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 12px 14px;
+    }
+
+    .performance-filter-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .performance-filter-row {
+        display: flex;
+        gap: 10px;
+        align-items: end;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .performance-month-control {
+        min-width: 220px;
+    }
+
+    .performance-month-control .select2-container {
+        width: 100% !important;
+    }
+
+    .performance-month-control .select2-selection {
+        min-height: 38px !important;
+        border: 1px solid #ced4da !important;
+        border-radius: .25rem !important;
+    }
+
+    .performance-month-control .select2-selection__rendered {
+        line-height: 36px !important;
+    }
+
+    .performance-month-control .select2-selection__arrow {
+        height: 36px !important;
+    }
+
+    @media (max-width: 768px) {
+        .performance-filter-row {
+            justify-content: stretch;
+        }
+
+        .performance-month-control,
+        .performance-filter-row .btn {
+            width: 100%;
+        }
+    }
+</style>
+@endsection
+
 @section('content')
 
 <!-- Filter Section -->
 <div class="row mb-3">
-    <div class="col-12 d-flex justify-content-end align-items-center">
-        <form id="filterForm" method="GET" action="{{ route('mitra-sbp') }}" class="d-flex align-items-center gap-2">
-            <select id="month" name="month" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
-                @foreach ($months as $m)
-                <option value="{{ $m['value'] }}" {{ $m['selected'] ? 'selected' : '' }}>
-                    {{ $m['label'] }}
-                </option>
-                @endforeach
-            </select>
-        </form>
+    <div class="col-12">
+        <div class="performance-filter-wrap">
+            <div class="performance-filter-row">
+                <form id="filterForm" method="GET" action="{{ route('mitra-sbp') }}">
+                    <div class="performance-month-control">
+                        <label for="month" class="performance-filter-label">Pilih Bulan</label>
+                        <select id="month" name="month" class="form-control">
+                            @foreach ($months as $m)
+                            <option value="{{ $m['value'] }}" {{ $m['selected'] ? 'selected' : '' }}>
+                                {{ $m['label'] }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </form>
+                <button type="button" id="btnExportAllExcel" class="btn btn-success btn-sm" title="Download Excel All" style="white-space: nowrap;">
+                    <i class="fas fa-file-excel mr-2"></i> Download Excel All
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -121,10 +191,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="mitraSBPTableCard">
-            <div class="card-header bg-gradient-success text-white">
+            <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Mitra SBP</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveMitraSBP" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportMitraSBPExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureMitraSBPTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -217,10 +295,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="agencyTableCard">
-            <div class="card-header bg-gradient-info text-white">
+            <div class="card-header bg-gradient-info text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Agency Indihome</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveAgency" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportAgencyExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureAgencyTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -312,10 +398,18 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="internalTableCard">
-            <div class="card-header bg-gradient-danger text-white">
+            <div class="card-header bg-gradient-danger text-white d-flex justify-content-between align-items-center"  style="padding: 1rem; border-radius: 0.35rem 0.35rem 0 0;">
                 <h4 class="mb-0"><i class="fas fa-table"></i> Report Internal Indihome</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnSaveInternal" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-image mr-2"></i> Save Image
+                    </button>
+                    <button type="button" id="btnExportInternalExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap; margin-right:5px;">
+                        <i class="fas fa-file-excel mr-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="captureInternalTable">
                 <small style="color: #666; display: block; margin-bottom: 15px;"><strong>Data Bulan:</strong> {{ $monthDisplay }}</small>
                 <table class="table table-sm table-bordered table-hover align-middle">
                     <thead>
@@ -426,6 +520,78 @@ $monthDisplay = \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->transl
         $('#month').on('change', function() {
             $('#filterForm').submit();
         });
+    });
+
+    // Handle Save Image Button
+    document.getElementById('btnSaveMitraSBP').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureMitraSBPTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'mitra_sbp_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportMitraSBPExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.mitra-sbp') }}?month=" + monthValue;
+    });
+    // Handle Save Image Button
+    document.getElementById('btnSaveAgency').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureAgencyTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'agency_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportAgencyExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.agency') }}?month=" + monthValue;
+    });
+    // Handle Save Image Button
+    document.getElementById('btnSaveInternal').addEventListener('click', function() {
+        html2canvas(document.getElementById('captureInternalTable'), {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+            .then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'internal_' + new Date().getTime() + '.png';
+                link.click();
+            })
+            .catch(err => {
+                console.error('Error capturing table:', err);
+                alert('Gagal menyimpan gambar. Silakan coba lagi.');
+            });
+    });
+    document.getElementById('btnExportInternalExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.internal') }}?month=" + monthValue;
+    });
+
+    document.getElementById('btnExportAllExcel').addEventListener('click', function() {
+        let monthValue = $('#month').val();
+        window.location = "{{ route('export.performance-all') }}?month=" + monthValue;
     });
 </script>
 

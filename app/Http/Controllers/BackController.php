@@ -31,7 +31,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b',
         ]);
         $data = [
             'name' => $request->name,
@@ -87,7 +87,13 @@ class BackController extends Controller
                 case 'Treg':
                     return redirect()->route('race_summary_treg');
                 case 'cvsr':
-                    return redirect()->route('leads-master.index');
+                    return redirect()->route('presensi.index');
+                case 'TCD':
+                    return redirect()->route('report-agency-advertising');
+                case 'Internal':
+                    return redirect()->route('mitra-sbp');
+                case 'b2b':
+                    return redirect()->route('amlevelup.index');
                 default:
                     return redirect()->route('home'); // fallback
             }
@@ -776,15 +782,26 @@ class BackController extends Controller
 
     /**     * Export PowerHouse Voucher Report to Excel
      */
-    public function exportPowerHouseVoucher()
+    public function exportPowerHouseVoucher(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+        \Log::info($startDate);
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
         
         // Query dengan JOIN untuk mendapatkan data lengkap
-        $data = DB::table('report_balance_top_up as rb')
+        $query = DB::table('report_balance_top_up as rb')
             ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
             ->select(
                 'rb.email_client',
@@ -797,10 +814,10 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
-            ->orderBy('dv.voucher_code')
-            ->get();
-        
+            ->whereBetween('rb.paid_date', [$startDate, $endDate])
+            ->orderBy('dv.voucher_code');
+
+        $data = $query->get();
         // Mapping untuk PowerHouse names
         $powerHouseMapping = [
             'SUPER1' => 'Angga Satria Gusti',
@@ -815,11 +832,12 @@ class BackController extends Controller
         
         // Transform data untuk Excel
         $exportData = $data->map(function ($item) use ($powerHouseMapping) {
+            $voucherCode = strtoupper($item->voucher_code);
             return [
                 'Email' => $item->email_client,
                 'Perusahaan' => $item->company_name,
-                'Voucher Code' => $item->voucher_code,
-                'PowerHouse' => $powerHouseMapping[$item->voucher_code] ?? '-',
+                'Voucher Code' => $voucherCode,
+                'PowerHouse' => $powerHouseMapping[$voucherCode] ?? '-',
                 'Amount' => $item->amount,
                 'Discount' => $item->discount,
                 'Total Settlement' => $item->total,
@@ -878,7 +896,7 @@ class BackController extends Controller
         $currentMonth = Carbon::now()->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Query dengan JOIN (per akun, bukan aggregate)
         $data = DB::table('report_balance_top_up as rb')
@@ -911,7 +929,9 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky'
+            'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman'
         ];
         
         // Transform data untuk Excel (per akun dengan insentif per akun)
@@ -981,10 +1001,13 @@ class BackController extends Controller
      */
     public function getPowerHouseVoucher(Request $request)
     {
-        // Get month from request (format Y-m-d) or use current month
-        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
-        // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -1003,7 +1026,7 @@ class BackController extends Controller
 
         // Get users associated with PowerHouse teams
         $powerHouseUserMap = [
-            'Angga Satria Gusti' => ['Angga Satria Gusti'],
+            'Angga Satria Gusti' => ['Angga Satria Gusti', 'Angga S. Gusti'],
             'Abdul Halim' => ['Abdul Halim'],
             'Raden Agie S. Akbar' => ['Raden Agie Satria Akbar', 'Raden Agie S. Akbar'],
             'Sony Widjaya' => ['Sony Widjaya'],
@@ -1023,7 +1046,7 @@ class BackController extends Controller
                 DB::raw('MAX(rb.tgl_transaksi) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
+            ->whereBetween('rb.paid_date', [$startDate, $endDate])
             ->groupBy('dv.voucher_code')
             ->get()
             ->keyBy('voucher_code');
@@ -1047,7 +1070,7 @@ class BackController extends Controller
             if (!empty($userIds)) {
                 $jumlahLeads = DB::table('leads_master')
                     ->whereIn('user_id', $userIds)
-                    ->whereRaw('DATE_FORMAT(created_at, "%Y-%m") = ?', [$month])
+                    ->whereBetween('created_at', [$startDate, $endDate])
                     ->count();
             }
 
@@ -1056,7 +1079,7 @@ class BackController extends Controller
             if (!empty($userNames)) {
                 $jumlahVisit = DB::table('bookings')
                     ->whereIn('nama', $userNames)
-                    ->whereRaw('DATE_FORMAT(tanggal, "%Y-%m") = ?', [$month])
+                    ->whereBetween('tanggal', [$startDate, $endDate])
                     ->count();
             }
             
@@ -1104,16 +1127,236 @@ class BackController extends Controller
             ->make(true);
     }
 
+    public function getPowerHouseDealTopupMom(Request $request)
+    {
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+        $startDateFormatted = $startDate->format('Y-m-d');
+        $endDateFormatted = $endDate->format('Y-m-d');
+
+        $phUsers = DB::table('users')
+            ->where('role', 'PH')
+            ->where('name', '!=', 'self service')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        if ($phUsers->isEmpty()) {
+            return DataTables::of([])->make(true);
+        }
+
+        $allTeamUserIds = $phUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        $topUpStatsByUser = collect();
+        $topUpNewAkunByUser = collect();
+        $topUpExistingAkunByUser = collect();
+        $momByUser = collect();
+        $topUpAggByUser = collect();
+        $leadAggByUser = collect();
+        $visitAggByName = collect();
+
+        if (!empty($allTeamUserIds)) {
+            $topUpStatsByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpAggByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
+                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->whereBetween(
+                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                    [$startDateFormatted, $endDateFormatted]
+                )
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_existing_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            // MOM selalu dibandingkan pada tanggal aktual hari ini, tidak mengikuti filter end_date.
+            $momToday = Carbon::today();
+            $currentMonthStart = $momToday->copy()->startOfMonth()->format('Y-m-d');
+            $currentMonthUntilToday = $momToday->copy()->format('Y-m-d');
+            $prevMonthStart = $momToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d');
+            $prevMonthSameDay = $momToday->copy()->subMonthNoOverflow()->format('Y-m-d');
+            $prevMonthEnd = $momToday->copy()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d');
+            $prevMonthRemainingStart = $momToday->copy()->subMonthNoOverflow()->addDay()->format('Y-m-d');
+
+            $momByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilToday}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
+                )
+                ->get()
+                ->keyBy('user_id');
+        }
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $allTeamUserIds)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $phUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
+        // Build result per user PH (tanpa referral code)
+        $result = [];
+        foreach ($phUsers as $phUser) {
+            $userId = (int) $phUser->id;
+
+            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0);
+            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0);
+
+            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
+            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
+            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
+                $difference = $totalTopUpFromStats - $splitTotal;
+                $topUpExistingAkunRp += $difference;
+                $totalTopup = $totalTopUpFromStats;
+            }
+
+            $momGap = $momCurrentPartial - $momPrevPartial;
+            $poin = floor($totalTopup / 1000000);
+
+            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
+            $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
+            $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
+                ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
+                : '-';
+
+            $result[] = [
+                'team_powerhouse' => $phUser->name,
+                'jumlah_akun' => $jumlahAkun,
+                'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => $jumlahVisit,
+                'deal_topup_new_akun' => $topUpNewAkunCount,
+                'deal_topup_existing_akun' => $topUpExistingAkunCount,
+                'top_up_new_akun_rp' => $topUpNewAkunRp,
+                'top_up_existing_akun_rp' => $topUpExistingAkunRp,
+                'total_topup' => $totalTopup,
+                'mom_prev_partial' => $momPrevPartial,
+                'mom_current_partial' => $momCurrentPartial,
+                'mom_prev_remaining' => $momPrevRemaining,
+                'mom_gap' => $momGap,
+                'poin' => $poin,
+                'tgl_transaksi_terakhir' => $tglFormatted,
+            ];
+        }
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_partial', function ($row) {
+                return number_format($row['mom_prev_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_current_partial', function ($row) {
+                return number_format($row['mom_current_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_remaining', function ($row) {
+                return number_format($row['mom_prev_remaining'], 0, ',', '.');
+            })
+            ->editColumn('mom_gap', function ($row) {
+                return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
     /**
      * Get Canvasser Voucher Report
      * Data dari JOIN report_balance_top_up + data_voucher
      */
     public function getCanvasserVoucher(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
-        
+        // Get month from request (format Y-m-d) or use current month
+        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        // Extract only Y-m from the date parameter
+        $month = Carbon::parse($monthParam)->format('Y-m');
+
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1130,6 +1373,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher (PER AKUN, bukan di-aggregate)
@@ -1144,11 +1389,11 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
+            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
             ->get();
-
+        // dd($voucherData);
         // Build result per akun (per email_client)
         $result = [];
         foreach ($voucherData as $data) {
@@ -1188,10 +1433,13 @@ class BackController extends Controller
      */
     public function getCanvasserVoucherSummary(Request $request)
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        // Get month from request (format Y-m-d) or use current month
+        $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        // Extract only Y-m from the date parameter
+        $month = Carbon::parse($monthParam)->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1208,6 +1456,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
@@ -1220,7 +1470,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
-            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
+            ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
             ->get();
@@ -1275,7 +1525,7 @@ class BackController extends Controller
         $currentMonth = Carbon::now()->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1292,6 +1542,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
@@ -1473,9 +1725,8 @@ class BackController extends Controller
     public function exportRegional()
     {
         try {
-            $monthFilter = request()->get('month');
             $leadProgramController = new LeadProgramController();
-            $data = $leadProgramController->getRegionalData($monthFilter);
+            $data = $leadProgramController->getRegionalData(request());
 
             if (empty($data)) {
                 return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');

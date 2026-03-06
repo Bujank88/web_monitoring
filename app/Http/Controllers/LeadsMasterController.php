@@ -12,6 +12,7 @@ use DataTables;
 use Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class LeadsMasterController extends Controller
 {
@@ -22,7 +23,7 @@ class LeadsMasterController extends Controller
     {
         logUserLogin();
         return view('leads-master.index', [
-            'canvassers' => Cache::remember('users_list_leads', 3600, fn() => User::orderBy('name')->get()),
+            'canvassers' => Cache::remember('users_list_leads', 3600, fn() => User::whereIn('role', ['cvsr', 'PH'])->orderBy('name')->get()),
             'sources'    => Cache::remember('sources_list_leads', 3600, fn() => LeadsSource::orderBy('name')->get()),
             'regionals'  => Cache::remember('regionals_list_leads', 3600, fn() => 
                 DB::table('regional_provinces')
@@ -47,7 +48,8 @@ class LeadsMasterController extends Controller
             ->select(
                 'dls.*'
             )
-            ->orderBy('dls.total_settlement_klien', 'desc');
+            ->orderBy('dls.total_settlement_klien', 'desc')
+            ->orderBy('dls.saldo_utama', 'desc');
 
         // 🔐 Filter berdasarkan role
         if (!auth()->user()->hasRole('Admin')) {
@@ -117,6 +119,10 @@ class LeadsMasterController extends Controller
                 $amount = $row->total_settlement_klien ?? 0;
                 return 'Rp ' . number_format($amount, 0, ',', '.');
             })
+            ->addColumn('saldo_utama', function ($row) {
+                $amount = $row->saldo_utama ?? 0;
+                return 'Rp ' . number_format($amount, 0, ',', '.');
+            })
             ->addColumn('aksi', function ($row) {
                 $btn = '
                     <a href="' . route('leads-master.show', $row->leads_master_id) . '" class="btn btn-sm btn-warning mt-1">
@@ -140,7 +146,16 @@ class LeadsMasterController extends Controller
 
                 return $btn;
             })
-            ->rawColumns(['aksi', 'status', 'data_type'])
+            ->addColumn('rekomendasi', function ($row) {
+                $saldo = $row->saldo_utama ?? 0;
+
+                if ($saldo >= 1000000) {
+                    return '<span class="badge badge-warning">Push Campaign</span>';
+                }
+
+                return '<span class="badge badge-danger">Push Topup</span>';
+            })
+            ->rawColumns(['aksi', 'status', 'data_type', 'rekomendasi'])
             ->make(true);
     }
 
@@ -242,7 +257,7 @@ class LeadsMasterController extends Controller
             'source_id' => 'required|exists:leads_source,id',
             'sector_id' => 'required|exists:sectors,id',
             // 'kode_voucher' => 'nullable|string|max:255',
-            'company_name' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
             'mobile_phone' => [
                 'required',
                 'string',
@@ -255,6 +270,13 @@ class LeadsMasterController extends Controller
                 'email',
                 'max:255',
                 'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
             ],
             // 'status' => 'required|in:Ok,No',
             'nama' => 'nullable|string|max:255',
@@ -284,7 +306,7 @@ class LeadsMasterController extends Controller
             'source_id' => $validated['source_id'],
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
-            'company_name' => $validated['company_name'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
             'mobile_phone' => $validated['mobile_phone'],
             'email' => $validated['email'] ?? null,
             'status' => $statusValue,  // simpan 1 untuk Ok, 0 untuk No
@@ -345,7 +367,7 @@ class LeadsMasterController extends Controller
             'user_id' => 'required|exists:users,id',
             // 'source_id' => 'required|exists:leads_source,id',
             'sector_id' => 'nullable|exists:sectors,id',
-            'company_name' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
             'mobile_phone' => [
                 'required',
                 'string',
@@ -358,6 +380,13 @@ class LeadsMasterController extends Controller
                 'email',
                 'max:255',
                 'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
             ],
             // 'status' => 'required|in:Ok,No',
             'nama' => 'nullable|string|max:255',
@@ -381,7 +410,7 @@ class LeadsMasterController extends Controller
             'source_id' => null,
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
-            'company_name' => $validated['company_name'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
             'mobile_phone' => $validated['mobile_phone'],
             'email' => $validated['email'] ?? null,
             'status' => $statusValue,  // simpan 1 untuk Ok, 0 untuk No
@@ -411,7 +440,8 @@ class LeadsMasterController extends Controller
         
         $leadSources = LeadsSource::all();
         $sectors = Sector::all();
-        return view('leads-master.edit', compact('lead', 'leadSources', 'sectors'));
+        $canvassers = Cache::remember('users_list_leads', 3600, fn() => User::orderBy('name')->get());
+        return view('leads-master.edit', compact('lead', 'leadSources', 'sectors', 'canvassers'));
     }
 
     public function update(Request $request, LeadsMaster $lead)
@@ -443,7 +473,10 @@ class LeadsMasterController extends Controller
             'myads_account' => 'nullable|string|max:255'
         ]);
 
+        $userId = auth()->user()->role === 'Admin' ? $request->user_id : $lead->user_id;
+
         $lead->update([
+            'user_id' => $userId,
             // 'kode_voucher' => $request->kode_voucher,
             'company_name' => $request->company_name,
             'mobile_phone' => $request->mobile_phone,
@@ -492,13 +525,25 @@ class LeadsMasterController extends Controller
                 'lm.updated_at' => now(),
             ]);
 
-        \Log::info('Leads Master Sync - Email matched: ' . $syncedCount . ' records, Old accounts (1+ month): ' . $syncedOldCount . ' records');
+        // 3. Sinkronisasi reg_id dari user_id registrasi berdasarkan email
+        $syncedRegIdCount = DB::table('leads_master as lm')
+            ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
+            ->where('dsa.status', 'APPROVE')
+            ->whereNotNull('dsa.user_id')
+            ->where('dsa.user_id', '!=', '')
+            ->update([
+                'lm.reg_id' => DB::raw('dsa.user_id'),
+                'lm.updated_at' => now(),
+            ]);
+
+        \Log::info('Leads Master Sync - Email matched: ' . $syncedCount . ' records, Old accounts (1+ month): ' . $syncedOldCount . ' records, Reg ID synced: ' . $syncedRegIdCount . ' records');
 
         return response()->json([
             'success' => true,
-            'message' => "Sinkronisasi selesai. Email cocok: {$syncedCount}, Akun lama (>1 bulan): {$syncedOldCount}",
+            'message' => "Sinkronisasi selesai. Email cocok: {$syncedCount}, Akun lama (>1 bulan): {$syncedOldCount}, Reg ID: {$syncedRegIdCount}",
             'synced_email_count' => $syncedCount,
             'synced_old_account_count' => $syncedOldCount,
+            'synced_reg_id_count' => $syncedRegIdCount,
         ]);
     }
 
@@ -582,6 +627,13 @@ class LeadsMasterController extends Controller
             ->whereYear('tgl_transaksi', $year)
             ->groupBy('email_client');
 
+        // Subquery saldo utama berdasarkan reg_id (leads_master) = id_user (saldo_users)
+        $saldoUtamaSubquery = DB::table('saldo_users as su')
+            ->select(
+                'su.id_user',
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            );
+
         // Query untuk mendapatkan data yang akan dimasukkan
         $leadsData = LeadsMaster::with(['user'])
             ->leftJoinSub(
@@ -589,6 +641,13 @@ class LeadsMasterController extends Controller
                 'rbt',
                 function ($join) {
                     $join->on(DB::raw('LOWER(rbt.email_client)'), '=', DB::raw('LOWER(leads_master.email)'));
+                }
+            )
+            ->leftJoinSub(
+                $saldoUtamaSubquery,
+                'su',
+                function ($join) {
+                    $join->on('leads_master.reg_id', '=', 'su.id_user');
                 }
             )
             ->select(
@@ -610,7 +669,8 @@ class LeadsMasterController extends Controller
                 'leads_master.remarks',
                 'leads_master.created_at',
                 'leads_master.updated_at',
-                DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien')
+                DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             )
             ->get();
 
@@ -635,6 +695,7 @@ class LeadsMasterController extends Controller
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
                 'total_settlement_klien' => $lead->total_settlement_klien,
+                'saldo_utama' => $lead->saldo_utama,
                 'created_at' => $lead->created_at,
                 'updated_at' => $lead->updated_at,
             ];
@@ -678,6 +739,9 @@ class LeadsMasterController extends Controller
 
         // Get lead data
         $lead = LeadsMaster::with(['user'])->findOrFail($leadId);
+        $saldoUtama = DB::table('saldo_users')
+            ->where('id_user', $lead->reg_id)
+            ->value('saldo_utama');
 
         // Update atau insert ke summary table
         DB::table('detail_leads_summary')->updateOrInsert(
@@ -700,11 +764,66 @@ class LeadsMasterController extends Controller
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
                 'total_settlement_klien' => $settlement ?? 0,
+                'saldo_utama' => $saldoUtama ?? 0,
                 'created_at' => $lead->created_at,
                 'updated_at' => now(),
             ]
         );
     }
+    public function syncLeadsFromTopUp()
+    {
+        // 1️⃣ Referral code yang valid
+        $validReferralCodes = [
+            'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
+            'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
+            'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
+        ];
 
+        // 2️⃣ Ambil data top up + referral_code user
+        $topUps = DB::table('report_balance_top_up as r')
+            ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
+            ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
+            ->whereNotNull('r.email_client')
+            ->whereDate('r.tgl_transaksi', Carbon::today())
+            ->select(
+                'u.id as user_id',
+                'r.company_name',
+                'r.email_client',
+                'r.alamat',
+                DB::raw('UPPER(u.referral_code) as referral_code')
+            )
+            ->get();
+            
+        foreach ($topUps as $topUp) {
+            
+            // 3️⃣ CEK EMAIL — kalau sudah ada, skip
+            $emailExists = LeadsMaster::where('email', $topUp->email_client)->exists();
+            if ($emailExists) {
+                continue;
+            }
+
+            // 4️⃣ Insert ke leads_master
+            LeadsMaster::create([
+                'user_id'        => $topUp->user_id,
+                'source_id'      => null,
+                'sector_id'      => 2, // Default ke sektor "Lain-lain"
+                'company_name'   => $topUp->company_name,
+                'mobile_phone'   => '-',
+                'email'          => $topUp->email_client,
+                'status'         => 1,
+                'nama'           => $topUp->company_name ?? 'Unknown',
+                'address'        => $topUp->alamat,
+                'remarks'        => 'Automate Create by Referral Code: ' . $topUp->referral_code,
+                'myads_account'  => null,
+                'data_type'      => 'Leads'
+            ]);
+        \Log::info('Sync Leads from TopUp - Total new leads added: ' . $topUps->count());
+        }
+        return response()->json([
+            'success' => true,
+            'total'   => $topUps->count(),
+            'message' => 'Sync leads selesai (email duplicate di-skip)',
+        ]);
+    }
 
 }

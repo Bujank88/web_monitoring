@@ -17,18 +17,21 @@ class FrontController extends Controller
         if (Auth::user() or 'sukseslogin' == Session::get('login')) {
             if ('User' == Auth::user()->role) {
                 return redirect('/home');
-            } else if ('TL' == Auth::user()->role) {
-                return redirect('/loglogin');
             } else if ('Treg' == Auth::user()->role) {
                 return redirect()->route('race_summary_treg');
             } else if (in_array(Auth::user()->role, ['Admin', 'Tsel'])) {
                 return redirect('/admin/home');
-            } else if (in_array(Auth::user()->role, ['Admin', 'cvsr'])) {
-                return redirect()->route('leads-master.index');
+            } else if ('cvsr' == Auth::user()->role) {
+                return redirect()->route('presensi.index');
+            } else if ('TCD' == Auth::user()->role) {
+                return redirect()->route('report-agency-advertising');
+            } else if ('Internal' == Auth::user()->role) {
+                return redirect()->route('mitra-sbp');
+            } else if ('b2b' == Auth::user()->role) {
+                return redirect()->route('amlevelup.index');
             } else {
-                return redirect('/admin/home');
+            return redirect('/admin/home');
             }
-            return view('user.index');
         }
         // return view('errors.503');
         return view('auth.login');
@@ -204,7 +207,19 @@ class FrontController extends Controller
     public function monitoringCanvasserVoucher()
     {
         logUserLogin();
-        return view('admin.canvaser_voucher');
+        $months = [];
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+        
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+        return view('admin.canvaser_voucher', compact('months'));
     }
     public function monitoringPowerHouseReferral()
     {

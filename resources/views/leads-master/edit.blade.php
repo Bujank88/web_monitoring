@@ -39,8 +39,18 @@
             {{-- USER NAME --}}
             <div class="form-group">
                 <label>User Canvasser</label>
-                <input type="text" class="form-control" value="{{ $lead->user->name ?? auth()->user()->name }}" disabled>
-                <input type="hidden" name="user_id" value="{{ $lead->user_id ?? auth()->id() }}">
+                @if(auth()->user()->role === 'Admin')
+                    <select name="user_id" class="form-control select2">
+                        @foreach($canvassers as $canvasser)
+                            <option value="{{ $canvasser->id }}" {{ (string) old('user_id', $lead->user_id) === (string) $canvasser->id ? 'selected' : '' }}>
+                                {{ $canvasser->name }} ({{ $canvasser->role }})
+                            </option>
+                        @endforeach
+                    </select>
+                @else
+                    <input type="text" class="form-control" value="{{ $lead->user->name ?? auth()->user()->name }}" disabled>
+                    <input type="hidden" name="user_id" value="{{ $lead->user_id ?? auth()->id() }}">
+                @endif
             </div>
             @if(($lead->data_type ?? old('data_type')) === 'Eksisting Akun')
                     
