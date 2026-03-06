@@ -896,7 +896,7 @@ class BackController extends Controller
         $currentMonth = Carbon::now()->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Query dengan JOIN (per akun, bukan aggregate)
         $data = DB::table('report_balance_top_up as rb')
@@ -929,7 +929,9 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky'
+            'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman'
         ];
         
         // Transform data untuk Excel (per akun dengan insentif per akun)
@@ -1354,7 +1356,7 @@ class BackController extends Controller
         $month = Carbon::parse($monthParam)->format('Y-m');
 
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1371,6 +1373,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher (PER AKUN, bukan di-aggregate)
@@ -1435,7 +1439,7 @@ class BackController extends Controller
         $month = Carbon::parse($monthParam)->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1452,6 +1456,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
@@ -1519,7 +1525,7 @@ class BackController extends Controller
         $currentMonth = Carbon::now()->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13'];
+        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = [
@@ -1536,6 +1542,8 @@ class BackController extends Controller
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
             'EXTRA13' => 'Rizky',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
         ];
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher

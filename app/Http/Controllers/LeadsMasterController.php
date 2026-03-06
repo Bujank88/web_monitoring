@@ -775,7 +775,7 @@ class LeadsMasterController extends Controller
         // 1️⃣ Referral code yang valid
         $validReferralCodes = [
             'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
-            'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13',
+            'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
             'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
         ];
 
