@@ -143,40 +143,40 @@ Schedule::call(function () {
     \Log::info("Retry Send Presensi - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendPresensiNotifications');
 
-// Schedule::call(function () {
-//     app(PanenPoinController::class)->refreshSummaryPanenPoin();
-// })->everyFiveMinutes()->name('refreshSummaryPanenPoin');
+Schedule::call(function () {
+    app(PanenPoinController::class)->refreshSummaryPanenPoin();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoin');
 
-// Schedule::call(function () {
-//     app(AmLevelUpController::class)->refreshSummaryamlevelup();
-// })->everyTwoMinutes()->name('refreshSummaryamlevelup');
+Schedule::call(function () {
+    app(AmLevelUpController::class)->refreshSummaryamlevelup();
+})->everyTwoMinutes()->name('refreshSummaryamlevelup');
 
-// Schedule::call(function () {
-//     app(LogbookController::class)->refreshLogbookStatus();
-// })->everyTwoMinutes()->name('refreshLogbookStatus');
+Schedule::call(function () {
+    app(LogbookController::class)->refreshLogbookStatus();
+})->everyTwoMinutes()->name('refreshLogbookStatus');
 
-// Schedule::call(function () {
-//     app(LogbookDailyController::class)->refreshLogbookDaily();
-// })->everyTwoMinutes()->name('refreshLogbookDaily');
+Schedule::call(function () {
+    app(LogbookDailyController::class)->refreshLogbookDaily();
+})->everyTwoMinutes()->name('refreshLogbookDaily');
 
-// // Schedule::call(function () {
-// //     app(LeadsMasterController::class)->syncLeadsWithRegistration();
-// // })->everyTenMinutes()->name('syncLeadsWithRegistration');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsWithRegistration();
+})->everyTenMinutes()->name('syncLeadsWithRegistration');
 
-// Schedule::call(function () {
-//     app(LeadsMasterController::class)->syncLeadsFromTopUp();
-// })->everyTenMinutes()->name('syncLeadsFromTopUp');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsFromTopUp();
+})->everyTenMinutes()->name('syncLeadsFromTopUp');
 
-// Schedule::call(function () {
-//     app(LeadsMasterController::class)->syncLeadsWithRegional();
-// })->everyTenMinutes()->name('syncLeadsWithRegional');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsWithRegional();
+})->everyTenMinutes()->name('syncLeadsWithRegional');
 
-// Schedule::call(function () {
-//     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
-// })->everyFiveMinutes()->name('refreshDetailLeadsSummary');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->refreshDetailLeadsSummary();
+})->everyFiveMinutes()->name('refreshDetailLeadsSummary');
 
-// // Refresh Regional Canvasser Summary setiap 5 menit
-// Schedule::command('summary:refresh-regional-canvasser')->everyFiveMinutes()->name('refreshRegionalCanvasserSummary');
+// Refresh Regional Canvasser Summary setiap 5 menit
+Schedule::command('summary:refresh-regional-canvasser')->everyFiveMinutes()->name('refreshRegionalCanvasserSummary');
 
 // // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {
