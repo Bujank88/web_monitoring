@@ -143,37 +143,37 @@ Schedule::call(function () {
     \Log::info("Retry Send Presensi - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendPresensiNotifications');
 
-Schedule::call(function () {
-    app(PanenPoinController::class)->refreshSummaryPanenPoin();
-})->everyMinute()->name('refreshSummaryPanenPoin');
+// Schedule::call(function () {
+//     app(PanenPoinController::class)->refreshSummaryPanenPoin();
+// })->everyMinute()->name('refreshSummaryPanenPoin');
 
-Schedule::call(function () {
-    app(AmLevelUpController::class)->refreshSummaryamlevelup();
-})->everyMinute()->name('refreshSummaryamlevelup');
+// Schedule::call(function () {
+//     app(AmLevelUpController::class)->refreshSummaryamlevelup();
+// })->everyMinute()->name('refreshSummaryamlevelup');
 
-Schedule::call(function () {
-    app(LogbookController::class)->refreshLogbookStatus();
-})->everyMinute()->name('refreshLogbookStatus');
+// Schedule::call(function () {
+//     app(LogbookController::class)->refreshLogbookStatus();
+// })->everyMinute()->name('refreshLogbookStatus');
 
-Schedule::call(function () {
-    app(LogbookDailyController::class)->refreshLogbookDaily();
-})->everyMinute()->name('refreshLogbookDaily');
+// Schedule::call(function () {
+//     app(LogbookDailyController::class)->refreshLogbookDaily();
+// })->everyMinute()->name('refreshLogbookDaily');
 
-Schedule::call(function () {
-    app(LeadsMasterController::class)->syncLeadsWithRegistration();
-})->everyTenMinutes()->name('syncLeadsWithRegistration');
+// Schedule::call(function () {
+//     app(LeadsMasterController::class)->syncLeadsWithRegistration();
+// })->everyTenMinutes()->name('syncLeadsWithRegistration');
 
-Schedule::call(function () {
-    app(LeadsMasterController::class)->syncLeadsFromTopUp();
-})->everyTenMinutes()->name('syncLeadsFromTopUp');
+// Schedule::call(function () {
+//     app(LeadsMasterController::class)->syncLeadsFromTopUp();
+// })->everyTenMinutes()->name('syncLeadsFromTopUp');
 
-Schedule::call(function () {
-    app(LeadsMasterController::class)->syncLeadsWithRegional();
-})->everyTenMinutes()->name('syncLeadsWithRegional');
+// Schedule::call(function () {
+//     app(LeadsMasterController::class)->syncLeadsWithRegional();
+// })->everyTenMinutes()->name('syncLeadsWithRegional');
 
-Schedule::call(function () {
-    app(LeadsMasterController::class)->refreshDetailLeadsSummary();
-})->everyTwoMinutes()->name('refreshDetailLeadsSummary');
+// Schedule::call(function () {
+//     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
+// })->everyTwoMinutes()->name('refreshDetailLeadsSummary');
 
 // // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {
