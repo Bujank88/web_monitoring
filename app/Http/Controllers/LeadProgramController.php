@@ -441,6 +441,23 @@ class LeadProgramController extends Controller
                     : Carbon::createFromFormat('Y-m-d', $monthFilter);
             }
 
+            // Create cache key with month filter
+            $cacheKey = 'regional_data_' . ($monthFilter ?? Carbon::now()->format('Y-m'));
+            
+            // Cache hasil query selama 5 menit (300 detik)
+            return Cache::remember($cacheKey, 300, function() use ($request, $monthFilter, $monthDate) {
+                return $this->processRegionalData($request, $monthFilter, $monthDate);
+            });
+        } catch (\Exception $e) {
+            \Log::error("Error in getRegionalData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return [];
+        }
+    }
+    
+    private function processRegionalData($request, $monthFilter, $monthDate)
+    {
+        try {
             // OPTIMIZED: Cache canvassers list (TTL 15 menit) 
             $canvasers = Cache::remember('canvassers_active', 900, function() {
                 return DB::table('users')
@@ -748,7 +765,7 @@ class LeadProgramController extends Controller
             \Log::info("Total results: " . count($result));
             return $result;
         } catch (\Exception $e) {
-            \Log::error("Error in getRegionalData: " . $e->getMessage());
+            \Log::error("Error in processRegionalData: " . $e->getMessage());
             \Log::error($e->getTraceAsString());
             return [];
         }
@@ -771,8 +788,24 @@ class LeadProgramController extends Controller
     public function getRegionalChartData(Request $request)
     {
         try {
-            // OPTIMIZED: Query langsung untuk chart, tidak perlu panggil getRegionalData yang berat
             $monthFilter = $request->get('month');
+            $cacheKey = 'regional_chart_' . ($monthFilter ?? Carbon::now()->format('Y-m'));
+            
+            // Cache chart data selama 5 menit
+            return Cache::remember($cacheKey, 300, function() use ($request, $monthFilter) {
+                return $this->processRegionalChartData($request, $monthFilter);
+            });
+        } catch (\Exception $e) {
+            \Log::error("Error in getRegionalChartData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+    
+    private function processRegionalChartData($request, $monthFilter)
+    {
+        try {
+            // Parse month filter
             $monthDate = null;
             if (!empty($monthFilter)) {
                 $monthDate = strlen($monthFilter) === 7
@@ -794,7 +827,7 @@ class LeadProgramController extends Controller
             }
 
             $canvaserIds = $canvasers->pluck('id')->all();
-            $logbookPeriod = $monthDate ? $monthDate->copy() : Carbon::now();
+            $logbookPeriod = $monthDate ?? Carbon::now();
             $logbookMonth = (int) $logbookPeriod->month;
             $logbookYear = (int) $logbookPeriod->year;
 
@@ -804,7 +837,7 @@ class LeadProgramController extends Controller
             $endOfMonthFormatted = ($monthDate ? $monthDate->copy() : Carbon::now())->endOfMonth()->format('Y-m-d');
             $currentMonth = $today->format('Y-m');
 
-            // Single optimized query to get all data for chart
+            // Single optimized query untuk chart - lebih cepat dari multiple queries
             $chartData = DB::table('users as u')
                 ->leftJoin('logbook as lb', function($join) use ($logbookMonth, $logbookYear) {
                     $join->on('u.id', '=', 'lb.user_id')
@@ -814,6 +847,7 @@ class LeadProgramController extends Controller
                 ->leftJoin('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
                 ->leftJoin('data_registarsi_status_approveorreject as dt', function($join) use ($startOfMonth, $endOfMonthFormatted) {
                     $join->on('lm.email', '=', 'dt.email')
+                         ->where('dt.status', 'APPROVE')
                          ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startOfMonth, $endOfMonthFormatted]);
                 })
                 ->leftJoin('report_balance_top_up as rp', function($join) use ($startOfMonth, $todayDate) {
@@ -830,7 +864,7 @@ class LeadProgramController extends Controller
                     'u.id',
                     'u.name',
                     DB::raw("COUNT(DISTINCT CASE WHEN lm.data_type = 'leads' THEN lb.leads_master_id END) as new_leads"),
-                    DB::raw("COUNT(DISTINCT CASE WHEN dt.email IS NOT NULL AND dt.status = 'APPROVE' THEN dt.email END) as new_akun"),
+                    DB::raw("COUNT(DISTINCT CASE WHEN dt.email IS NOT NULL THEN dt.email END) as new_akun"),
                     DB::raw("COUNT(DISTINCT CASE WHEN lm.data_type = 'Eksisting Akun' THEN lb.leads_master_id END) as existing_akun_count"),
                     DB::raw("COUNT(DISTINCT CASE WHEN rp.id IS NOT NULL THEN rp.id END) as top_up_existing_akun_count"),
                     DB::raw("COALESCE(tc.target, 0) as target"),
@@ -854,7 +888,7 @@ class LeadProgramController extends Controller
                 'canvassers' => $result
             ]);
         } catch (\Exception $e) {
-            \Log::error("Error in getRegionalChartData: " . $e->getMessage());
+            \Log::error("Error in processRegionalChartData: " . $e->getMessage());
             \Log::error($e->getTraceAsString());
             return response()->json(['error' => $e->getMessage()], 500);
         }

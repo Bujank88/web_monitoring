@@ -630,8 +630,8 @@
                 return $(this).data('placeholder');
             }
         });
-        // Load Chart Data untuk Regional
-        loadRegionalChart();
+        
+        // NOTE: Chart akan di-load setelah DataTable selesai (lazy loading)
 
         // Month filter change event
         $('#filterMonthDashboard').on('change', function() {
@@ -647,8 +647,8 @@
             const monthOnly = selectedMonth.substring(0, 7);
             $('#displayedMonth').text(monthOnly);
             
-            // Reload chart and table data
-            loadRegionalChart(selectedMonth);
+            // Reset flag dan reload table dulu, chart akan di-load otomatis setelah table selesai
+            window.chartLoaded = false;
             if (typeof regionalTable !== 'undefined') {
                 regionalTable.ajax.reload();
             }
@@ -748,8 +748,16 @@
             preDrawCallback: function() {
                 $('#loading-overlay').addClass('show');
             },
-            drawCallback: function() {
+            drawCallback: function(settings) {
                 $('#loading-overlay').removeClass('show');
+                
+                // Lazy load chart setelah table selesai render (hanya sekali)
+                if (!window.chartLoaded) {
+                    window.chartLoaded = true;
+                    setTimeout(function() {
+                        loadRegionalChart();
+                    }, 100);
+                }
             },
             columns: [{
                     data: 'no',
