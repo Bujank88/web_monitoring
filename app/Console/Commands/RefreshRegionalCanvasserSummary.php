@@ -9,22 +9,46 @@ use Illuminate\Support\Facades\Log;
 
 class RefreshRegionalCanvasserSummary extends Command
 {
-    protected $signature = 'summary:refresh-regional-canvasser {month?}';
-    protected $description = 'Refresh regional canvasser summary table for specified month or current month';
+    protected $signature = 'summary:refresh-regional-canvasser {month?} {--all : Refresh all months in current year} {--year= : Refresh all months in specific year}';
+    protected $description = 'Refresh regional canvasser summary table for specified month, current month, or all months';
 
     public function handle()
     {
-        $monthInput = $this->argument('month');
-        $monthDate = $monthInput 
-            ? Carbon::createFromFormat('Y-m', $monthInput)
-            : Carbon::now();
-        
-        $this->info("Refreshing regional canvasser summary for: " . $monthDate->format('Y-m'));
+        // ⚠️ COMMAND DISABLED TEMPORARILY - Causing database lock
+        // Reason: Heavy triple JOIN queries on leads_master + data_registarsi_status_approveorreject + report_balance_top_up
+        // Date: 2026-03-09
+        $this->error('⚠️  Command is temporarily disabled due to performance issues.');
+        $this->error('    This command causes table locks on leads_master and data_registarsi_status_approveorreject.');
+        $this->info('    Please optimize queries or add proper indexes before re-enabling.');
+        return 1;
         
         try {
+            // Option 1: Refresh all months in current or specific year
+            if ($this->option('all') || $this->option('year')) {
+                $year = $this->option('year') ?: Carbon::now()->year;
+                $this->info("Refreshing regional canvasser summary for ALL months in year {$year}");
+                
+                for ($month = 1; $month <= 12; $month++) {
+                    $monthDate = Carbon::create($year, $month, 1);
+                    $this->info("\n[{$month}/12] Processing " . $monthDate->format('F Y') . "...");
+                    $this->refreshSummary($monthDate);
+                }
+                
+                $this->info("\n✓ All months refreshed successfully!");
+                return 0;
+            }
+            
+            // Option 2: Refresh specific month or current month
+            $monthInput = $this->argument('month');
+            $monthDate = $monthInput 
+                ? Carbon::createFromFormat('Y-m', $monthInput)
+                : Carbon::now();
+            
+            $this->info("Refreshing regional canvasser summary for: " . $monthDate->format('Y-m'));
             $this->refreshSummary($monthDate);
             $this->info("✓ Summary refreshed successfully!");
             return 0;
+            
         } catch (\Exception $e) {
             $this->error("✗ Error: " . $e->getMessage());
             Log::error("Error refreshing regional canvasser summary: " . $e->getMessage());
@@ -116,7 +140,7 @@ class RefreshRegionalCanvasserSummary extends Command
             ->keyBy('user_id');
             
         $topUpStatsByUser = DB::table('report_balance_top_up as rp')
-            ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+            ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
             ->whereIn('lm.user_id', $canvaserIds)
             ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
             ->groupBy('lm.user_id')
@@ -130,10 +154,10 @@ class RefreshRegionalCanvasserSummary extends Command
             
         $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
             ->join('report_balance_top_up as rp', function ($join) {
-                $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                $join->on('dt.email', '=', 'rp.email_client')
                     ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
             })
-            ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+            ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
             ->whereIn('lm.user_id', $canvaserIds)
             ->where('dt.status', 'APPROVE')
             ->whereBetween(
@@ -151,9 +175,9 @@ class RefreshRegionalCanvasserSummary extends Command
             ->keyBy('user_id');
             
         $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-            ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+            ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
             ->join('report_balance_top_up as rp', function ($join) {
-                $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                $join->on('dt.email', '=', 'rp.email_client')
                     ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
             })
             ->whereIn('lm.user_id', $canvaserIds)
