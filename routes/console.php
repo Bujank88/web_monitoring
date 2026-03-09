@@ -159,9 +159,9 @@ Schedule::call(function () {
     app(LogbookDailyController::class)->refreshLogbookDaily();
 })->everyTwoMinutes()->name('refreshLogbookDaily');
 
-Schedule::call(function () {
-    app(LeadsMasterController::class)->syncLeadsWithRegistration();
-})->everyTenMinutes()->name('syncLeadsWithRegistration');
+// Schedule::call(function () {
+//     app(LeadsMasterController::class)->syncLeadsWithRegistration();
+// })->everyTenMinutes()->name('syncLeadsWithRegistration');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsFromTopUp();
