@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\RegionalSummary;
 
@@ -439,11 +441,14 @@ class LeadProgramController extends Controller
                     : Carbon::createFromFormat('Y-m-d', $monthFilter);
             }
 
-            $canvasers = DB::table('users')
-                ->where('role', 'cvsr')
-                ->where('name', '!=', 'self service')
-                ->select('id', 'name')
-                ->get();
+            // OPTIMIZED: Cache canvassers list (TTL 15 menit) 
+            $canvasers = Cache::remember('canvassers_active', 900, function() {
+                return DB::table('users')
+                    ->where('role', 'cvsr')
+                    ->where('name', '!=', 'self service')
+                    ->select('id', 'name')
+                    ->get();
+            });
 
             if ($canvasers->isEmpty()) {
                 return [];
@@ -610,7 +615,8 @@ class LeadProgramController extends Controller
                 ->get()
                 ->keyBy('user_id');
 
-            $momToday = Carbon::now();
+            // FIX: Use filtered month for MoM calculation, not always current month
+            $momToday = $monthDate ?? Carbon::now();
             $currentMonthStart = $momToday->copy()->startOfMonth()->format('Y-m-d');
             $currentMonthUntilToday = $momToday->copy()->format('Y-m-d');
             $prevMonthStart = $momToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d');
@@ -765,36 +771,84 @@ class LeadProgramController extends Controller
     public function getRegionalChartData(Request $request)
     {
         try {
-            // Gunakan source data yang sama dengan tabel regional agar ACV chart
-            // selalu identik dengan kolom "Total (Rp.)" pada tabel.
-            $tableRows = $this->getRegionalData($request);
+            // OPTIMIZED: Query langsung untuk chart, tidak perlu panggil getRegionalData yang berat
+            $monthFilter = $request->get('month');
+            $monthDate = null;
+            if (!empty($monthFilter)) {
+                $monthDate = strlen($monthFilter) === 7
+                    ? Carbon::createFromFormat('Y-m-d', $monthFilter . '-01')
+                    : Carbon::createFromFormat('Y-m-d', $monthFilter);
+            }
 
-            $toNumber = function ($value) {
-                if (is_numeric($value)) {
-                    return (float) $value;
-                }
+            // Cache canvassers list (TTL 15 menit)
+            $canvasers = Cache::remember('canvassers_active', 900, function() {
+                return DB::table('users')
+                    ->where('role', 'cvsr')
+                    ->where('name', '!=', 'self service')
+                    ->select('id', 'name')
+                    ->get();
+            });
 
-                $normalized = str_replace('.', '', (string) $value);
-                $normalized = str_replace(',', '.', $normalized);
+            if ($canvasers->isEmpty()) {
+                return response()->json(['canvassers' => []]);
+            }
 
-                return (float) $normalized;
-            };
+            $canvaserIds = $canvasers->pluck('id')->all();
+            $logbookPeriod = $monthDate ? $monthDate->copy() : Carbon::now();
+            $logbookMonth = (int) $logbookPeriod->month;
+            $logbookYear = (int) $logbookPeriod->year;
 
-            $result = collect($tableRows)
-                ->reject(fn($row) => !empty($row['is_total']))
-                ->map(function ($row) use ($toNumber) {
-                    return [
-                        'name' => $row['canvaser_name'] ?? '-',
-                        'new_leads' => (int) ($row['leads'] ?? 0),
-                        'new_akun' => (int) ($row['new_akun'] ?? 0),
-                        'existing_akun_count' => (int) ($row['existing_akun'] ?? 0),
-                        'top_up_existing_akun_count' => (int) ($row['top_up_existing_akun_count'] ?? 0),
-                        'target' => $toNumber($row['target'] ?? 0),
-                        'acv' => $toNumber($row['total_top_up_rp'] ?? 0),
-                    ];
+            $today = $monthDate ? $monthDate->copy()->endOfMonth() : Carbon::now();
+            $todayDate = $today->format('Y-m-d');
+            $startOfMonth = ($monthDate ? $monthDate->copy() : Carbon::now())->startOfMonth()->format('Y-m-d');
+            $endOfMonthFormatted = ($monthDate ? $monthDate->copy() : Carbon::now())->endOfMonth()->format('Y-m-d');
+            $currentMonth = $today->format('Y-m');
+
+            // Single optimized query to get all data for chart
+            $chartData = DB::table('users as u')
+                ->leftJoin('logbook as lb', function($join) use ($logbookMonth, $logbookYear) {
+                    $join->on('u.id', '=', 'lb.user_id')
+                         ->where('lb.bulan', $logbookMonth)
+                         ->where('lb.tahun', $logbookYear);
                 })
-                ->values()
-                ->all();
+                ->leftJoin('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
+                ->leftJoin('data_registarsi_status_approveorreject as dt', function($join) use ($startOfMonth, $endOfMonthFormatted) {
+                    $join->on('lm.email', '=', 'dt.email')
+                         ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startOfMonth, $endOfMonthFormatted]);
+                })
+                ->leftJoin('report_balance_top_up as rp', function($join) use ($startOfMonth, $todayDate) {
+                    $join->on('lm.email', '=', 'rp.email_client')
+                         ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate]);
+                })
+                ->leftJoin('target_canvaser as tc', function($join) use ($currentMonth) {
+                    $join->on('u.id', '=', 'tc.user_id')
+                         ->where('tc.bulan', $currentMonth);
+                })
+                ->whereIn('u.id', $canvaserIds)
+                ->groupBy('u.id', 'u.name', 'tc.target')
+                ->select(
+                    'u.id',
+                    'u.name',
+                    DB::raw("COUNT(DISTINCT CASE WHEN lm.data_type = 'leads' THEN lb.leads_master_id END) as new_leads"),
+                    DB::raw("COUNT(DISTINCT CASE WHEN dt.email IS NOT NULL AND dt.status = 'APPROVE' THEN dt.email END) as new_akun"),
+                    DB::raw("COUNT(DISTINCT CASE WHEN lm.data_type = 'Eksisting Akun' THEN lb.leads_master_id END) as existing_akun_count"),
+                    DB::raw("COUNT(DISTINCT CASE WHEN rp.id IS NOT NULL THEN rp.id END) as top_up_existing_akun_count"),
+                    DB::raw("COALESCE(tc.target, 0) as target"),
+                    DB::raw("COALESCE(SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))), 0) as acv")
+                )
+                ->get();
+
+            $result = $chartData->map(function($row) {
+                return [
+                    'name' => $row->name ?? '-',
+                    'new_leads' => (int) $row->new_leads,
+                    'new_akun' => (int) $row->new_akun,
+                    'existing_akun_count' => (int) $row->existing_akun_count,
+                    'top_up_existing_akun_count' => (int) $row->top_up_existing_akun_count,
+                    'target' => (float) $row->target,
+                    'acv' => (float) $row->acv,
+                ];
+            })->values()->all();
 
             return response()->json([
                 'canvassers' => $result
