@@ -15,92 +15,54 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('leads_master', function (Blueprint $table) {
-            // 1. Index untuk kolom email (PALING PENTING!)
-            // Digunakan untuk:
-            // - Join dengan report_balance_top_up (email_client)
-            // - Join dengan data_registarsi_status_approveorreject
-            // - WHERE email = ...
-            // - Cek duplicate email
-            if (!$this->indexExists('leads_master', 'idx_email')) {
-                $table->index('email', 'idx_email');
-            }
+        // Gunakan raw SQL untuk create index (jika sudah ada akan di-skip)
+        $indexes = [
+            // Format: [index_name, column(s), description]
+            ['idx_email', 'email', 'JOIN dengan report_balance_top_up, cek duplicate'],
+            ['idx_user_id', 'user_id', 'Filter canvasser, role-based access control'],
+            ['idx_reg_id', 'reg_id', 'JOIN dengan saldo_users'],
+            ['idx_mobile_phone', 'mobile_phone', 'Cek duplicate phone, search'],
+            ['idx_regional', 'regional', 'Filter regional, reporting'],
+            ['idx_data_type', 'data_type', 'Filter Leads vs Eksisting Akun'],
+            ['idx_created_at', 'created_at', 'Filter date range, sorting'],
+            ['idx_user_regional', 'user_id, regional', 'Compound: filter canvasser + regional'],
+            ['idx_email_data_type', 'email, data_type', 'Compound: email + tipe data'],
+            ['idx_source_id', 'source_id', 'Foreign key ke leads_source'],
+            ['idx_sector_id', 'sector_id', 'Foreign key ke sectors'],
+        ];
 
-            // 2. Index untuk user_id (foreign key ke users)
-            // Digunakan untuk:
-            // - Filter canvasser di datatable
-            // - Role-based access control (user_id = auth()->id())
-            // - Join dengan users table
-            if (!$this->indexExists('leads_master', 'idx_user_id')) {
-                $table->index('user_id', 'idx_user_id');
-            }
+        $createdCount = 0;
+        $skippedCount = 0;
 
-            // 3. Index untuk reg_id (link ke saldo_users.id_user)
-            // Digunakan untuk:
-            // - Join dengan saldo_users untuk get saldo_utama
-            // - Sinkronisasi dengan data registrasi
-            if (!$this->indexExists('leads_master', 'idx_reg_id')) {
-                $table->index('reg_id', 'idx_reg_id');
+        foreach ($indexes as [$indexName, $columns, $description]) {
+            try {
+                // Cek apakah index sudah ada menggunakan raw query
+                if (!$this->indexExists('leads_master', $indexName)) {
+                    DB::statement("CREATE INDEX {$indexName} ON leads_master ({$columns})");
+                    echo "✅ Created index: {$indexName} ({$description})\n";
+                    $createdCount++;
+                } else {
+                    echo "⏭️  Skipped: {$indexName} (already exists)\n";
+                    $skippedCount++;
+                }
+            } catch (\Exception $e) {
+                // Jika error (mungkin index sudah ada), skip saja
+                echo "⚠️  Skipped: {$indexName} - {$e->getMessage()}\n";
+                $skippedCount++;
             }
+        }
 
-            // 4. Index untuk mobile_phone
-            // Digunakan untuk:
-            // - Cek duplicate phone number
-            // - Search/filter nomor HP
-            if (!$this->indexExists('leads_master', 'idx_mobile_phone')) {
-                $table->index('mobile_phone', 'idx_mobile_phone');
-            }
-
-            // 5. Index untuk regional
-            // Digunakan untuk:
-            // - Filter regional di datatable
-            // - Group by regional untuk reporting
-            if (!$this->indexExists('leads_master', 'idx_regional')) {
-                $table->index('regional', 'idx_regional');
-            }
-
-            // 6. Index untuk data_type
-            // Digunakan untuk:
-            // - Filter "Leads" vs "Eksisting Akun"
-            // - Reporting dan analytics
-            if (!$this->indexExists('leads_master', 'idx_data_type')) {
-                $table->index('data_type', 'idx_data_type');
-            }
-
-            // 7. Index untuk created_at
-            // Digunakan untuk:
-            // - Filter date range di datatable
-            // - Sorting by newest/oldest
-            // - Reporting per periode
-            if (!$this->indexExists('leads_master', 'idx_created_at')) {
-                $table->index('created_at', 'idx_created_at');
-            }
-
-            // 8. Compound index untuk kombinasi filter yang sering digunakan
-            // user_id + regional (untuk filter canvasser + regional sekaligus)
-            if (!$this->indexExists('leads_master', 'idx_user_regional')) {
-                $table->index(['user_id', 'regional'], 'idx_user_regional');
-            }
-
-            // 9. Compound index untuk email + data_type
-            // Digunakan untuk query yang filter email dan cek tipe data sekaligus
-            if (!$this->indexExists('leads_master', 'idx_email_data_type')) {
-                $table->index(['email', 'data_type'], 'idx_email_data_type');
-            }
-
-            // 10. Index untuk source_id dan sector_id (foreign keys)
-            if (!$this->indexExists('leads_master', 'idx_source_id')) {
-                $table->index('source_id', 'idx_source_id');
-            }
-            if (!$this->indexExists('leads_master', 'idx_sector_id')) {
-                $table->index('sector_id', 'idx_sector_id');
-            }
-        });
-
-        // Setelah add indexes, update table statistics
-        DB::statement('ANALYZE TABLE leads_master');
+        // Update table statistics untuk optimize query planner
+        try {
+            DB::statement('ANALYZE TABLE leads_master');
+            echo "\n📊 Table statistics updated\n";
+        } catch (\Exception $e) {
+            echo "⚠️  Warning: Could not analyze table - {$e->getMessage()}\n";
+        }
         
-        echo "✅ Indexes berhasil ditambahkan ke leads_master\n";
+        echo "\n✅ Migration completed!\n";
+        echo "   - Created: {$createdCount} indexes\n";
+        echo "   - Skipped: {$skippedCount} indexes\n";
         echo "⏱️  Query SELECT akan JAUH lebih cepat sekarang!\n";
     }
 
@@ -109,39 +71,44 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('leads_master', function (Blueprint $table) {
-            // Drop indexes dalam urutan terbalik
-            $indexes = [
-                'idx_sector_id',
-                'idx_source_id',
-                'idx_email_data_type',
-                'idx_user_regional',
-                'idx_created_at',
-                'idx_data_type',
-                'idx_regional',
-                'idx_mobile_phone',
-                'idx_reg_id',
-                'idx_user_id',
-                'idx_email',
-            ];
+        // Drop indexes dalam urutan terbalik
+        $indexes = [
+            'idx_sector_id',
+            'idx_source_id',
+            'idx_email_data_type',
+            'idx_user_regional',
+            'idx_created_at',
+            'idx_data_type',
+            'idx_regional',
+            'idx_mobile_phone',
+            'idx_reg_id',
+            'idx_user_id',
+            'idx_email',
+        ];
 
-            foreach ($indexes as $index) {
+        foreach ($indexes as $index) {
+            try {
                 if ($this->indexExists('leads_master', $index)) {
-                    $table->dropIndex($index);
+                    DB::statement("DROP INDEX {$index} ON leads_master");
+                    echo "🗑️  Dropped index: {$index}\n";
                 }
+            } catch (\Exception $e) {
+                echo "⚠️  Could not drop {$index}: {$e->getMessage()}\n";
             }
-        });
+        }
     }
 
     /**
-     * Check if index exists
+     * Check if index exists menggunakan raw query
+     * Kompatibel dengan semua versi Laravel dan MySQL
      */
     private function indexExists($table, $index): bool
     {
-        $connection = Schema::getConnection();
-        $dbSchemaManager = $connection->getDoctrineSchemaManager();
-        $doctrineTable = $dbSchemaManager->introspectTable($table);
-        
-        return $doctrineTable->hasIndex($index);
+        try {
+            $result = DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$index]);
+            return count($result) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 };
