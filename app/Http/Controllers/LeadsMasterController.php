@@ -497,91 +497,54 @@ class LeadsMasterController extends Controller
      * - Update data_type ke 'Eksisting Akun' jika email sudah terdaftar
      * - Isi myads_account dengan email dari registrasi
      * - Cek juga akun yang sudah lebih dari 1 bulan di tanggal_approval_aktivasi
-     * 
-     * ✅ OPTIMIZED: Batch processing untuk mencegah table lock
      */
     public function syncLeadsWithRegistration()
     {
-        set_time_limit(300); // 5 menit max
-        ini_set('memory_limit', '512M');
-        
-        $startTime = now();
         $oneMonthAgo = now()->subMonth();
-        $syncedCount = 0;
-        $syncedOldCount = 0;
-        $syncedRegIdCount = 0;
 
-        try {
-            // 1. Get email yang perlu di-sync (hanya yang belum ter-sync)
-            $leadsToSync = DB::table('leads_master as lm')
-                ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
-                ->where('dsa.status', 'APPROVE')
-                ->where('lm.data_type', '!=', 'Eksisting Akun')
-                ->select('lm.id', 'dsa.email', 'dsa.user_id', 'dsa.tanggal_approval_aktivasi')
-                ->limit(500) // Max 500 rows per run untuk safety
-                ->get();
-
-            if ($leadsToSync->isEmpty()) {
-                \Log::info('Leads Master Sync - No records to sync');
-                return response()->json(['success' => true, 'message' => 'No records to sync']);
-            }
-
-            \Log::info("Leads Master Sync - Processing {$leadsToSync->count()} records...");
-
-            // 2. Process in batches of 100 (disable events untuk performa)
-            LeadsMaster::withoutEvents(function () use ($leadsToSync, &$syncedCount, &$syncedOldCount, &$syncedRegIdCount, $oneMonthAgo) {
-                $leadsToSync->chunk(100)->each(function ($batch, $index) use (&$syncedCount, &$syncedOldCount, &$syncedRegIdCount, $oneMonthAgo) {
-                    DB::transaction(function () use ($batch, &$syncedCount, &$syncedOldCount, &$syncedRegIdCount, $oneMonthAgo) {
-                        foreach ($batch as $lead) {
-                            try {
-                                $updateData = [
-                                    'data_type' => 'Eksisting Akun',
-                                    'myads_account' => $lead->email,
-                                    'updated_at' => now(),
-                                ];
-
-                                // Tambahkan reg_id jika ada user_id dari registrasi
-                                if (!empty($lead->user_id)) {
-                                    $updateData['reg_id'] = $lead->user_id;
-                                    $syncedRegIdCount++;
-                                }
-
-                                DB::table('leads_master')
-                                    ->where('id', $lead->id)
-                                    ->update($updateData);
-
-                                $syncedCount++;
-
-                                // Count old accounts (>1 month)
-                                if ($lead->tanggal_approval_aktivasi && Carbon::parse($lead->tanggal_approval_aktivasi)->lt($oneMonthAgo)) {
-                                    $syncedOldCount++;
-                                }
-                            } catch (\Exception $e) {
-                                \Log::error("Sync lead ID {$lead->id} error: " . $e->getMessage());
-                            }
-                        }
-                    });
-
-                    \Log::info("Batch " . ($index + 1) . " completed - Synced: {$syncedCount}");
-                    usleep(100000); // Sleep 100ms antar batch untuk kurangi load
-                });
-            });
-
-            $duration = now()->diffInSeconds($startTime);
-            \Log::info("Leads Master Sync - Completed in {$duration}s - Email matched: {$syncedCount}, Old accounts: {$syncedOldCount}, Reg ID: {$syncedRegIdCount}");
-
-            return response()->json([
-                'success' => true,
-                'message' => "Sync selesai. Processed: {$syncedCount} records in {$duration}s",
-                'synced_email_count' => $syncedCount,
-                'synced_old_account_count' => $syncedOldCount,
-                'synced_reg_id_count' => $syncedRegIdCount,
-                'duration_seconds' => $duration,
+        // 1. Sinkronisasi: Email leads_master yang ada di data_registarsi_status_approveorreject
+        $syncedCount = DB::table('leads_master as lm')
+            ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
+            ->where('dsa.status', 'APPROVE')
+            ->where('lm.data_type', '!=', 'Eksisting Akun') // Hindari update yang sudah ter-sync
+            ->update([
+                'lm.data_type' => 'Eksisting Akun',
+                'lm.myads_account' => DB::raw('dsa.email'),
+                'lm.updated_at' => now(),
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Sync Leads With Registration Error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-        }
+
+        // 2. Update leads yang emailnya cocok dan sudah lebih dari 1 bulan approval
+        $syncedOldCount = DB::table('leads_master as lm')
+            ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
+            ->where('dsa.status', 'APPROVE')
+            ->where('dsa.tanggal_approval_aktivasi', '<', $oneMonthAgo)
+            ->where('lm.data_type', '!=', 'Eksisting Akun') // Hindari update yang sudah ter-sync
+            ->update([
+                'lm.data_type' => 'Eksisting Akun',
+                'lm.myads_account' => DB::raw('dsa.email'),
+                'lm.updated_at' => now(),
+            ]);
+
+        // 3. Sinkronisasi reg_id dari user_id registrasi berdasarkan email
+        $syncedRegIdCount = DB::table('leads_master as lm')
+            ->join('data_registarsi_status_approveorreject as dsa', 'lm.email', '=', 'dsa.email')
+            ->where('dsa.status', 'APPROVE')
+            ->whereNotNull('dsa.user_id')
+            ->where('dsa.user_id', '!=', '')
+            ->update([
+                'lm.reg_id' => DB::raw('dsa.user_id'),
+                'lm.updated_at' => now(),
+            ]);
+
+        \Log::info('Leads Master Sync - Email matched: ' . $syncedCount . ' records, Old accounts (1+ month): ' . $syncedOldCount . ' records, Reg ID synced: ' . $syncedRegIdCount . ' records');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Sinkronisasi selesai. Email cocok: {$syncedCount}, Akun lama (>1 bulan): {$syncedOldCount}, Reg ID: {$syncedRegIdCount}",
+            'synced_email_count' => $syncedCount,
+            'synced_old_account_count' => $syncedOldCount,
+            'synced_reg_id_count' => $syncedRegIdCount,
+        ]);
     }
 
     /**
@@ -592,433 +555,275 @@ class LeadsMasterController extends Controller
      * Kondisi 2: Jika email tidak ditemukan di report_balance_top_up, cek di data_registarsi_status_approveorreject
      *           - Ambil provinsi dari data_registarsi_status_approveorreject
      *           - Cocokkan province dengan regional_provinces
-     * 
-     * ✅ OPTIMIZED: Batch processing untuk mencegah table lock
      */
     public function syncLeadsWithRegional()
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '512M');
-        
-        $startTime = now();
-        $syncedCountFromTopup = 0;
-        $syncedCountFromRegistrasi = 0;
+        // Kondisi 1: Sinkronisasi dari report_balance_top_up
+        $regionalFromTopup = DB::table('report_balance_top_up as rbt')
+            ->join('regional_provinces as rp', DB::raw('LOWER(rbt.data_province_name)'), '=', DB::raw('LOWER(rp.province)'))
+            ->select(
+                DB::raw('LOWER(rbt.email_client) as email_lower'),
+                'rp.regional'
+            )
+            ->distinct()
+            ->orderBy('rbt.tgl_transaksi', 'desc');
 
-        try {
-            // 1. Get leads yang belum punya regional (limit 500 per run)
-            $leadsWithoutRegional = DB::table('leads_master')
-                ->whereNull('regional')
-                ->whereNotNull('email')
-                ->select('id', 'email')
-                ->limit(500)
-                ->get();
-
-            if ($leadsWithoutRegional->isEmpty()) {
-                \Log::info('Regional Sync - No records to sync');
-                return response()->json(['success' => true, 'message' => 'No records to sync']);
-            }
-
-            \Log::info("Regional Sync - Processing {$leadsWithoutRegional->count()} records...");
-
-            // 2. Build mapping email -> regional dari TopUp
-            $regionalMapTopup = DB::table('report_balance_top_up as rbt')
-                ->join('regional_provinces as rp', DB::raw('LOWER(rbt.data_province_name)'), '=', DB::raw('LOWER(rp.province)'))
-                ->select(DB::raw('LOWER(rbt.email_client) as email'), 'rp.regional')
-                ->distinct()
-                ->orderBy('rbt.tgl_transaksi', 'desc')
-                ->pluck('regional', 'email')
-                ->toArray();
-
-            // 3. Build mapping email -> regional dari Registrasi
-            $regionalMapRegistrasi = DB::table('data_registarsi_status_approveorreject as dsa')
-                ->join('regional_provinces as rp', DB::raw('LOWER(dsa.provinsi)'), '=', DB::raw('LOWER(rp.province)'))
-                ->select(DB::raw('LOWER(dsa.email) as email'), 'rp.regional')
-                ->distinct()
-                ->pluck('regional', 'email')
-                ->toArray();
-
-            // 4. Process batch dengan disable events
-            LeadsMaster::withoutEvents(function () use ($leadsWithoutRegional, $regionalMapTopup, $regionalMapRegistrasi, &$syncedCountFromTopup, &$syncedCountFromRegistrasi) {
-                $leadsWithoutRegional->chunk(100)->each(function ($batch, $index) use ($regionalMapTopup, $regionalMapRegistrasi, &$syncedCountFromTopup, &$syncedCountFromRegistrasi) {
-                    DB::transaction(function () use ($batch, $regionalMapTopup, $regionalMapRegistrasi, &$syncedCountFromTopup, &$syncedCountFromRegistrasi) {
-                        foreach ($batch as $lead) {
-                            $emailLower = strtolower($lead->email);
-                            $regional = null;
-
-                            // Cek di TopUp dulu
-                            if (isset($regionalMapTopup[$emailLower])) {
-                                $regional = $regionalMapTopup[$emailLower];
-                                $syncedCountFromTopup++;
-                            }
-                            // Kalau gak ada, cek di Registrasi
-                            elseif (isset($regionalMapRegistrasi[$emailLower])) {
-                                $regional = $regionalMapRegistrasi[$emailLower];
-                                $syncedCountFromRegistrasi++;
-                            }
-
-                            if ($regional) {
-                                try {
-                                    DB::table('leads_master')
-                                        ->where('id', $lead->id)
-                                        ->update([
-                                            'regional' => $regional,
-                                            'updated_at' => now(),
-                                        ]);
-                                } catch (\Exception $e) {
-                                    \Log::error("Regional sync lead ID {$lead->id} error: " . $e->getMessage());
-                                }
-                            }
-                        }
-                    });
-
-                    \Log::info("Regional Batch " . ($index + 1) . " completed - TopUp: {$syncedCountFromTopup}, Registrasi: {$syncedCountFromRegistrasi}");
-                    usleep(100000); // Sleep 100ms
-                });
-            });
-
-            $totalSyncedCount = $syncedCountFromTopup + $syncedCountFromRegistrasi;
-            $duration = now()->diffInSeconds($startTime);
-            
-            \Log::info("Regional Sync - Completed in {$duration}s - TopUp: {$syncedCountFromTopup}, Registrasi: {$syncedCountFromRegistrasi}");
-
-            return response()->json([
-                'success' => true,
-                'message' => "Regional sync selesai. Total: {$totalSyncedCount} records in {$duration}s",
-                'synced_count_from_topup' => $syncedCountFromTopup,
-                'synced_count_from_registrasi' => $syncedCountFromRegistrasi,
-                'total_synced_count' => $totalSyncedCount,
-                'duration_seconds' => $duration,
+        $syncedCountFromTopup = DB::table('leads_master as lm')
+            ->joinSub($regionalFromTopup, 'rt', function ($join) {
+                $join->on(DB::raw('LOWER(lm.email)'), '=', 'rt.email_lower');
+            })
+            ->whereNull('lm.regional') // Hanya update yang belum punya regional
+            ->update([
+                'lm.regional' => DB::raw('rt.regional'),
+                'lm.updated_at' => now(),
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Regional Sync Error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-        }
+
+        // Kondisi 2: Sinkronisasi dari data_registarsi_status_approveorreject untuk email yang belum ketemu di report_balance_top_up
+        $regionalFromRegistrasi = DB::table('data_registarsi_status_approveorreject as dsa')
+            ->join('regional_provinces as rp', DB::raw('LOWER(dsa.provinsi)'), '=', DB::raw('LOWER(rp.province)'))
+            ->select(
+                DB::raw('LOWER(dsa.email) as email_lower'),
+                'rp.regional'
+            )
+            ->distinct();
+
+        $syncedCountFromRegistrasi = DB::table('leads_master as lm')
+            ->joinSub($regionalFromRegistrasi, 'rr', function ($join) {
+                $join->on(DB::raw('LOWER(lm.email)'), '=', 'rr.email_lower');
+            })
+            ->whereNull('lm.regional') // Hanya update yang belum punya regional
+            ->update([
+                'lm.regional' => DB::raw('rr.regional'),
+                'lm.updated_at' => now(),
+            ]);
+
+        $totalSyncedCount = $syncedCountFromTopup + $syncedCountFromRegistrasi;
+
+        \Log::info('Leads Master Regional Sync - From TopUp: ' . $syncedCountFromTopup . ' records, From Registrasi: ' . $syncedCountFromRegistrasi . ' records');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Sinkronisasi regional selesai. Dari TopUp: {$syncedCountFromTopup}, Dari Registrasi: {$syncedCountFromRegistrasi}",
+            'synced_count_from_topup' => $syncedCountFromTopup,
+            'synced_count_from_registrasi' => $syncedCountFromRegistrasi,
+            'total_synced_count' => $totalSyncedCount,
+        ]);
     }
 
     /**
      * Populate/Refresh detail_leads_summary table
      * Denormalisasi data dari leads_master + joins untuk performa lebih baik
-     * 
-     * ✅ OPTIMIZED: Incremental update (tidak truncate), batch processing
+     * Berjalan setiap 5 menit agar selalu up-to-date
      */
     public function refreshDetailLeadsSummary()
     {
-        set_time_limit(600); // 10 menit max (ini yang paling berat)
-        ini_set('memory_limit', '1G');
-        
-        $startTime = now();
         $month = now()->month;
         $year  = now()->year;
-        $processedCount = 0;
 
-        try {
-            \Log::info('Detail Leads Summary - Starting refresh...');
+        // Subquery untuk settlement bulan ini
+        $settlementSubquery = DB::table('report_balance_top_up as rbt')
+            ->select('email_client', DB::raw('SUM(total_settlement_klien) as total_settlement_klien'))
+            ->whereMonth('tgl_transaksi', $month)
+            ->whereYear('tgl_transaksi', $year)
+            ->groupBy('email_client');
 
-            // 1. Build settlement mapping (email -> total_settlement)
-            $settlementMap = DB::table('report_balance_top_up')
-                ->select('email_client', DB::raw('SUM(total_settlement_klien) as total'))
-                ->whereMonth('tgl_transaksi', $month)
-                ->whereYear('tgl_transaksi', $year)
-                ->groupBy('email_client')
-                ->pluck('total', 'email_client')
-                ->mapWithKeys(function ($value, $key) {
-                    return [strtolower($key) => $value];
-                })
-                ->toArray();
+        // Subquery saldo utama berdasarkan reg_id (leads_master) = id_user (saldo_users)
+        $saldoUtamaSubquery = DB::table('saldo_users as su')
+            ->select(
+                'su.id_user',
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            );
 
-            // 2. Build saldo mapping (reg_id -> saldo_utama)
-            $saldoMap = DB::table('saldo_users')
-                ->pluck('saldo_utama', 'id_user')
-                ->toArray();
+        // Query untuk mendapatkan data yang akan dimasukkan
+        $leadsData = LeadsMaster::with(['user'])
+            ->leftJoinSub(
+                $settlementSubquery,
+                'rbt',
+                function ($join) {
+                    $join->on(DB::raw('LOWER(rbt.email_client)'), '=', DB::raw('LOWER(leads_master.email)'));
+                }
+            )
+            ->leftJoinSub(
+                $saldoUtamaSubquery,
+                'su',
+                function ($join) {
+                    $join->on('leads_master.reg_id', '=', 'su.id_user');
+                }
+            )
+            ->select(
+                'leads_master.id as leads_master_id',
+                'leads_master.user_id',
+                'leads_master.source_id',
+                'leads_master.sector_id',
+                'leads_master.regional',
+                'leads_master.company_name',
+                'leads_master.mobile_phone',
+                'leads_master.email',
+                'leads_master.status',
+                'leads_master.nama',
+                'leads_master.address',
+                'leads_master.myads_account',
+                'leads_master.data_type',
+                'leads_master.komitmen',
+                'leads_master.plan_min_topup',
+                'leads_master.remarks',
+                'leads_master.created_at',
+                'leads_master.updated_at',
+                DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
+                DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
+            )
+            ->get();
 
-            \Log::info("Settlement map: " . count($settlementMap) . " records, Saldo map: " . count($saldoMap) . " records");
+        // Build array untuk batch insert
+        $summaryData = $leadsData->map(function ($lead) {
+            return [
+                'leads_master_id' => $lead->leads_master_id,
+                'user_id' => $lead->user_id,
+                'user_name' => $lead->user->name ?? null,
+                'source_id' => $lead->source_id,
+                'sector_id' => $lead->sector_id,
+                'regional' => $lead->regional,
+                'company_name' => $lead->company_name,
+                'mobile_phone' => $lead->mobile_phone,
+                'email' => $lead->email,
+                'status' => $lead->status,
+                'nama' => $lead->nama,
+                'address' => $lead->address,
+                'myads_account' => $lead->myads_account,
+                'data_type' => $lead->data_type,
+                'komitmen' => $lead->komitmen,
+                'plan_min_topup' => $lead->plan_min_topup,
+                'remarks' => $lead->remarks,
+                'total_settlement_klien' => $lead->total_settlement_klien,
+                'saldo_utama' => $lead->saldo_utama,
+                'created_at' => $lead->created_at,
+                'updated_at' => $lead->updated_at,
+            ];
+        })->toArray();
 
-            // 3. Process leads in chunks (INCREMENTAL UPDATE, tidak truncate!)
-            DB::table('leads_master')
-                ->orderBy('id')
-                ->chunk(200, function ($leads) use ($settlementMap, $saldoMap, &$processedCount, $startTime) {
-                    $batchData = [];
-
-                    foreach ($leads as $lead) {
-                        // Get settlement dari map
-                        $emailLower = strtolower($lead->email ?? '');
-                        $settlement = $settlementMap[$emailLower] ?? 0;
-
-                        // Get saldo dari map
-                        $saldo = $saldoMap[$lead->reg_id ?? ''] ?? 0;
-
-                        // Get user name
-                        $userName = null;
-                        if ($lead->user_id) {
-                            $user = Cache::remember("user_{$lead->user_id}", 3600, function () use ($lead) {
-                                return DB::table('users')->where('id', $lead->user_id)->first();
-                            });
-                            $userName = $user->name ?? null;
-                        }
-
-                        $batchData[] = [
-                            'leads_master_id' => $lead->id,
-                            'user_id' => $lead->user_id,
-                            'user_name' => $userName,
-                            'source_id' => $lead->source_id,
-                            'sector_id' => $lead->sector_id,
-                            'regional' => $lead->regional,
-                            'company_name' => $lead->company_name,
-                            'mobile_phone' => $lead->mobile_phone,
-                            'email' => $lead->email,
-                            'status' => $lead->status,
-                            'nama' => $lead->nama,
-                            'address' => $lead->address,
-                            'myads_account' => $lead->myads_account,
-                            'data_type' => $lead->data_type,
-                            'komitmen' => $lead->komitmen,
-                            'plan_min_topup' => $lead->plan_min_topup,
-                            'remarks' => $lead->remarks,
-                            'total_settlement_klien' => $settlement,
-                            'saldo_utama' => $saldo,
-                            'created_at' => $lead->created_at,
-                            'updated_at' => $lead->updated_at,
-                        ];
-                    }
-
-                    // Upsert batch (update jika ada, insert jika baru)
-                    if (!empty($batchData)) {
-                        try {
-                            DB::transaction(function () use ($batchData) {
-                                foreach (array_chunk($batchData, 100) as $chunk) {
-                                    foreach ($chunk as $data) {
-                                        DB::table('detail_leads_summary')
-                                            ->updateOrInsert(
-                                                ['leads_master_id' => $data['leads_master_id']],
-                                                $data
-                                            );
-                                    }
-                                }
-                            });
-                            $processedCount += count($batchData);
-                        } catch (\Exception $e) {
-                            \Log::error('Summary batch insert error: ' . $e->getMessage());
-                        }
-                    }
-
-                    // Log progress setiap batch
-                    $elapsed = now()->diffInSeconds($startTime);
-                    \Log::info("Summary refresh - Processed: {$processedCount} records in {$elapsed}s");
-
-                    usleep(200000); // Sleep 200ms antar batch
-                });
-
-            // 4. Delete summary rows yang leads_master-nya sudah dihapus
-            $deletedCount = DB::table('detail_leads_summary as dls')
-                ->leftJoin('leads_master as lm', 'dls.leads_master_id', '=', 'lm.id')
-                ->whereNull('lm.id')
-                ->delete();
-
-            if ($deletedCount > 0) {
-                \Log::info("Cleaned up {$deletedCount} orphaned summary records");
+        // Truncate dan insert ulang
+        DB::table('detail_leads_summary')->truncate();
+        
+        if (!empty($summaryData)) {
+            // Batch insert untuk performa
+            $chunks = array_chunk($summaryData, 500);
+            foreach ($chunks as $chunk) {
+                DB::table('detail_leads_summary')->insert($chunk);
             }
-
-            $duration = now()->diffInSeconds($startTime);
-            \Log::info("Detail Leads Summary - Completed in {$duration}s - Processed: {$processedCount} records");
-
-            return response()->json([
-                'success' => true,
-                'message' => "Summary refreshed. Total: {$processedCount} records in {$duration}s",
-                'total_records' => $processedCount,
-                'deleted_orphaned' => $deletedCount,
-                'duration_seconds' => $duration,
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Refresh Detail Leads Summary Error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
+
+        \Log::info('Detail Leads Summary - Refreshed: ' . count($summaryData) . ' records');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Summary direfresh. Total: " . count($summaryData) . " records",
+            'total_records' => count($summaryData),
+        ]);
     }
 
     /**
      * Update detail_leads_summary untuk satu record (dipanggil dari Event Listener saat ada update)
-     * 
-     * ⚡ OPTIMIZED: Cache query, simplified logic
      */
     public function updateSummaryRecord($leadId)
     {
-        try {
-            $month = now()->month;
-            $year  = now()->year;
+        $month = now()->month;
+        $year  = now()->year;
 
-            // Get lead data (cache untuk performa)
-            $lead = Cache::remember("lead_data_{$leadId}", 300, function () use ($leadId) {
-                return LeadsMaster::with(['user'])->find($leadId);
-            });
+        // Get settlement untuk email ini
+        $settlement = DB::table('report_balance_top_up')
+            ->where(DB::raw('LOWER(email_client)'), '=', DB::raw("LOWER((SELECT email FROM leads_master WHERE id = ?))"))
+            ->setBindings([$leadId])
+            ->whereMonth('tgl_transaksi', $month)
+            ->whereYear('tgl_transaksi', $year)
+            ->sum('total_settlement_klien');
 
-            if (!$lead) {
-                \Log::warning("updateSummaryRecord: Lead ID {$leadId} not found");
-                return;
-            }
+        // Get lead data
+        $lead = LeadsMaster::with(['user'])->findOrFail($leadId);
+        $saldoUtama = DB::table('saldo_users')
+            ->where('id_user', $lead->reg_id)
+            ->value('saldo_utama');
 
-            // Get settlement (cache 5 menit)
-            $cacheKey = "settlement_{$lead->email}_{$month}_{$year}";
-            $settlement = Cache::remember($cacheKey, 300, function () use ($lead, $month, $year) {
-                if (!$lead->email) return 0;
-                
-                return DB::table('report_balance_top_up')
-                    ->where(DB::raw('LOWER(email_client)'), strtolower($lead->email))
-                    ->whereMonth('tgl_transaksi', $month)
-                    ->whereYear('tgl_transaksi', $year)
-                    ->sum('total_settlement_klien') ?? 0;
-            });
-
-            // Get saldo (cache 5 menit)
-            $saldoUtama = 0;
-            if ($lead->reg_id) {
-                $saldoUtama = Cache::remember("saldo_{$lead->reg_id}", 300, function () use ($lead) {
-                    return DB::table('saldo_users')
-                        ->where('id_user', $lead->reg_id)
-                        ->value('saldo_utama') ?? 0;
-                });
-            }
-
-            // Update summary (gunakan transaction untuk konsistensi)
-            DB::transaction(function () use ($leadId, $lead, $settlement, $saldoUtama) {
-                DB::table('detail_leads_summary')->updateOrInsert(
-                    ['leads_master_id' => $leadId],
-                    [
-                        'user_id' => $lead->user_id,
-                        'user_name' => $lead->user->name ?? null,
-                        'source_id' => $lead->source_id,
-                        'sector_id' => $lead->sector_id,
-                        'regional' => $lead->regional,
-                        'company_name' => $lead->company_name,
-                        'mobile_phone' => $lead->mobile_phone,
-                        'email' => $lead->email,
-                        'status' => $lead->status,
-                        'nama' => $lead->nama,
-                        'address' => $lead->address,
-                        'myads_account' => $lead->myads_account,
-                        'data_type' => $lead->data_type,
-                        'komitmen' => $lead->komitmen,
-                        'plan_min_topup' => $lead->plan_min_topup,
-                        'remarks' => $lead->remarks,
-                        'total_settlement_klien' => $settlement,
-                        'saldo_utama' => $saldoUtama,
-                        'created_at' => $lead->created_at,
-                        'updated_at' => now(),
-                    ]
-                );
-            });
-        } catch (\Exception $e) {
-            \Log::error("updateSummaryRecord error for lead ID {$leadId}: " . $e->getMessage());
-        }
+        // Update atau insert ke summary table
+        DB::table('detail_leads_summary')->updateOrInsert(
+            ['leads_master_id' => $leadId],
+            [
+                'user_id' => $lead->user_id,
+                'user_name' => $lead->user->name ?? null,
+                'source_id' => $lead->source_id,
+                'sector_id' => $lead->sector_id,
+                'regional' => $lead->regional,
+                'company_name' => $lead->company_name,
+                'mobile_phone' => $lead->mobile_phone,
+                'email' => $lead->email,
+                'status' => $lead->status,
+                'nama' => $lead->nama,
+                'address' => $lead->address,
+                'myads_account' => $lead->myads_account,
+                'data_type' => $lead->data_type,
+                'komitmen' => $lead->komitmen,
+                'plan_min_topup' => $lead->plan_min_topup,
+                'remarks' => $lead->remarks,
+                'total_settlement_klien' => $settlement ?? 0,
+                'saldo_utama' => $saldoUtama ?? 0,
+                'created_at' => $lead->created_at,
+                'updated_at' => now(),
+            ]
+        );
     }
-    /**
-     * Sync leads dari TopUp berdasarkan referral code
-     * 
-     * ✅ OPTIMIZED: Batch insert, disable events
-     */
     public function syncLeadsFromTopUp()
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '512M');
-        
-        $startTime = now();
-        $addedCount = 0;
-        $skippedCount = 0;
+        // 1️⃣ Referral code yang valid
+        $validReferralCodes = [
+            'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
+            'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
+            'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
+        ];
 
-        try {
-            // 1. Referral code yang valid
-            $validReferralCodes = [
-                'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
-                'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
-                'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
-            ];
-
-            // 2. Ambil data top up hari ini (limit 200 untuk safety)
-            $topUps = DB::table('report_balance_top_up as r')
-                ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
-                ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
-                ->whereNotNull('r.email_client')
-                ->whereDate('r.tgl_transaksi', Carbon::today())
-                ->select(
-                    'u.id as user_id',
-                    'r.company_name',
-                    'r.email_client',
-                    'r.alamat',
-                    DB::raw('UPPER(u.referral_code) as referral_code')
-                )
-                ->limit(200)
-                ->get();
-
-            if ($topUps->isEmpty()) {
-                \Log::info('Sync Leads from TopUp - No new leads to process');
-                return response()->json(['success' => true, 'message' => 'No new leads']);
+        // 2️⃣ Ambil data top up + referral_code user
+        $topUps = DB::table('report_balance_top_up as r')
+            ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
+            ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
+            ->whereNotNull('r.email_client')
+            ->whereDate('r.tgl_transaksi', Carbon::today())
+            ->select(
+                'u.id as user_id',
+                'r.company_name',
+                'r.email_client',
+                'r.alamat',
+                DB::raw('UPPER(u.referral_code) as referral_code')
+            )
+            ->get();
+            
+        foreach ($topUps as $topUp) {
+            
+            // 3️⃣ CEK EMAIL — kalau sudah ada, skip
+            $emailExists = LeadsMaster::where('email', $topUp->email_client)->exists();
+            if ($emailExists) {
+                continue;
             }
 
-            \Log::info("Sync TopUp - Processing {$topUps->count()} potential leads...");
-
-            // 3. Get existing emails untuk filter duplicate
-            $existingEmails = DB::table('leads_master')
-                ->whereIn('email', $topUps->pluck('email_client')->toArray())
-                ->pluck('email')
-                ->map(fn($email) => strtolower($email))
-                ->toArray();
-
-            // 4. Process batch dengan disable events
-            LeadsMaster::withoutEvents(function () use ($topUps, $existingEmails, &$addedCount, &$skippedCount) {
-                $topUps->chunk(50)->each(function ($batch, $index) use ($existingEmails, &$addedCount, &$skippedCount) {
-                    DB::transaction(function () use ($batch, $existingEmails, &$addedCount, &$skippedCount) {
-                        foreach ($batch as $topUp) {
-                            // Skip jika email sudah ada
-                            if (in_array(strtolower($topUp->email_client), $existingEmails)) {
-                                $skippedCount++;
-                                continue;
-                            }
-
-                            try {
-                                DB::table('leads_master')->insert([
-                                    'user_id'        => $topUp->user_id,
-                                    'source_id'      => null,
-                                    'sector_id'      => 2,
-                                    'company_name'   => $topUp->company_name,
-                                    'mobile_phone'   => '-',
-                                    'email'          => $topUp->email_client,
-                                    'status'         => 1,
-                                    'nama'           => $topUp->company_name ?? 'Unknown',
-                                    'address'        => $topUp->alamat,
-                                    'remarks'        => 'Auto-created from TopUp (Ref: ' . $topUp->referral_code . ')',
-                                    'myads_account'  => null,
-                                    'data_type'      => 'Leads',
-                                    'created_at'     => now(),
-                                    'updated_at'     => now(),
-                                ]);
-                                
-                                $addedCount++;
-                                // Add to existing untuk prevent duplicate di batch berikutnya
-                                $existingEmails[] = strtolower($topUp->email_client);
-                            } catch (\Exception $e) {
-                                \Log::error("Insert lead from TopUp error: " . $e->getMessage());
-                                $skippedCount++;
-                            }
-                        }
-                    });
-
-                    \Log::info("TopUp Batch " . ($index + 1) . " completed - Added: {$addedCount}, Skipped: {$skippedCount}");
-                    usleep(100000); // Sleep 100ms
-                });
-            });
-
-            $duration = now()->diffInSeconds($startTime);
-            \Log::info("Sync TopUp - Completed in {$duration}s - Added: {$addedCount}, Skipped: {$skippedCount}");
-
-            return response()->json([
-                'success' => true,
-                'message' => "Sync TopUp selesai. Added: {$addedCount}, Skipped: {$skippedCount} in {$duration}s",
-                'added' => $addedCount,
-                'skipped' => $skippedCount,
-                'duration_seconds' => $duration,
+            // 4️⃣ Insert ke leads_master
+            LeadsMaster::create([
+                'user_id'        => $topUp->user_id,
+                'source_id'      => null,
+                'sector_id'      => 2, // Default ke sektor "Lain-lain"
+                'company_name'   => $topUp->company_name,
+                'mobile_phone'   => '-',
+                'email'          => $topUp->email_client,
+                'status'         => 1,
+                'nama'           => $topUp->company_name ?? 'Unknown',
+                'address'        => $topUp->alamat,
+                'remarks'        => 'Automate Create by Referral Code: ' . $topUp->referral_code,
+                'myads_account'  => null,
+                'data_type'      => 'Leads'
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Sync Leads From TopUp Error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        \Log::info('Sync Leads from TopUp - Total new leads added: ' . $topUps->count());
         }
+        return response()->json([
+            'success' => true,
+            'total'   => $topUps->count(),
+            'message' => 'Sync leads selesai (email duplicate di-skip)',
+        ]);
     }
 
 }

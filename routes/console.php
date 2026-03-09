@@ -163,13 +163,13 @@ Schedule::call(function () {
 // //     app(LeadsMasterController::class)->syncLeadsWithRegistration();
 // // })->everyTenMinutes()->name('syncLeadsWithRegistration');
 
-// Schedule::call(function () {
-//     app(LeadsMasterController::class)->syncLeadsFromTopUp();
-// })->everyTenMinutes()->name('syncLeadsFromTopUp');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsFromTopUp();
+})->everyTenMinutes()->name('syncLeadsFromTopUp');
 
-// Schedule::call(function () {
-//     app(LeadsMasterController::class)->syncLeadsWithRegional();
-// })->everyTenMinutes()->name('syncLeadsWithRegional');
+Schedule::call(function () {
+    app(LeadsMasterController::class)->syncLeadsWithRegional();
+})->everyTenMinutes()->name('syncLeadsWithRegional');
 
 // Schedule::call(function () {
 //     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
