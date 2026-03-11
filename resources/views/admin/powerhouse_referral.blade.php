@@ -523,23 +523,23 @@
         background-color: #ffffff;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(3),
-    #powerHousePerformanceTable tbody td:nth-child(4) {
+    #powerHousePerformanceTable tbody td:nth-child(4),
+    #powerHousePerformanceTable tbody td:nth-child(5) {
         background-color: #d1e7dd;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(5),
     #powerHousePerformanceTable tbody td:nth-child(6),
-    #powerHousePerformanceTable tbody td:nth-child(7) {
+    #powerHousePerformanceTable tbody td:nth-child(7),
+    #powerHousePerformanceTable tbody td:nth-child(8) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(8),
     #powerHousePerformanceTable tbody td:nth-child(9),
     #powerHousePerformanceTable tbody td:nth-child(10),
-    #powerHousePerformanceTable tbody td:nth-child(11) {
+    #powerHousePerformanceTable tbody td:nth-child(11),
+    #powerHousePerformanceTable tbody td:nth-child(12) {
         background-color: #d3ffcd;
         font-weight: 600;
     }
