@@ -1159,8 +1159,20 @@ class BackController extends Controller
         $topUpAggByUser = collect();
         $leadAggByUser = collect();
         $visitAggByName = collect();
+        $targetByUser = collect();
+
+        $targetMonth = $request->get('month')
+            ? Carbon::parse($request->get('month'))->format('Y-m')
+            : $startDate->format('Y-m');
 
         if (!empty($allTeamUserIds)) {
+            $targetByUser = DB::table('target_ph')
+                ->whereIn('user_id', $allTeamUserIds)
+                ->where('bulan', $targetMonth)
+                ->select('user_id', 'target')
+                ->get()
+                ->keyBy('user_id');
+
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
@@ -1295,6 +1307,7 @@ class BackController extends Controller
             $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
             $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
             $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
+            $target = (float) ($targetByUser[$userId]->target ?? 0);
             $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
                 ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
                 : '-';
@@ -1309,6 +1322,7 @@ class BackController extends Controller
                 'top_up_new_akun_rp' => $topUpNewAkunRp,
                 'top_up_existing_akun_rp' => $topUpExistingAkunRp,
                 'total_topup' => $totalTopup,
+                'target' => $target,
                 'mom_prev_partial' => $momPrevPartial,
                 'mom_current_partial' => $momCurrentPartial,
                 'mom_prev_remaining' => $momPrevRemaining,
@@ -1338,6 +1352,9 @@ class BackController extends Controller
             })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
             })
             ->editColumn('mom_prev_partial', function ($row) {
                 return number_format($row['mom_prev_partial'], 0, ',', '.');
