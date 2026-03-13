@@ -182,9 +182,11 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
     Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
+    Route::get('leads-master/create-enterprise', [LeadsMasterController::class, 'createEnterprise'])->name('leads-master.create-enterprise');
     Route::get('leads-master/data', [LeadsMasterController::class, 'data'])->name('leads-master.data');
     Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
     Route::post('leads-master/store-existing', [LeadsMasterController::class, 'storeExisting'])->name('leads-master.store-existing');
+    Route::post('leads-master/store-enterprise', [LeadsMasterController::class, 'storeEnterprise'])->name('leads-master.store-enterprise');
     Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show');
     Route::get('leads-master/{lead}/edit', [LeadsMasterController::class, 'edit'])->name('leads-master.edit')->whereNumber('lead');
     Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
