@@ -249,6 +249,15 @@ class LeadsMasterController extends Controller
 
         return view('leads-master.create-existing', compact('leadSources', 'sectors'));
     }
+
+    public function createEnterprise()
+    {
+        logUserLogin();
+        $leadSources = LeadsSource::all();
+        $sectors = Sector::all();
+
+        return view('leads-master.create-enterprise', compact('leadSources', 'sectors'));
+    }
     public function store(Request $request)
     {
         // Custom validation rules
@@ -421,6 +430,65 @@ class LeadsMasterController extends Controller
             'data_type' => 'Eksisting Akun',
         ]);
 
+
+        return redirect()->route('leads-master.index')->with('success', 'Leads baru berhasil disimpan.');
+    }
+
+    public function storeEnterprise(Request $request)
+    {
+        $rules = [
+            'user_id' => 'required|exists:users,id',
+            'sector_id' => 'nullable|exists:sectors,id',
+            'company_name' => 'required|string|max:255',
+            'mobile_phone' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^62\d{9,14}$/',
+                'unique:leads_master,mobile_phone',
+            ],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
+            ],
+            'nama' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'remarks' => 'nullable|string|max:1000',
+            'myads_account' => 'required|string|max:255'
+        ];
+
+        $messages = [
+            'mobile_phone.regex' => 'Nomor HP harus diawali dengan kode negara 62 dan hanya angka (9-12 digit).',
+            'mobile_phone.unique' => 'Nomor HP sudah terdaftar.',
+            'email.unique' => 'Email sudah terdaftar.',
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        $statusValue = 1;
+        LeadsMaster::create([
+            'user_id' => $validated['user_id'],
+            'source_id' => null,
+            'sector_id' => $validated['sector_id'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
+            'mobile_phone' => $validated['mobile_phone'],
+            'email' => $validated['email'] ?? null,
+            'status' => $statusValue,
+            'nama' => $validated['nama'],
+            'address' => $validated['address'] ?? null,
+            'remarks' => $validated['remarks'] ?? null,
+            'myads_account' => $validated['myads_account'],
+            'data_type' => 'Enterprise Akun',
+        ]);
 
         return redirect()->route('leads-master.index')->with('success', 'Leads baru berhasil disimpan.');
     }

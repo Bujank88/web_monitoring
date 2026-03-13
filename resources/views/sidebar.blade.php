@@ -288,6 +288,15 @@
                         <p>New/Eksisting Akun</p>
                     </a>
                 </li>         
+                @if($isAdmin)
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create-enterprise') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('leads-master.create-enterprise') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-building" style="color:rgb(245, 158, 11);"></i>
+                        <p>Akun Enterprise</p>
+                    </a>
+                </li>
+                @endif
                 @if($isAdmin || $isCanv || $isPH)
                 <li class="nav-item">
                     <a href="{{ route('faq-l0') }}"
