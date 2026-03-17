@@ -153,15 +153,15 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(PanenPoinController::class)->refreshSummaryPanenPoin();
-})->everyMinute()->name('refreshSummaryPanenPoin');
+})->everyFiveMinutes()->name('refreshSummaryPanenPoin');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();
-})->everyMinute()->name('refreshSummaryamlevelup');
+})->everyTwoMinutes()->name('refreshSummaryamlevelup');
 
 Schedule::call(function () {
     app(LogbookController::class)->refreshLogbookStatus();
-})->everyMinute()->name('refreshLogbookStatus');
+})->everyTwoMinutes()->name('refreshLogbookStatus');
 
 Schedule::call(function () {
     app(LogbookDailyController::class)->refreshLogbookDailyToday();
@@ -185,7 +185,10 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
-})->everyTwoMinutes()->name('refreshDetailLeadsSummary');
+})->everyFiveMinutes()->name('refreshDetailLeadsSummary');
+
+// Refresh Regional Canvasser Summary setiap 5 menit
+Schedule::command('summary:refresh-regional-canvasser')->everyFiveMinutes()->name('refreshRegionalCanvasserSummary');
 
 // // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {
