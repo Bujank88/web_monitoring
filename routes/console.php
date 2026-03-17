@@ -19,6 +19,14 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Artisan::command('logbook:refresh-today', function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyToday();
+})->purpose('Refresh logbook daily topup for today (manual_upload_topup)');
+
+Artisan::command('logbook:refresh-past', function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyPast();
+})->purpose('Refresh logbook daily topup for past days (report_balance_top_up)');
+
 // // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
     \Log::info('=== RETRY SEND PRESENSI NOTIFICATIONS STARTED ===');
@@ -156,8 +164,12 @@ Schedule::call(function () {
 })->everyMinute()->name('refreshLogbookStatus');
 
 Schedule::call(function () {
-    app(LogbookDailyController::class)->refreshLogbookDaily();
-})->everyMinute()->name('refreshLogbookDaily');
+    app(LogbookDailyController::class)->refreshLogbookDailyToday();
+})->everyMinute()->name('refreshLogbookDailyToday');
+
+Schedule::call(function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyPast();
+})->everyTenMinutes()->name('refreshLogbookDailyPast');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegistration();
