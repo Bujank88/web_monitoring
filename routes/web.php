@@ -267,10 +267,15 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
         ->name('amlevelup.clients');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,TCD'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim'])->group(function () {
     Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
     Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
     Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
+    Route::get('report-maxim', [ReportController::class, 'reportMaxim'])->name('report-maxim');
+    Route::get('report-maxim/data', [ReportController::class, 'reportMaximData'])->name('report-maxim.data');
+    Route::get('report-maxim/export', [ReportController::class, 'exportMaxim'])->name('report-maxim.export');
+    Route::get('report-saldo-maxim', [ReportController::class, 'reportSaldoMaxim'])->name('report-saldo-maxim');
+    Route::get('report-saldo-maxim/data', [ReportController::class, 'reportSaldoMaximData'])->name('report-saldo-maxim.data');
 });
 
 
