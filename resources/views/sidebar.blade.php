@@ -20,6 +20,7 @@
                 $isTcd = $user->role === 'TCD';
                 $isInternal = $user->role === 'Internal';
                 $isB2b = $user->role === 'b2b';
+                $isMaxim = $user->role === 'Maxim';
                 @endphp
 
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -36,6 +37,8 @@
                 <span class="badge badge-success">Internal</span>
                 @elseif($isB2b)
                 <span class="badge badge-primary">B2B</span>
+                @elseif($isMaxim)
+                <span class="badge badge-warning">MAXIM</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
                 @elseif($isTreg)
@@ -61,7 +64,6 @@
                                 </p>
                             </a>
                     <ul class="nav nav-treeview">
-                    
                     <li class="nav-item">
                         <a href="{{ route('report-agency-advertising') }}"
                             class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -71,6 +73,7 @@
                     </li>
                     </ul>
                 </li>
+                
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -171,6 +174,49 @@
                     </li>
                     </ul>
                 </li>
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isMaxim)
+                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
+                                <p>
+                                    Maxim
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('report-maxim') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report Maxim</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-saldo-maxim') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo Maxim</p>
+                        </a>
+                    </li>
+                    </ul>
+                </li>
+                
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -382,6 +428,8 @@
                     </li>
                     </ul>
                 </li>
+                {{-- <li class="nav-header">MAXIM</li> --}}
+                
                 @if($isAdmin || $isPH)
                     <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
@@ -682,7 +730,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"

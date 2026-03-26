@@ -90,6 +90,8 @@ class BackController extends Controller
                     return redirect()->route('presensi.index');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
+                case 'Maxim':
+                    return redirect()->route('report-maxim');
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
                 case 'b2b':
