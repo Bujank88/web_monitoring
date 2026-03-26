@@ -428,7 +428,31 @@
                     </li>
                     </ul>
                 </li>
-                {{-- <li class="nav-header">MAXIM</li> --}}
+                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
+                                <p>
+                                    Maxim
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('report-maxim') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report Maxim</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-saldo-maxim') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo Maxim</p>
+                        </a>
+                    </li>
+                    </ul>
+                </li>
                 
                 @if($isAdmin || $isPH)
                     <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
