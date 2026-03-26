@@ -507,7 +507,7 @@
                                 <th style="text-align: center;">Nama Canvasser</th>
                                 <th style="text-align: center;">Total Client</th>
                                 <th style="text-align: center;">Total Top Up</th>
-                                <th style="text-align: center;">Total Insentif</th>
+                                {{-- <th style="text-align: center;">Total Insentif</th> --}}
                             </tr>
                         </thead>
                         <tbody>
@@ -547,7 +547,7 @@
                                 <th style="text-align: center;">Canvasser</th>
                                 <th style="text-align: center;">Email Client</th>
                                 <th style="text-align: center;">Top Up</th>
-                                <th style="text-align: center;">Insentif</th>
+                                {{-- <th style="text-align: center;">Insentif</th> --}}
                                 <th style="text-align: center;">Tgl Transaksi Terakhir</th>
                             </tr>
                         </thead>
@@ -589,7 +589,7 @@
                 { data: 'canvasser', name: 'canvasser', className: 'text-center' },
                 { data: 'email_client', name: 'email_client', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                { data: 'insentif', name: 'insentif', className: 'text-center' },
+                // { data: 'insentif', name: 'insentif', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
             order: [[1, 'asc']],
@@ -625,7 +625,7 @@
                 { data: 'canvasser', name: 'canvasser', className: 'text-center' },
                 { data: 'total_client', name: 'total_client', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                { data: 'total_insentif', name: 'total_insentif', className: 'text-center' }
+                // { data: 'total_insentif', name: 'total_insentif', className: 'text-center' }
             ],
             order: [[1, 'asc']],
             rowCallback: function(row, data, index) {
