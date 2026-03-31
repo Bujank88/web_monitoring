@@ -852,7 +852,6 @@ class LeadsMasterController extends Controller
             ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
             ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
             ->whereNotNull('r.email_client')
-            ->whereDate('r.tgl_transaksi', Carbon::today())
             ->select(
                 'u.id as user_id',
                 'r.company_name',
