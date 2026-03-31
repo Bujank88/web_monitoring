@@ -151,9 +151,9 @@ Schedule::call(function () {
     \Log::info("Retry Send Presensi - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendPresensiNotifications');
 
-Schedule::call(function () {
-    app(PanenPoinController::class)->refreshSummaryPanenPoin();
-})->everyFiveMinutes()->name('refreshSummaryPanenPoin');
+// Schedule::call(function () {
+//     app(PanenPoinController::class)->refreshSummaryPanenPoin();
+// })->everyFiveMinutes()->name('refreshSummaryPanenPoin');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();
