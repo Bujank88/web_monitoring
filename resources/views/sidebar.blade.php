@@ -400,7 +400,7 @@
                         <p>Topup & Client Canvasser</p>
                     </a>
                 </li>           --}}
-                
+                @if($isAdmin || $isTCD)
                 <li class="nav-item {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
@@ -428,6 +428,8 @@
                     </li>
                     </ul>
                 </li>
+                @endif
+                @if($isAdmin || $isMaxim)
                 <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
@@ -453,7 +455,7 @@
                     </li>
                     </ul>
                 </li>
-                
+                @endif
                 @if($isAdmin || $isPH)
                     <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">

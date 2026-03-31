@@ -70,9 +70,11 @@
         <div class="performance-filter-wrap">
             <div class="performance-filter-row">
                 <form id="filterForm" method="GET" action="{{ route('mitra-sbp') }}">
+                    
                     <div class="performance-month-control">
                         <label for="month" class="performance-filter-label">Pilih Bulan</label>
                         <select id="month" name="month" class="form-control">
+                            
                             @foreach ($months as $m)
                             <option value="{{ $m['value'] }}" {{ $m['selected'] ? 'selected' : '' }}>
                                 {{ $m['label'] }}

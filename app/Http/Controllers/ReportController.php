@@ -378,13 +378,17 @@ public function topupCanvasserData(Request $request)
         
         /* ================= GENERATE MONTHS DROPDOWN ================= */
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
-        
         /* ================= GET CVSR EMAILS TO EXCLUDE ================= */
         // Get all CVSR emails to exclude from Mitra SBP, Agency, Internal counts
         // REASON: CVSR takes PRIORITY over remark classification (align with Daily TopUp logic)
@@ -496,14 +500,15 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
+            $date = $baseDate->copy()->subMonths($i);
+
             $months[] = [
-                'value' => $value,
-                'label' => $label,
-                'selected' => $value === $month
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
             ];
         }
 
@@ -539,11 +544,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
         
         $lastUpdated = DB::table('saldo_users')->max('updated_at');
@@ -726,11 +736,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Saldo Agency Advertising';
@@ -746,11 +761,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Saldo Maxim';
@@ -765,11 +785,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Campaign Agency Advertising';
@@ -785,11 +810,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Campaign Maxim';
