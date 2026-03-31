@@ -400,7 +400,7 @@
                         <p>Topup & Client Canvasser</p>
                     </a>
                 </li>           --}}
-                @if($isAdmin || $isTCD)
+                @if($isAdmin || $isTcd)
                 <li class="nav-item {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
