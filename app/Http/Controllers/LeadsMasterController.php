@@ -161,27 +161,40 @@ class LeadsMasterController extends Controller
 
     public function export(Request $request)
     {
-        $query = LeadsMaster::with(['user', 'source', 'sector'])
-            ->orderBy('created_at', 'asc');
+        $query = DB::table('detail_leads_summary as dls')
+            ->select(
+                'dls.user_name',
+                'dls.regional',
+                'dls.company_name',
+                'dls.email',
+                'dls.mobile_phone',
+                'dls.data_type',
+                'dls.created_at',
+                'dls.total_settlement_klien',
+                'dls.saldo_utama'
+            )
+            ->orderBy('dls.total_settlement_klien', 'desc')
+            ->orderBy('dls.saldo_utama', 'desc');
+
 
         // 🔐 ROLE
         if (!auth()->user()->hasRole('Admin')) {
-            $query->where('user_id', auth()->id());
+            $query->where('dls.user_id', auth()->id());
         }
 
         // Filter Canvasser
         if ($request->canvasser) {
-            $query->where('user_id', $request->canvasser);
+            $query->where('dls.user_id', $request->canvasser);
         }
 
         // Filter Regional
         if ($request->regional) {
-            $query->where('regional', $request->regional);
+            $query->where('dls.regional', $request->regional);
         }
 
         // Filter Tanggal
         if ($request->start_date && $request->end_date) {
-            $query->whereBetween('created_at', [
+            $query->whereBetween('dls.created_at', [
                 $request->start_date . ' 00:00:00',
                 $request->end_date . ' 23:59:59'
             ]);
@@ -195,7 +208,6 @@ class LeadsMasterController extends Controller
         ];
 
         $columns = [
-            'Status',
             'Canvasser',
             'Regional',
             'Nama Perusahaan',
@@ -203,6 +215,9 @@ class LeadsMasterController extends Controller
             'No HP',
             'Tipe Data',
             'Tanggal',
+            'Total Settlement',
+            'Saldo Utama',
+            'Rekomendasi',
         ];
 
         $callback = function () use ($query, $columns) {
@@ -214,15 +229,21 @@ class LeadsMasterController extends Controller
             fputcsv($file, $columns);
 
             foreach ($query->cursor() as $row) {
+                $totalSettlement = $row->total_settlement_klien ?? 0;
+                $saldoUtama = $row->saldo_utama ?? 0;
+                $rekomendasi = ($saldoUtama >= 1000000) ? 'Push Campaign' : 'Push Topup';
+
                 fputcsv($file, [
-                    $row->status == 1 ? 'Deal' : 'No Deal',
-                    $row->user->name ?? '-',
+                    $row->user_name ?? '-',
                     $row->regional ?? '-',
                     $row->company_name ?? '-',
                     $row->email ?? '-',
                     $row->mobile_phone ?? '-',
                     $row->data_type ?? '-',
-                    $row->created_at->format('Y-m-d'),
+                    \Carbon\Carbon::parse($row->created_at)->format('Y-m-d'),
+                    'Rp ' . number_format($totalSettlement, 0, ',', '.'),
+                    'Rp ' . number_format($saldoUtama, 0, ',', '.'),
+                    $rekomendasi,
                 ]);
             }
 

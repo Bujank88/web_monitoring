@@ -931,7 +931,7 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
+            'EXTRA13' => 'Nyayu Zettiara Septianita',
             'EXTRA14' => 'Afan',
             'EXTRA15' => 'Herman'
         ];
@@ -1401,7 +1401,7 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
+            'EXTRA13' => 'Nyayu Zettiara Septianita',
             'EXTRA14' => 'Afan',
             'EXTRA15' => 'Herman',
         ];
@@ -1484,7 +1484,7 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
+            'EXTRA13' => 'Nyayu Zettiara Septianita',
             'EXTRA14' => 'Afan',
             'EXTRA15' => 'Herman',
         ];
@@ -1570,7 +1570,7 @@ class BackController extends Controller
             'EXTRA10' => 'Riva',
             'EXTRA11' => 'Fanni',
             'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
+            'EXTRA13' => 'Nyayu Zettiara Septianita',
             'EXTRA14' => 'Afan',
             'EXTRA15' => 'Herman',
         ];

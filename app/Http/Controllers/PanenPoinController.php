@@ -487,6 +487,8 @@ class PanenPoinController extends Controller
             \Log::info('=== REFRESH SUMMARY PANEN POIN STARTED ===');
             
             // Tentukan range tanggal bulan berjalan
+            // $startDate = Carbon::now()->subMonth()->endOfMonth()->format('Y-m-d');
+            // $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
             $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             
