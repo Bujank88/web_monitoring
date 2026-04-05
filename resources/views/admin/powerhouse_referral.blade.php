@@ -636,7 +636,7 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -645,6 +645,8 @@
                                 <th style="text-align: center;">Jumlah Visit</th>
                                 <th style="text-align: center;">Jumlah Leads</th>
                                 <th style="text-align: center;">Jumlah Akun</th>
+                                <th style="text-align: center;">leads to visit (%)</th>
+                                <th style="text-align: center;">new akun to leads (%)</th>
                                 <th style="text-align: center;">Top Up</th>
                                 <th style="text-align: center;">Poin</th>
                                 <th style="text-align: center;">Tgl Transaksi Terakhir</th>
@@ -658,6 +660,8 @@
                                 <td id="totalJumlahVisit" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahLeads" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalPercentageLeadToVisit" style="text-align: center; padding: 12px;">0%</td>
+                                <td id="totalPercentageNewAkunToLead" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalTopUp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalPoin" style="text-align: center; padding: 12px;">0</td>
                                 <td style="text-align: center; padding: 12px;">-</td>
@@ -775,13 +779,18 @@
                 { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
                 { data: 'jumlah_akun', name: 'jumlah_akun', className: 'text-center' },
+                { data: 'percentage_lead_to_visit', name: 'percentage_lead_to_visit', className: 'text-center' },
+                { data: 'percentage_new_akun_to_lead', name: 'percentage_new_akun_to_lead', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
                 { data: 'poin', name: 'poin', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
             rowCallback: function(row, data, index) {
+                applyPercentageCellStyle($('td', row).eq(6), data.percentage_lead_to_visit);
+                applyPercentageCellStyle($('td', row).eq(7), data.percentage_new_akun_to_lead);
+
                 // Highlight poin cells dengan warna biru gradient untuk nilai > 0
-                var poinCell = $('td', row).eq(7);
+                var poinCell = $('td', row).eq(9);
                 var poinValue = parseInt(poinCell.text().trim());
                 
                 if (poinValue > 0) {
@@ -909,11 +918,33 @@
 
             window.location.href = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
         });
+
+        function getPercentageStyle(percent) {
+            let backgroundColor = percent >= 100 ? '#28a745' : (percent >= 75 ? '#ffc107' : '#dc3545');
+            let textColor = percent >= 75 && percent < 100 ? '#212529' : '#ffffff';
+
+            return {
+                'background': `linear-gradient(135deg, ${backgroundColor} 0%, ${backgroundColor}cc 100%)`,
+                'color': textColor,
+                'font-weight': '700'
+            };
+        }
+
+        function applyPercentageCellStyle(cell, rawValue) {
+            const percent = typeof rawValue === 'number'
+                ? rawValue
+                : parseFloat(String(rawValue || '0').replace('%', '').replace(/\./g, '').replace(',', '.')) || 0;
+
+            cell.css(getPercentageStyle(percent));
+        }
+
         // Function to calculate totals
         function calculateTotals() {
             let totalAkun = 0;
             let totalLeads = 0;
             let totalVisit = 0;
+            let totalPercentageLeadToVisit = 0;
+            let totalPercentageNewAkunToLead = 0;
             let totalTopup = 0;
             let totalPoin = 0;
 
@@ -930,22 +961,35 @@
                 // Column 6: Jumlah Visit
                 totalVisit += parseInt(cells.eq(3).text().trim()) || 0;
 
-                // Column 7: Top Up (extract number from Rp text)
-                const topupText = cells.eq(6).text().trim();
+                // Column 9: Top Up (extract number from Rp text)
+                const topupText = cells.eq(8).text().trim();
                 const topupMatch = topupText.match(/[\d.,]+/);
                 if (topupMatch) {
                     let topupValue = topupMatch[0].replace(/\./g, '').replace(/,/g, '.');
                     totalTopup += parseFloat(topupValue) || 0;
                 }
                 
-                // Column 8: Poin
-                totalPoin += parseInt(cells.eq(7).text().trim()) || 0;
+                // Column 10: Poin
+                totalPoin += parseInt(cells.eq(9).text().trim()) || 0;
             });
+
+            totalPercentageLeadToVisit = totalVisit > 0 ? (totalLeads / totalVisit) * 100 : 0;
+            totalPercentageNewAkunToLead = totalLeads > 0 ? (totalAkun / totalLeads) * 100 : 0;
 
             // Update total row
             $('#totalJumlahAkun').text(totalAkun);
             $('#totalJumlahLeads').text(totalLeads);
             $('#totalJumlahVisit').text(totalVisit);
+            $('#totalPercentageLeadToVisit').text(totalPercentageLeadToVisit.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + '%');
+            $('#totalPercentageNewAkunToLead').text(totalPercentageNewAkunToLead.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + '%');
+            applyPercentageCellStyle($('#totalPercentageLeadToVisit'), totalPercentageLeadToVisit);
+            applyPercentageCellStyle($('#totalPercentageNewAkunToLead'), totalPercentageNewAkunToLead);
             
             // Format total topup as currency
             if (totalTopup > 0) {

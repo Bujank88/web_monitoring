@@ -1089,6 +1089,9 @@ class BackController extends Controller
                 $totalTopup = (float)($voucherInfo->total_topup ?? 0);
                 // Hitung POIN: 1 Poin = 1 juta rupiah
                 $poin = floor($totalTopup / 1000000);
+                $jumlahAkun = (int)($voucherInfo->jumlah_akun ?? 0);
+                $percentageLeadToVisit = $jumlahVisit > 0 ? ($jumlahLeads / $jumlahVisit) * 100 : 0;
+                $percentageNewAkunToLead = $jumlahLeads > 0 ? ($jumlahAkun / $jumlahLeads) * 100 : 0;
 
                 $tglFormatted = $voucherInfo->tgl_transaksi_terakhir ? 
                     Carbon::parse($voucherInfo->tgl_transaksi_terakhir)->format('d M Y') : '-';
@@ -1096,9 +1099,11 @@ class BackController extends Controller
                 $result[] = [
                     'referral_code' => $voucherCode,
                     'team_powerhouse' => $powerHouseName,
-                    'jumlah_akun' => (int)($voucherInfo->jumlah_akun ?? 0),
+                    'jumlah_akun' => $jumlahAkun,
                     'jumlah_leads' => $jumlahLeads,
                     'jumlah_visit' => $jumlahVisit,
+                    'percentage_lead_to_visit' => $percentageLeadToVisit,
+                    'percentage_new_akun_to_lead' => $percentageNewAkunToLead,
                     'total_topup' => $totalTopup,
                     'poin' => $poin,
                     'tgl_transaksi_terakhir' => $tglFormatted,
@@ -1111,6 +1116,8 @@ class BackController extends Controller
                     'jumlah_akun' => 0,
                     'jumlah_leads' => $jumlahLeads,
                     'jumlah_visit' => $jumlahVisit,
+                    'percentage_lead_to_visit' => $jumlahVisit > 0 ? ($jumlahLeads / $jumlahVisit) * 100 : 0,
+                    'percentage_new_akun_to_lead' => 0,
                     'total_topup' => 0,
                     'poin' => 0,
                     'tgl_transaksi_terakhir' => '-',
@@ -1120,6 +1127,12 @@ class BackController extends Controller
 
         return DataTables::of($result)
             ->addIndexColumn()
+            ->editColumn('percentage_lead_to_visit', function ($row) {
+                return number_format($row['percentage_lead_to_visit'], 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_new_akun_to_lead', function ($row) {
+                return number_format($row['percentage_new_akun_to_lead'], 2, ',', '.') . '%';
+            })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
             })
