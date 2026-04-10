@@ -728,12 +728,12 @@
 
                 @endif
                 @if($isAdmin || $isCanv || $isPH)
-                <li class="nav-header">EVENT RAMADHAN ONLY</li>
+                <li class="nav-header">EVENT APRIL</li>
                 <li class="nav-item">
                     <a href="{{ route('logbook-event.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logbook-event.*') ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-mosque" style="color:#20c997;"></i>
-                        <p>Logbook Event Ramadhan</p>
+                        <i class="nav-icon fas fa-calendar-alt" style="color:#20c997;"></i>
+                        <p>Logbook Event April 2026</p>
                     </a>
                 </li>
                 @endif
