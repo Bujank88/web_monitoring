@@ -267,7 +267,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
         ->name('amlevelup.clients');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(function () {
     Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
     Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
     Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
@@ -276,6 +276,11 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim'])->group(function () {
     Route::get('report-maxim/export', [ReportController::class, 'exportMaxim'])->name('report-maxim.export');
     Route::get('report-saldo-maxim', [ReportController::class, 'reportSaldoMaxim'])->name('report-saldo-maxim');
     Route::get('report-saldo-maxim/data', [ReportController::class, 'reportSaldoMaximData'])->name('report-saldo-maxim.data');
+    Route::get('report-automatech', [ReportController::class, 'reportAutomatech'])->name('report-automatech');
+    Route::get('report-automatech/data', [ReportController::class, 'reportAutomatechData'])->name('report-automatech.data');
+    Route::get('report-automatech/export', [ReportController::class, 'exportAutomatech'])->name('report-automatech.export');
+    Route::get('report-saldo-automatech', [ReportController::class, 'reportSaldoAutomatech'])->name('report-saldo-automatech');
+    Route::get('report-saldo-automatech/data', [ReportController::class, 'reportSaldoAutomatechData'])->name('report-saldo-automatech.data');
 });
 
 

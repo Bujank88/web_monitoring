@@ -21,6 +21,7 @@
                 $isInternal = $user->role === 'Internal';
                 $isB2b = $user->role === 'b2b';
                 $isMaxim = $user->role === 'Maxim';
+                $isAutomatech = $user->role === 'Automatech';
                 @endphp
 
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -39,6 +40,8 @@
                 <span class="badge badge-primary">B2B</span>
                 @elseif($isMaxim)
                 <span class="badge badge-warning">MAXIM</span>
+                @elseif($isAutomatech)
+                <span class="badge badge-warning">AUTOMATECH</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
                 @elseif($isTreg)
@@ -212,6 +215,49 @@
                             class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                             <p>Report Saldo Maxim</p>
+                        </a>
+                    </li>
+                    </ul>
+                </li>
+                
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isAutomatech)
+                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
+                                <p>
+                                    Automatech
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('report-automatech') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report Automatech</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-saldo-automatech') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo Automatech</p>
                         </a>
                     </li>
                     </ul>
@@ -451,6 +497,33 @@
                             class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                             <p>Report Saldo Maxim</p>
+                        </a>
+                    </li>
+                    </ul>
+                </li>
+                @endif
+                @if($isAdmin || $isAutomatech)
+                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
+                                <p>
+                                    Automatech
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('report-automatech') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report Automatech</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-saldo-automatech') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo Automatech</p>
                         </a>
                     </li>
                     </ul>
@@ -756,7 +829,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"

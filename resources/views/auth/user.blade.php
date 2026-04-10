@@ -206,6 +206,7 @@
                             <option value="Internal">Internal</option>
                             <option value="b2b">B2B</option>
                             <option value="Maxim">Maxim</option>
+                            <option value="Automatech">Automatech</option>
                         </select>
                     </div>
                     
@@ -306,6 +307,8 @@
                         } else if (data === 'b2b') {
                             badgeClass = 'badge-primary';
                         } else if (data === 'Maxim') {
+                            badgeClass = 'badge-warning';
+                        } else if (data === 'Automatech') {
                             badgeClass = 'badge-warning';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;
