@@ -32,7 +32,8 @@ class ReportController extends Controller
     }
 
     
-public function topupCanvasserData(Request $request)
+
+    public function topupCanvasserData(Request $request)
 {
     /* ================= DATE RANGE ================= */
     if ($request->month) {
@@ -777,6 +778,32 @@ public function topupCanvasserData(Request $request)
 
         return view('mitra-sbp.report-saldo-maxim', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
+
+    public function reportSaldoAutomatech(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo Automatech';
+
+        return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
     public function reportAgencyAdvertising(Request $request)
     {
         logUserLogin();
@@ -825,6 +852,32 @@ public function topupCanvasserData(Request $request)
         $pageTitle = 'Report Campaign Maxim';
 
         return view('mitra-sbp.report-maxim', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+
+    public function reportAutomatech(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Automatech';
+
+        return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
 
     public function reportSaldoSbpData(Request $request)
@@ -1147,6 +1200,64 @@ public function topupCanvasserData(Request $request)
             })
             ->make(true);
     }
+
+    public function reportSaldoAutomatechData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+        $baseQuery = DB::table('automatech as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
     public function reportCampaignSbpData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -1278,6 +1389,61 @@ public function topupCanvasserData(Request $request)
         $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
 
         $baseQuery = DB::table('maxim as a')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+            ->whereBetween('b.created_at', [$startDate, $endDate]);
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
+                'a.email_myads as email',
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_brand as nama_instansi',
+                'b.area_provinsi',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
+                'b.total',
+                'b.sukses as success',
+                'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                'b.pesan as pesan',
+                'b.status as campaign_status',
+                'a.remark'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(CAST(COALESCE(b.sukses, 0) AS UNSIGNED)) as success_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.gagal, 0) AS UNSIGNED)) as failed_total')
+            ->selectRaw('SUM(CAST(COALESCE(b.total, 0) AS UNSIGNED)) as total_campaign')
+            ->first();
+
+        $summary = [
+            'success' => (int) ($summaryRow->success_total ?? 0),
+            'failed' => (int) ($summaryRow->failed_total ?? 0),
+            'total' => (int) ($summaryRow->total_campaign ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('balance_terpakai', function ($row) {
+                return 'Rp ' . number_format($row->balance_terpakai, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+
+    public function reportAutomatechData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = DB::table('automatech as a')
             ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
             ->whereBetween('b.created_at', [$startDate, $endDate]);
 
@@ -1761,6 +1927,138 @@ public function topupCanvasserData(Request $request)
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error('Export Campaign Maxim Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+
+    public function exportAutomatech(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $remark = $request->get('remark');
+
+            $query = DB::table('automatech as a')
+                ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+                ->select(
+                    DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'b.broadcast_date',
+                    'a.email_myads as email',
+                    'b.id_iklan',
+                    'b.nama_iklan',
+                    'b.nama_brand as nama_instansi',
+                    'b.area_provinsi',
+                    'b.tipe_iklan as campaign_type',
+                    'b.tipe_inventori as inventory_type',
+                    'b.total',
+                    'b.sukses as success',
+                    'b.gagal as failed',
+                    'b.delivered',
+                    'b.read',
+                    'b.click',
+                    'b.balance_terpakai',
+                    'b.pesan as pesan',
+                    'b.status as campaign_status',
+                    'a.remark'
+                )
+                ->whereYear('b.created_at', $year)
+                ->whereMonth('b.created_at', $monthNum);
+
+            if (!empty($remark)) {
+                $query->where('a.remark', $remark);
+            }
+
+            $data = $query->orderByRaw('COALESCE(b.broadcast_date, b.created_at) DESC')->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleRemark = $remark ?: 'Semua';
+            $sheet->setCellValue('A1', 'REPORT CAMPAIGN AUTOMATECH - ' . strtoupper($titleRemark) . ' - ' . $month);
+            $sheet->mergeCells('A1:S1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Iklan',
+                'Broadcast Date',
+                'Email',
+                'ID Iklan',
+                'Nama Iklan',
+                'Nama Instansi',
+                'Area Provinsi',
+                'Campaign Type',
+                'Inventory Type',
+                'Total',
+                'Success',
+                'Failed',
+                'Delivered',
+                'Read',
+                'Click',
+                'Balance Terpakai',
+                'Pesan',
+                'Campaign Status',
+                'Remark'
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:S3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->broadcast_date,
+                    $row->email,
+                    $row->id_iklan,
+                    $row->nama_iklan,
+                    $row->nama_instansi,
+                    $row->area_provinsi,
+                    $row->campaign_type,
+                    $row->inventory_type,
+                    $row->total,
+                    $row->success,
+                    $row->failed,
+                    $row->delivered,
+                    $row->read,
+                    $row->click,
+                    $row->balance_terpakai,
+                    $row->pesan,
+                    $row->campaign_status,
+                    $row->remark,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'S') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Campaign_Automatech_' . ($remark ?: 'Semua') . '_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Campaign Automatech Error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal export data');
         }
     }

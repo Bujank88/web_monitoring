@@ -92,6 +92,8 @@ class BackController extends Controller
                     return redirect()->route('report-agency-advertising');
                 case 'Maxim':
                     return redirect()->route('report-maxim');
+                case 'Automatech':
+                    return redirect()->route('report-automatech');
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
                 case 'b2b':
