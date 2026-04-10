@@ -91,27 +91,19 @@
 <div class="row mb-3">
     <div class="col-12">
         <div class="row">
-            <div class="col-lg col-md-4 col-6 mb-2">
+            <div class="col-lg col-md-6 col-6 mb-2">
                 <div class="card border-left-primary">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Success</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countSuccess">0</div>
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">CTR SMS</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countCtrSms">0</div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg col-md-4 col-6 mb-2">
+            <div class="col-lg col-md-6 col-6 mb-2">
                 <div class="card border-left-success">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Failed</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countFailed">0</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg col-md-4 col-6 mb-2">
-                <div class="card border-left-warning">
-                    <div class="card-body">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Total</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countTotal">0</div>
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">CTR WABA</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="countCtrWaba">0</div>
                     </div>
                 </div>
             </div>
@@ -269,9 +261,8 @@
             },
             drawCallback: function(settings) {
                 var summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
-                $('#countSuccess').text(summary.success || 0);
-                $('#countFailed').text(summary.failed || 0);
-                $('#countTotal').text(summary.total || 0);
+                $("#countCtrSms").text((summary.ctr_sms ?? 0).toFixed(2) + "%");
+                $("#countCtrWaba").text((summary.ctr_waba ?? 0).toFixed(2) + "%");
             }
         });
 

@@ -1471,15 +1471,20 @@ class ReportController extends Controller
             );
 
         $summaryRow = (clone $baseQuery)
-            ->selectRaw('SUM(CAST(COALESCE(b.sukses, 0) AS UNSIGNED)) as success_total')
-            ->selectRaw('SUM(CAST(COALESCE(b.gagal, 0) AS UNSIGNED)) as failed_total')
-            ->selectRaw('SUM(CAST(COALESCE(b.total, 0) AS UNSIGNED)) as total_campaign')
+            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'SMS' THEN CAST(COALESCE(b.click, 0) AS UNSIGNED) ELSE 0 END) as click_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'SMS' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'WABA' THEN CAST(COALESCE(b.click, 0) AS UNSIGNED) ELSE 0 END) as click_waba")
+            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'WABA' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_waba")
             ->first();
 
+        $clickSms = (float) ($summaryRow->click_sms ?? 0);
+        $successSms = (float) ($summaryRow->success_sms ?? 0);
+        $clickWaba = (float) ($summaryRow->click_waba ?? 0);
+        $successWaba = (float) ($summaryRow->success_waba ?? 0);
+
         $summary = [
-            'success' => (int) ($summaryRow->success_total ?? 0),
-            'failed' => (int) ($summaryRow->failed_total ?? 0),
-            'total' => (int) ($summaryRow->total_campaign ?? 0),
+            'ctr_sms' => $successSms > 0 ? ($clickSms / $successSms) * 100 : 0,
+            'ctr_waba' => $successWaba > 0 ? ($clickWaba / $successWaba) * 100 : 0,
         ];
 
         return datatables()->of($query)
