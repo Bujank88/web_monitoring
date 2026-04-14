@@ -1361,6 +1361,12 @@ class BackController extends Controller
 
         return DataTables::of($result)
             ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
             ->editColumn('top_up_new_akun_rp', function ($row) {
                 return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
             })
@@ -1865,3 +1871,4 @@ class BackController extends Controller
         }
     }
 }
+

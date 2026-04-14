@@ -531,15 +531,16 @@
 
     #powerHousePerformanceTable tbody td:nth-child(6),
     #powerHousePerformanceTable tbody td:nth-child(7),
-    #powerHousePerformanceTable tbody td:nth-child(8) {
+    #powerHousePerformanceTable tbody td:nth-child(8),
+    #powerHousePerformanceTable tbody td:nth-child(9) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(9),
     #powerHousePerformanceTable tbody td:nth-child(10),
     #powerHousePerformanceTable tbody td:nth-child(11),
-    #powerHousePerformanceTable tbody td:nth-child(12) {
+    #powerHousePerformanceTable tbody td:nth-child(12),
+    #powerHousePerformanceTable tbody td:nth-child(13) {
         background-color: #d3ffcd;
         font-weight: 600;
     }
@@ -686,14 +687,14 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="12" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="13" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
                                 <th rowspan="2" style="text-align: center;">Team PowerHouse</th>
                                 <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
-                                <th colspan="3" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
+                                <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                                 <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
                             </tr>
                             <tr>
@@ -702,6 +703,7 @@
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Acv (%)</th>
                                 <th id="momHeaderPrevPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $prevSameDay->day }} {{ $prevSameDay->translatedFormat('M') }}</th>
                                 <th id="momHeaderCurrentPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $momRefDate->day }} {{ $momRefDate->translatedFormat('M') }}</th>
                                 <th id="momHeaderPrevRemaining" style="text-align: center; background-color: #d3ffcd;">{{ $prevRemainingStartDay }} &ndash; {{ $prevMonthEndDay }} {{ $prevSameDay->translatedFormat('M') }}</th>
@@ -718,6 +720,7 @@
                                 <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpPerformance" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAcvPerformance" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalMomPrevPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomCurrentPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomPrevRemaining" style="text-align: center; padding: 12px;">0</td>
@@ -841,6 +844,7 @@
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
                 { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
+                { data: 'acv', name: 'acv', className: 'text-center' },
                 { data: 'mom_prev_partial', name: 'mom_prev_partial', className: 'text-center' },
                 { data: 'mom_current_partial', name: 'mom_current_partial', className: 'text-center' },
                 { data: 'mom_prev_remaining', name: 'mom_prev_remaining', className: 'text-center' },
@@ -852,6 +856,9 @@
                     'color': '#7a5d00',
                     'font-weight': '600'
                 });
+            },
+            rowCallback: function(row, data) {
+                applyPercentageCellStyle($('td', row).eq(8), data.acv);
             },
             drawCallback: function() {
                 calculatePerformanceTotals();
@@ -920,8 +927,8 @@
         });
 
         function getPercentageStyle(percent) {
-            let backgroundColor = percent >= 100 ? '#28a745' : (percent >= 75 ? '#ffc107' : '#dc3545');
-            let textColor = percent >= 75 && percent < 100 ? '#212529' : '#ffffff';
+            let backgroundColor = percent >= 100 ? '#2e7d32' : (percent >= 75 ? '#f9a825' : '#c62828');
+            let textColor = percent >= 75 && percent < 100 ? '#1f2937' : '#ffffff';
 
             return {
                 'background': `linear-gradient(135deg, ${backgroundColor} 0%, ${backgroundColor}cc 100%)`,
@@ -1009,6 +1016,7 @@
             let totalTopUpExistingAkunRp = 0;
             let totalTopup = 0;
             let totalTarget = 0;
+            let totalAcv = 0;
             let totalMomPrevPartial = 0;
             let totalMomCurrentPartial = 0;
             let totalMomPrevRemaining = 0;
@@ -1031,10 +1039,10 @@
                 totalTopUpExistingAkunRp += parseNumber(cells.eq(6).text().trim());
                 totalTopup += parseNumber(cells.eq(7).text().trim());
 
-                totalMomPrevPartial += parseNumber(cells.eq(8).text().trim());
-                totalMomCurrentPartial += parseNumber(cells.eq(9).text().trim());
-                totalMomPrevRemaining += parseNumber(cells.eq(10).text().trim());
-                totalMomGap += parseNumber(cells.eq(11).text().trim());
+                totalMomPrevPartial += parseNumber(cells.eq(9).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(10).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(11).text().trim());
+                totalMomGap += parseNumber(cells.eq(12).text().trim());
             });
 
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
@@ -1043,6 +1051,9 @@
             $('#totalTopUpNewAkunRp').text(Math.floor(totalTopUpNewAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpExistingAkunRp').text(Math.floor(totalTopUpExistingAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpPerformance').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
+            totalAcv = totalTarget > 0 ? (totalTopup / totalTarget) * 100 : 0;
+            $('#totalAcvPerformance').text(totalAcv.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%');
+            applyPercentageCellStyle($('#totalAcvPerformance'), totalAcv);
             $('#totalMomPrevPartial').text(Math.floor(totalMomPrevPartial).toLocaleString('id-ID'));
             $('#totalMomCurrentPartial').text(Math.floor(totalMomCurrentPartial).toLocaleString('id-ID'));
             $('#totalMomPrevRemaining').text(Math.floor(totalMomPrevRemaining).toLocaleString('id-ID'));
