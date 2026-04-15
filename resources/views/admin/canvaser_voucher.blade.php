@@ -507,7 +507,7 @@
                                 <th style="text-align: center;">Nama Canvasser</th>
                                 <th style="text-align: center;">Total Client</th>
                                 <th style="text-align: center;">Total Top Up</th>
-                                {{-- <th style="text-align: center;">Total Insentif</th> --}}
+                                <th style="text-align: center;">Total Insentif</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -547,7 +547,7 @@
                                 <th style="text-align: center;">Canvasser</th>
                                 <th style="text-align: center;">Email Client</th>
                                 <th style="text-align: center;">Top Up</th>
-                                {{-- <th style="text-align: center;">Insentif</th> --}}
+                                <th style="text-align: center;">Insentif</th>
                                 <th style="text-align: center;">Tgl Transaksi Terakhir</th>
                             </tr>
                         </thead>
@@ -589,7 +589,7 @@
                 { data: 'canvasser', name: 'canvasser', className: 'text-center' },
                 { data: 'email_client', name: 'email_client', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                // { data: 'insentif', name: 'insentif', className: 'text-center' },
+                { data: 'insentif', name: 'insentif', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
             order: [[1, 'asc']],
@@ -625,7 +625,7 @@
                 { data: 'canvasser', name: 'canvasser', className: 'text-center' },
                 { data: 'total_client', name: 'total_client', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                // { data: 'total_insentif', name: 'total_insentif', className: 'text-center' }
+                { data: 'total_insentif', name: 'total_insentif', className: 'text-center' }
             ],
             order: [[1, 'asc']],
             rowCallback: function(row, data, index) {
@@ -665,6 +665,7 @@
             var selectedText = $('#filterMonthCvsr option:selected').text();
             // $('#displayedMonthCvsr').text(selectedText);
             // Reload data table
+            updateInsentifVisibility();
             table.ajax.reload();
             summaryTable.ajax.reload();
         });
@@ -686,6 +687,22 @@
                     alert('Gagal menyimpan gambar. Silakan coba lagi.');
                 });
         });
+
+        function isInsentifVisible(monthValue) {
+            if (!monthValue) return false;
+            return monthValue.startsWith('2026-01') || monthValue.startsWith('2026-02');
+        }
+
+        function updateInsentifVisibility() {
+            var selectedMonth = $('#filterMonthCvsr').val();
+            var visible = isInsentifVisible(selectedMonth);
+            table.column(5).visible(visible, false);
+            summaryTable.column(5).visible(visible, false);
+            table.columns.adjust().draw(false);
+            summaryTable.columns.adjust().draw(false);
+        }
+
+        updateInsentifVisibility();
     });
 </script>
 @endsection
