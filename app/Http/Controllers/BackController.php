@@ -897,7 +897,9 @@ class BackController extends Controller
      */
     public function exportCanvasserVoucher()
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $monthParam = request()->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
+        $currentMonth = $monthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
@@ -920,51 +922,47 @@ class BackController extends Controller
             ->get();
         
         // Mapping untuk Canvasser names
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Nyayu Z. Septianita',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman'
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
         
         // Transform data untuk Excel (per akun dengan insentif per akun)
-        $exportData = $data->map(function ($item) use ($canvasserMapping) {
+        $showInsentif = $this->isCanvasserInsentifVisible($monthStart);
+        $exportData = $data->map(function ($item) use ($canvasserMapping, $showInsentif) {
             $totalAmount = (float)$item->amount;
             // Insentif per akun: jika total > 500K, dapat 100K
             $insentif = $totalAmount > 500000 ? 100000 : 0;
+            $canvasserName = $canvasserMapping[$item->voucher_code] ?? '';
             
-            return [
+            $row = [
                 'Email' => $item->email_client,
                 'Perusahaan' => $item->company_name,
                 'Voucher Code' => $item->voucher_code,
-                'Canvasser' => $canvasserMapping[$item->voucher_code] ?? '-',
+                'Canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'Total Top Up' => $totalAmount,
-                'Insentif' => $insentif,
                 'Payment Method' => $item->payment_method_name,
                 'Tanggal Pembayaran' => Carbon::parse($item->paid_date)->format('d-m-Y H:i:s')
             ];
+
+            if ($showInsentif) {
+                $row['Insentif'] = $insentif;
+            }
+
+            return $row;
         });
         
         // Create Excel file
         $fileName = 'Canvasser_Referral_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
         
-        return response()->streamDownload(function () use ($exportData) {
+        return response()->streamDownload(function () use ($exportData, $showInsentif) {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header
-            $headers = ['Email', 'Perusahaan', 'Voucher Code', 'Canvasser', 'Total Top Up', 'Insentif', 'Payment Method', 'Tanggal Pembayaran'];
+            $headers = ['Email', 'Perusahaan', 'Voucher Code', 'Canvasser', 'Total Top Up'];
+            if ($showInsentif) {
+                $headers[] = 'Insentif';
+            }
+            $headers[] = 'Payment Method';
+            $headers[] = 'Tanggal Pembayaran';
             $sheet->fromArray($headers, null, 'A1');
             
             // Style header
@@ -973,7 +971,8 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
                 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
             ];
-            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
+            $lastColumn = $showInsentif ? 'I' : 'H';
+            $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray($headerStyle);
             
             // Add data
             $row = 2;
@@ -988,9 +987,14 @@ class BackController extends Controller
             $sheet->getColumnDimension('C')->setWidth(15);
             $sheet->getColumnDimension('D')->setWidth(15);
             $sheet->getColumnDimension('E')->setWidth(18);
-            $sheet->getColumnDimension('F')->setWidth(15);
-            $sheet->getColumnDimension('G')->setWidth(20);
-            $sheet->getColumnDimension('H')->setWidth(20);
+            if ($showInsentif) {
+                $sheet->getColumnDimension('F')->setWidth(15);
+                $sheet->getColumnDimension('G')->setWidth(20);
+                $sheet->getColumnDimension('H')->setWidth(20);
+            } else {
+                $sheet->getColumnDimension('F')->setWidth(20);
+                $sheet->getColumnDimension('G')->setWidth(20);
+            }
             
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -1402,30 +1406,15 @@ class BackController extends Controller
     {
         // Get month from request (format Y-m-d) or use current month
         $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
         // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        $month = $monthStart->format('Y-m');
 
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Nyayu Z. Septianita',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher (PER AKUN, bukan di-aggregate)
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1454,9 +1443,10 @@ class BackController extends Controller
             $tglFormatted = $data->paid_date ? 
                 Carbon::parse($data->paid_date)->format('d M Y') : '-';
                 
+            $canvasserName = $canvasserMapping[$data->voucher_code] ?? '';
             $result[] = [
                 'referral_code' => $data->voucher_code,
-                'canvasser' => $canvasserMapping[$data->voucher_code] ?? $data->voucher_code,
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'email_client' => $data->email_client,
                 'company_name' => $data->company_name,
                 'total_topup' => $totalTopup,
@@ -1485,30 +1475,15 @@ class BackController extends Controller
     {
         // Get month from request (format Y-m-d) or use current month
         $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
         // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        $month = $monthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Nyayu Z. Septianita',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1547,9 +1522,10 @@ class BackController extends Controller
                 }
             }
 
+            $canvasserName = $canvasserMapping[$voucherCode] ?? '';
             $summaryData[] = [
                 'referral_code' => $voucherCode,
-                'canvasser' => $canvasserMapping[$voucherCode] ?? $voucherCode,
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'total_client' => $totalClient,
                 'total_topup' => $totalTopup,
                 'total_insentif' => $totalInsentif,
@@ -1572,29 +1548,15 @@ class BackController extends Controller
      */
     public function exportCanvasserVoucherSummary()
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $monthParam = request()->get('month', Carbon::now()->format('Y-m-d'));
+        $currentMonthStart = Carbon::parse($monthParam)->startOfMonth();
+        $currentMonth = $currentMonthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
         $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
         
         // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Nyayu Z. Septianita',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($currentMonthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1611,6 +1573,7 @@ class BackController extends Controller
             ->get();
 
         // Group by voucher code and calculate summary
+        $showInsentif = $this->isCanvasserInsentifVisible($currentMonthStart);
         $summaryData = [];
         $grouped = $voucherData->groupBy('voucher_code');
         
@@ -1634,24 +1597,31 @@ class BackController extends Controller
                 }
             }
             
-            $summaryData[] = [
+            $canvasserName = $canvasserMapping[$voucherCode] ?? '';
+            $row = [
                 'referral_code' => $voucherCode,
-                'canvasser' => $canvasserMapping[$voucherCode] ?? $voucherCode,
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'total_client' => count($emailClients),
                 'total_topup' => $totalTopup,
-                'total_insentif' => $totalInsentif,
             ];
+            if ($showInsentif) {
+                $row['total_insentif'] = $totalInsentif;
+            }
+            $summaryData[] = $row;
         }
 
         // Create Excel file
         $fileName = 'Canvasser_Summary_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
         
-        return response()->streamDownload(function () use ($summaryData) {
+        return response()->streamDownload(function () use ($summaryData, $showInsentif) {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header
-            $headers = ['Referral Code', 'Nama Canvasser', 'Total Client', 'Total Top Up', 'Total Insentif'];
+            $headers = ['Referral Code', 'Nama Canvasser', 'Total Client', 'Total Top Up'];
+            if ($showInsentif) {
+                $headers[] = 'Total Insentif';
+            }
             $sheet->fromArray($headers, null, 'A1');
             
             // Style header
@@ -1660,7 +1630,8 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '36B9CC']],
                 'alignment' => ['horizontal' => 'center', 'vertical' => 'center']
             ];
-            $sheet->getStyle('A1:E1')->applyFromArray($headerStyle);
+            $lastColumn = $showInsentif ? 'E' : 'D';
+            $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray($headerStyle);
             
             // Add data
             $row = 2;
@@ -1678,7 +1649,9 @@ class BackController extends Controller
             $sheet->getColumnDimension('B')->setWidth(25);
             $sheet->getColumnDimension('C')->setWidth(15);
             $sheet->getColumnDimension('D')->setWidth(20);
-            $sheet->getColumnDimension('E')->setWidth(20);
+            if ($showInsentif) {
+                $sheet->getColumnDimension('E')->setWidth(20);
+            }
             
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -1869,6 +1842,62 @@ class BackController extends Controller
             \Log::error("Error in exportRegional: " . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
         }
+    }
+
+    private function getCanvasserOwnerMapForMonth(Carbon $monthStart): array
+    {
+        $defaultMapping = [
+            'EXTRA1' => 'Amanah',
+            'EXTRA2' => 'Indah',
+            'EXTRA3' => 'Maria',
+            'EXTRA4' => 'Meisya',
+            'EXTRA5' => 'Hardi',
+            'EXTRA6' => 'Bustomi',
+            'EXTRA7' => 'Intan',
+            'EXTRA8' => 'Hika Rochmah',
+            'EXTRA9' => 'Akbar Zikron',
+            'EXTRA10' => 'Riva',
+            'EXTRA11' => 'Fanni',
+            'EXTRA12' => 'Maiph',
+            'EXTRA13' => 'Nyayu Z. Septianita',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
+        ];
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn('voucher_code', array_keys($defaultMapping))
+            ->distinct()
+            ->pluck('voucher_code')
+            ->toArray();
+
+        $baseMapping = $defaultMapping;
+        foreach ($historyCodes as $code) {
+            $baseMapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn('voucher_code', array_keys($defaultMapping))
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select('voucher_code', 'owner_name')
+            ->get();
+
+        $override = [];
+        foreach ($historyRows as $row) {
+            $override[$row->voucher_code] = $row->owner_name;
+        }
+
+        return array_merge($baseMapping, $override);
+    }
+
+    private function isCanvasserInsentifVisible(Carbon $monthStart): bool
+    {
+        $monthKey = $monthStart->format('Y-m');
+        return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
 
