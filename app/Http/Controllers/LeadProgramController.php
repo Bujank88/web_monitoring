@@ -46,6 +46,11 @@ class LeadProgramController extends Controller
                 ->pluck('id')
                 ->toArray();
 
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
             // Query data topup dari MySQL untuk bulan berjalan atau bulan yang difilter
             if ($monthFilter) {
                 $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
@@ -96,6 +101,7 @@ class LeadProgramController extends Controller
                         'outlet' => ['settlement' => 0, 'users' => []],
                         'canvasser' => ['settlement' => 0, 'users' => []],
                         'b2b' => ['settlement' => 0, 'users' => []],
+                        'powerhouse' => ['settlement' => 0, 'users' => []],
                         'advertising' => ['settlement' => 0, 'users' => []],
                     ];
                 }
@@ -117,7 +123,12 @@ class LeadProgramController extends Controller
                     $groupedData[$date]['b2b']['settlement'] += $settlement;
                     $groupedData[$date]['b2b']['users'][] = $userId;
                 }
-                // PRIORITY 2: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
+                // PRIORITY 3: Jika email ada di leads_master dan user belongs to PH
+                elseif (!empty($leadsUserId) && in_array($leadsUserId, $powerhouseUserIds)) {
+                    $groupedData[$date]['powerhouse']['settlement'] += $settlement;
+                    $groupedData[$date]['powerhouse']['users'][] = $userId;
+                }
+                // PRIORITY 4: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
                 // HANYA jika tidak ada di leads_master sebagai cvsr
                 elseif (!empty($row->remark)) {
                     if ($row->remark === 'Internal') {
@@ -166,6 +177,8 @@ class LeadProgramController extends Controller
                 'canvasser_user' => [],
                 'b2b_settle' => 0,
                 'b2b_user' => [],
+                'powerhouse_settle' => 0,
+                'powerhouse_user' => [],
                 'advertising_settle' => 0,
                 'advertising_user' => [],
             ];
@@ -188,6 +201,8 @@ class LeadProgramController extends Controller
                     'canvasser_user' => count(array_unique($data['canvasser']['users'])),
                     'b2b_settle' => number_format($data['b2b']['settlement'], 0, ',', '.'),
                     'b2b_user' => count(array_unique($data['b2b']['users'])),
+                    'powerhouse_settle' => number_format($data['powerhouse']['settlement'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($data['powerhouse']['users'])),
                     'advertising_settle' => number_format($data['advertising']['settlement'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($data['advertising']['users'])),
                     'total' => number_format(
@@ -197,6 +212,7 @@ class LeadProgramController extends Controller
                             $data['outlet']['settlement'] +
                             $data['canvasser']['settlement'] +
                             $data['b2b']['settlement']+
+                            $data['powerhouse']['settlement'] +
                             $data['advertising']['settlement'],
                         0,
                         ',',
@@ -209,6 +225,7 @@ class LeadProgramController extends Controller
                         $data['outlet']['users'],
                         $data['canvasser']['users'],
                         $data['b2b']['users'],
+                        $data['powerhouse']['users'],
                         $data['advertising']['users']
                     ))),
                 ];
@@ -228,6 +245,8 @@ class LeadProgramController extends Controller
                 $totals['canvasser_user'] = array_merge($totals['canvasser_user'], $data['canvasser']['users']);
                 $totals['b2b_settle'] += $data['b2b']['settlement'];
                 $totals['b2b_user'] = array_merge($totals['b2b_user'], $data['b2b']['users']);
+                $totals['powerhouse_settle'] += $data['powerhouse']['settlement'];
+                $totals['powerhouse_user'] = array_merge($totals['powerhouse_user'], $data['powerhouse']['users']);
                 $totals['advertising_settle'] += $data['advertising']['settlement'];
                 $totals['advertising_user'] = array_merge($totals['advertising_user'], $data['advertising']['users']);
             }
@@ -248,6 +267,8 @@ class LeadProgramController extends Controller
                     'canvasser_user' => count(array_unique($totals['canvasser_user'])),
                     'b2b_settle' => number_format($totals['b2b_settle'], 0, ',', '.'),
                     'b2b_user' => count(array_unique($totals['b2b_user'])),
+                    'powerhouse_settle' => number_format($totals['powerhouse_settle'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($totals['powerhouse_user'])),
                     'advertising_settle' => number_format($totals['advertising_settle'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($totals['advertising_user'])),
                     'total' => number_format(
@@ -257,6 +278,7 @@ class LeadProgramController extends Controller
                             $totals['outlet_settle'] +
                             $totals['canvasser_settle'] +
                             $totals['b2b_settle'] +
+                            $totals['powerhouse_settle'] +
                             $totals['advertising_settle'],
                         0,
                         ',',
@@ -269,6 +291,7 @@ class LeadProgramController extends Controller
                         $totals['outlet_user'],
                         $totals['canvasser_user'],
                         $totals['b2b_user'],
+                        $totals['powerhouse_user'],
                         $totals['advertising_user']
                     ))),
                 ];
