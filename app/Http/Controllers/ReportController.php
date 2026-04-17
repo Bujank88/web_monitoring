@@ -880,6 +880,32 @@ class ReportController extends Controller
         return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
 
+    protected function automatechCouponClickSubquery()
+    {
+        return DB::table('em_coupon_click_soadb')
+            ->select(
+                'campaign_id',
+                DB::raw('SUM(COALESCE(total, 0)) as total_click')
+            )
+            ->groupBy('campaign_id');
+    }
+
+    protected function automatechCampaignBaseQuery(Carbon $startDate, Carbon $endDate, ?string $remark = null)
+    {
+        $query = DB::table('automatech as a')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+            ->leftJoinSub($this->automatechCouponClickSubquery(), 'acc', function ($join) {
+                $join->on('acc.campaign_id', '=', 'b.id_iklan');
+            })
+            ->whereBetween('b.created_at', [$startDate, $endDate]);
+
+        if (!empty($remark)) {
+            $query->where('a.remark', $remark);
+        }
+
+        return $query;
+    }
+
     public function reportSaldoSbpData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -1442,10 +1468,9 @@ class ReportController extends Controller
         [$year, $monthNum] = explode('-', $month);
         $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
         $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+        $remark = $request->get('remark');
 
-        $baseQuery = DB::table('automatech as a')
-            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
-            ->whereBetween('b.created_at', [$startDate, $endDate]);
+        $baseQuery = $this->automatechCampaignBaseQuery($startDate, $endDate, $remark);
 
         $query = (clone $baseQuery)
             ->select(
@@ -1463,7 +1488,7 @@ class ReportController extends Controller
                 'b.gagal as failed',
                 'b.delivered',
                 'b.read',
-                'b.click',
+                DB::raw('CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) as click'),
                 DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
                 'b.pesan as pesan',
                 'b.status as campaign_status',
@@ -1471,10 +1496,10 @@ class ReportController extends Controller
             );
 
         $summaryRow = (clone $baseQuery)
-            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'SMS' THEN CAST(COALESCE(b.click, 0) AS UNSIGNED) ELSE 0 END) as click_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'SMS' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'WABA' THEN CAST(COALESCE(b.click, 0) AS UNSIGNED) ELSE 0 END) as click_waba")
-            ->selectRaw("SUM(CASE WHEN UPPER(b.tipe_iklan) = 'WABA' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_waba")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%SMS%' THEN CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) ELSE 0 END) as click_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%SMS%' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WABA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WHATSAPP%' THEN CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) ELSE 0 END) as click_waba")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WABA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WHATSAPP%' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_waba")
             ->first();
 
         $clickSms = (float) ($summaryRow->click_sms ?? 0);
@@ -1943,9 +1968,10 @@ class ReportController extends Controller
             $month = $request->get('month', now()->format('Y-m'));
             [$year, $monthNum] = explode('-', $month);
             $remark = $request->get('remark');
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
 
-            $query = DB::table('automatech as a')
-                ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+            $query = $this->automatechCampaignBaseQuery($startDate, $endDate, $remark)
                 ->select(
                     DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
                     'b.broadcast_date',
@@ -1961,18 +1987,12 @@ class ReportController extends Controller
                     'b.gagal as failed',
                     'b.delivered',
                     'b.read',
-                    'b.click',
+                    DB::raw('CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) as click'),
                     'b.balance_terpakai',
                     'b.pesan as pesan',
                     'b.status as campaign_status',
                     'a.remark'
-                )
-                ->whereYear('b.created_at', $year)
-                ->whereMonth('b.created_at', $monthNum);
-
-            if (!empty($remark)) {
-                $query->where('a.remark', $remark);
-            }
+                );
 
             $data = $query->orderByRaw('COALESCE(b.broadcast_date, b.created_at) DESC')->get();
 
