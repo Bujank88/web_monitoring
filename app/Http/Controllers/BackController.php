@@ -971,7 +971,7 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
                 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
             ];
-            $lastColumn = $showInsentif ? 'I' : 'H';
+            $lastColumn = $showInsentif ? 'H' : 'G';
             $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray($headerStyle);
             
             // Add data
@@ -1577,23 +1577,20 @@ class BackController extends Controller
         $summaryData = [];
         $grouped = $voucherData->groupBy('voucher_code');
         
-        foreach ($grouped as $voucherCode => $items) {
+        foreach ($canvasserCodes as $voucherCode) {
+            $items = $grouped[$voucherCode] ?? collect();
             $totalTopup = 0;
             $totalInsentif = 0;
-            $emailClients = [];
+            $totalClient = 0;
             
             foreach ($items as $item) {
                 $amount = (float)$item->total_topup;
                 $totalTopup += $amount;
+                $totalClient++;
                 
                 // Insentif per akun: jika total top-up >= 500K, dapat 100K
                 if ($amount >= 500000) {
                     $totalInsentif += 100000;
-                }
-                
-                // Collect unique email clients
-                if (!in_array($item->email_client, $emailClients)) {
-                    $emailClients[] = $item->email_client;
                 }
             }
             
@@ -1601,7 +1598,7 @@ class BackController extends Controller
             $row = [
                 'referral_code' => $voucherCode,
                 'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
-                'total_client' => count($emailClients),
+                'total_client' => $totalClient,
                 'total_topup' => $totalTopup,
             ];
             if ($showInsentif) {
@@ -1640,7 +1637,9 @@ class BackController extends Controller
                 $sheet->setCellValue('B' . $row, $item['canvasser']);
                 $sheet->setCellValue('C' . $row, $item['total_client']);
                 $sheet->setCellValue('D' . $row, $item['total_topup']);
-                $sheet->setCellValue('E' . $row, $item['total_insentif']);
+                if ($showInsentif) {
+                    $sheet->setCellValue('E' . $row, $item['total_insentif'] ?? 0);
+                }
                 $row++;
             }
             
