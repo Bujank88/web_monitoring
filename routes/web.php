@@ -122,6 +122,9 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
     Route::get('/powerhouse-referral', [FrontController::class, 'monitoringPowerHouseReferral'])->name('admin.monitoring.powerhouse_referral');
     Route::get('/get-powerhouse-voucher-data', [BackController::class, 'getPowerHouseVoucher'])->name('powerhouse_voucher_data');
     Route::get('/get-powerhouse-deal-topup-mom-data', [BackController::class, 'getPowerHouseDealTopupMom'])->name('powerhouse_deal_topup_mom_data');
+    Route::get('/powerhouse-semester', [FrontController::class, 'monitoringPowerHouseSemester'])->name('admin.monitoring.powerhouse_semester');
+    Route::get('/get-powerhouse-semester-deal-topup-mom-data', [BackController::class, 'getPowerHouseSemesterDealTopupMom'])->name('powerhouse_semester_deal_topup_mom_data');
+    Route::get('/get-powerhouse-semester-target-data', [BackController::class, 'getPowerHouseSemesterTargets'])->name('powerhouse_semester_target_data');
     Route::get('/export-powerhouse-voucher', [BackController::class, 'exportPowerHouseVoucher'])->name('export.powerhouse_voucher');
 
     Route::get('/monitor-voucher', [FrontController::class, 'botVoucher'])->name('admin.voucher');
@@ -177,6 +180,7 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
 });
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::view('faq-l0', 'faq.l0')->name('faq-l0');
+    Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
 
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');

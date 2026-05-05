@@ -240,6 +240,41 @@ class FrontController extends Controller
         
         return view('admin.powerhouse_referral', compact('months'));
     }
+    public function monitoringPowerHouseSemester()
+    {
+        logUserLogin();
+
+        $currentDate = Carbon::now();
+        $currentSemester = $currentDate->month <= 6 ? 1 : 2;
+        $selectedSemester = request('semester', $currentDate->year . '-' . $currentSemester);
+        $semesters = [];
+
+        for ($year = $currentDate->year - 1; $year <= $currentDate->year + 1; $year++) {
+            foreach ([1, 2] as $semester) {
+                $startMonth = $semester === 1 ? 1 : 7;
+                $endMonth = $semester === 1 ? 6 : 12;
+                $startDate = Carbon::create($year, $startMonth, 1)->startOfMonth();
+                $endDate = Carbon::create($year, $endMonth, 1)->endOfMonth();
+                $value = $year . '-' . $semester;
+
+                $semesters[] = [
+                    'value' => $value,
+                    'label' => sprintf(
+                        'Semester %d %d (%s - %s)',
+                        $semester,
+                        $year,
+                        $startDate->translatedFormat('F'),
+                        $endDate->translatedFormat('F')
+                    ),
+                    'start_date' => $startDate->format('Y-m-d'),
+                    'end_date' => $endDate->format('Y-m-d'),
+                    'selected' => $value === $selectedSemester,
+                ];
+            }
+        }
+
+        return view('admin.powerhouse_semester', compact('semesters', 'selectedSemester'));
+    }
     public function refreshSummarySimpatiTiktok()
     {
         $data = DB::table('simpati_tiktok as st')

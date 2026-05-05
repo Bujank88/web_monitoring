@@ -298,13 +298,20 @@
                         <p>Report Canvasser</p>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="{{ route('tips-sales') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('tips-sales') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-lightbulb" style="color:rgb(255, 193, 7);"></i>
+                        <p>Tips Sales</p>
+                    </a>
+                </li>
                 @endif
                 @if($isAdmin || $isTsel || $isPH)
                 <li class="nav-item has-treeview 
-                    {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'menu-open' : '' }}">
+                    {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
                     
                     <a href="#" class="nav-link 
-                        {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral')) ? 'active' : '' }}">
+                        {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-house-chimney-user"></i>
                         <p>
                             Powerhouse
@@ -313,7 +320,7 @@
                     </a>
 
                     <ul class="nav nav-treeview">
-                        <!-- Report Powerhouse -->
+                        @if($isAdmin)
                         <li class="nav-item">
                             <a href="{{ route('region-target') }}"
                             class="nav-link {{ request()->routeIs('region-target') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -321,6 +328,7 @@
                                 <p>Report Powerhouse</p>
                             </a>
                         </li>
+                        @endif
 
                         <!-- Powerhouse Referral -->
                         <li class="nav-item">
@@ -328,6 +336,13 @@
                             class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}"  style="padding-left: 45px;">
                                 <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
                                 <p>PowerHouse Referral</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_semester') }}"
+                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_semester') ? 'active' : '' }}"  style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-calendar-alt" style="color:#17a2b8;"></i>
+                                <p>PowerHouse Semester</p>
                             </a>
                         </li>
                     </ul>
