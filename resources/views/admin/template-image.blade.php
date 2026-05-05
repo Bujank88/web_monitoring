@@ -115,7 +115,7 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-body text-center text-muted">
-                    <small>Menu ini tersedia untuk Admin, Canvasser, dan PowerHouse.</small>
+                    <small>=========================</small>
                 </div>
             </div>
         </div>
