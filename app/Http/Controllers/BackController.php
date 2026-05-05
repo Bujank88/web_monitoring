@@ -20,11 +20,247 @@ use Carbon\Carbon;
 use Dflydev\DotAccessData\Data;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 
 class BackController extends Controller
 {
+    private function resolveSemesterPeriod(?string $semesterValue): array
+    {
+        $now = Carbon::now();
+        $defaultSemester = $now->month <= 6 ? 1 : 2;
+
+        if (!preg_match('/^(\d{4})-(1|2)$/', (string) $semesterValue, $matches)) {
+            $year = (int) $now->year;
+            $semester = (int) $defaultSemester;
+        } else {
+            $year = (int) $matches[1];
+            $semester = (int) $matches[2];
+        }
+
+        $startMonth = $semester === 1 ? 1 : 7;
+        $endMonth = $semester === 1 ? 6 : 12;
+        $startDate = Carbon::create($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $endMonth, 1)->endOfMonth();
+
+        return [
+            'year' => $year,
+            'semester' => $semester,
+            'value' => $year . '-' . $semester,
+            'label' => sprintf(
+                'Semester %d %d (%s - %s)',
+                $semester,
+                $year,
+                $startDate->translatedFormat('F'),
+                $endDate->translatedFormat('F')
+            ),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ];
+    }
+
+    private function buildPowerHouseDealTopupMomResult(
+        Carbon $startDate,
+        Carbon $endDate,
+        callable $targetResolver,
+        ?Carbon $momReferenceDate = null
+    ): array {
+        $startDateFormatted = $startDate->copy()->startOfDay()->format('Y-m-d');
+        $endDateFormatted = $endDate->copy()->endOfDay()->format('Y-m-d');
+
+        $phUsers = DB::table('users')
+            ->where('role', 'PH')
+            ->where('name', '!=', 'self service')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        if ($phUsers->isEmpty()) {
+            return [];
+        }
+
+        $allTeamUserIds = $phUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        $topUpStatsByUser = collect();
+        $topUpNewAkunByUser = collect();
+        $topUpExistingAkunByUser = collect();
+        $momByUser = collect();
+        $topUpAggByUser = collect();
+        $leadAggByUser = collect();
+        $visitAggByName = collect();
+        $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
+
+        if (!empty($allTeamUserIds)) {
+            $topUpStatsByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpAggByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
+                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->whereBetween(
+                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                    [$startDateFormatted, $endDateFormatted]
+                )
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_existing_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $momReference = ($momReferenceDate ?: Carbon::today())->copy()->endOfDay();
+            $currentMonthStart = $momReference->copy()->startOfMonth()->format('Y-m-d');
+            $currentMonthUntilRef = $momReference->copy()->format('Y-m-d');
+            $prevMonthRef = $momReference->copy()->subMonthNoOverflow();
+            $prevMonthStart = $prevMonthRef->copy()->startOfMonth()->format('Y-m-d');
+            $prevMonthSameDay = $prevMonthRef->copy()->format('Y-m-d');
+            $prevMonthEnd = $prevMonthRef->copy()->endOfMonth()->format('Y-m-d');
+            $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
+
+            $momByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
+                )
+                ->get()
+                ->keyBy('user_id');
+        }
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $allTeamUserIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $phUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
+        $result = [];
+        foreach ($phUsers as $phUser) {
+            $userId = (int) $phUser->id;
+
+            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0);
+            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0);
+
+            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
+            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
+            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
+                $difference = $totalTopUpFromStats - $splitTotal;
+                $topUpExistingAkunRp += $difference;
+                $totalTopup = $totalTopUpFromStats;
+            }
+
+            $momGap = $momCurrentPartial - $momPrevPartial;
+            $poin = floor($totalTopup / 1000000);
+
+            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
+            $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
+            $target = (float) ($targetByTeam[$phUser->name]->target ?? 0);
+            $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
+                ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
+                : '-';
+
+            $result[] = [
+                'team_powerhouse' => $phUser->name,
+                'jumlah_akun' => $jumlahAkun,
+                'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => $jumlahVisit,
+                'deal_topup_new_akun' => $topUpNewAkunCount,
+                'deal_topup_existing_akun' => $topUpExistingAkunCount,
+                'top_up_new_akun_rp' => $topUpNewAkunRp,
+                'top_up_existing_akun_rp' => $topUpExistingAkunRp,
+                'total_topup' => $totalTopup,
+                'target' => $target,
+                'mom_prev_partial' => $momPrevPartial,
+                'mom_current_partial' => $momCurrentPartial,
+                'mom_prev_remaining' => $momPrevRemaining,
+                'mom_gap' => $momGap,
+                'poin' => $poin,
+                'tgl_transaksi_terakhir' => $tglFormatted,
+            ];
+        }
+
+        return collect($result)
+            ->sort(function ($a, $b) {
+                if ($a['total_topup'] === $b['total_topup']) {
+                    return strcmp($a['team_powerhouse'], $b['team_powerhouse']);
+                }
+                return $b['total_topup'] <=> $a['total_topup'];
+            })
+            ->values()
+            ->all();
+    }
+
     public function registerStore(Request $request)
     {
         $validated = $request->validate([
@@ -1157,211 +1393,23 @@ class BackController extends Controller
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
             : Carbon::now()->endOfDay();
-        $startDateFormatted = $startDate->format('Y-m-d');
-        $endDateFormatted = $endDate->format('Y-m-d');
-
-        $phUsers = DB::table('users')
-            ->where('role', 'PH')
-            ->where('name', '!=', 'self service')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
-
-        if ($phUsers->isEmpty()) {
-            return DataTables::of([])->make(true);
-        }
-
-        $allTeamUserIds = $phUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-
-        $topUpStatsByUser = collect();
-        $topUpNewAkunByUser = collect();
-        $topUpExistingAkunByUser = collect();
-        $momByUser = collect();
-        $topUpAggByUser = collect();
-        $leadAggByUser = collect();
-        $visitAggByName = collect();
-        $targetByUser = collect();
 
         $targetMonth = $request->get('month')
             ? Carbon::parse($request->get('month'))->format('Y-m')
             : $startDate->format('Y-m');
 
-        if (!empty($allTeamUserIds)) {
-            $targetByUser = DB::table('target_ph')
-                ->whereIn('user_id', $allTeamUserIds)
-                ->where('bulan', $targetMonth)
-                ->select('user_id', 'target')
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpStatsByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpAggByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
-                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereBetween(
-                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                    [$startDateFormatted, $endDateFormatted]
-                )
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_existing_akun_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            // MOM selalu dibandingkan pada tanggal aktual hari ini, tidak mengikuti filter end_date.
-            $momToday = Carbon::today();
-            $currentMonthStart = $momToday->copy()->startOfMonth()->format('Y-m-d');
-            $currentMonthUntilToday = $momToday->copy()->format('Y-m-d');
-            $prevMonthStart = $momToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d');
-            $prevMonthSameDay = $momToday->copy()->subMonthNoOverflow()->format('Y-m-d');
-            $prevMonthEnd = $momToday->copy()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d');
-            $prevMonthRemainingStart = $momToday->copy()->subMonthNoOverflow()->addDay()->format('Y-m-d');
-
-            $momByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilToday}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
-                )
-                ->get()
-                ->keyBy('user_id');
-        }
-
-        $leadAggByUser = DB::table('leads_master')
-            ->whereIn('user_id', $allTeamUserIds)
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('user_id')
-            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
-            ->get()
-            ->keyBy('user_id');
-
-        $visitAggByName = DB::table('bookings')
-            ->whereIn('nama', $phUsers->pluck('name')->values()->all())
-            ->whereBetween('tanggal', [$startDate, $endDate])
-            ->groupBy('nama')
-            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
-            ->get()
-            ->keyBy('nama');
-
-        // Build result per user PH (tanpa referral code)
-        $result = [];
-        foreach ($phUsers as $phUser) {
-            $userId = (int) $phUser->id;
-
-            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0);
-            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
-            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
-            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
-            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
-            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0);
-            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0);
-            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0);
-
-            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
-            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
-            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
-                $difference = $totalTopUpFromStats - $splitTotal;
-                $topUpExistingAkunRp += $difference;
-                $totalTopup = $totalTopUpFromStats;
+        $result = $this->buildPowerHouseDealTopupMomResult(
+            $startDate,
+            $endDate,
+            function ($phUsers) use ($targetMonth) {
+                return DB::table('target_ph')
+                    ->whereIn('user_id', $phUsers->pluck('id')->all())
+                    ->where('bulan', $targetMonth)
+                    ->select('user_id', 'target')
+                    ->get()
+                    ->keyBy('user_id');
             }
-
-            $momGap = $momCurrentPartial - $momPrevPartial;
-            $poin = floor($totalTopup / 1000000);
-
-            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
-            $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
-            $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
-            $target = (float) ($targetByUser[$userId]->target ?? 0);
-            $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
-                ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
-                : '-';
-
-            $result[] = [
-                'team_powerhouse' => $phUser->name,
-                'jumlah_akun' => $jumlahAkun,
-                'jumlah_leads' => $jumlahLeads,
-                'jumlah_visit' => $jumlahVisit,
-                'deal_topup_new_akun' => $topUpNewAkunCount,
-                'deal_topup_existing_akun' => $topUpExistingAkunCount,
-                'top_up_new_akun_rp' => $topUpNewAkunRp,
-                'top_up_existing_akun_rp' => $topUpExistingAkunRp,
-                'total_topup' => $totalTopup,
-                'target' => $target,
-                'mom_prev_partial' => $momPrevPartial,
-                'mom_current_partial' => $momCurrentPartial,
-                'mom_prev_remaining' => $momPrevRemaining,
-                'mom_gap' => $momGap,
-                'poin' => $poin,
-                'tgl_transaksi_terakhir' => $tglFormatted,
-            ];
-        }
-
-        $result = collect($result)
-            ->sort(function ($a, $b) {
-                if ($a['total_topup'] === $b['total_topup']) {
-                    return strcmp($a['team_powerhouse'], $b['team_powerhouse']);
-                }
-                return $b['total_topup'] <=> $a['total_topup'];
-            })
-            ->values()
-            ->all();
+        );
 
         return DataTables::of($result)
             ->addIndexColumn()
@@ -1370,6 +1418,11 @@ class BackController extends Controller
                 $total = (float) ($row['total_topup'] ?? 0);
                 $acv = $target > 0 ? ($total / $target) * 100 : 0;
                 return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->addColumn('gap_to_target', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                return 'Rp ' . number_format($target - $total, 0, ',', '.');
             })
             ->editColumn('top_up_new_akun_rp', function ($row) {
                 return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
@@ -1395,6 +1448,132 @@ class BackController extends Controller
             ->editColumn('mom_gap', function ($row) {
                 return number_format($row['mom_gap'], 0, ',', '.');
             })
+            ->make(true);
+    }
+
+    public function getPowerHouseSemesterDealTopupMom(Request $request)
+    {
+        $semesterPeriod = $this->resolveSemesterPeriod($request->get('semester'));
+        $year = $semesterPeriod['year'];
+        $semester = $semesterPeriod['semester'];
+        $startDate = $semesterPeriod['start_date'];
+        $endDate = $semesterPeriod['end_date'];
+
+        $result = $this->buildPowerHouseDealTopupMomResult(
+            $startDate,
+            $endDate,
+            function ($phUsers) use ($year, $semester) {
+                if (!Schema::hasTable('target_ph_semesters')) {
+                    return collect();
+                }
+
+                return DB::table('target_ph_semesters')
+                    ->where('year', $year)
+                    ->where('semester', $semester)
+                    ->whereIn('team_powerhouse', $phUsers->pluck('name')->all())
+                    ->select('team_powerhouse', 'target')
+                    ->get()
+                    ->keyBy('team_powerhouse');
+            },
+            $endDate
+        );
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->addColumn('gap_to_target', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                return 'Rp ' . number_format($target - $total, 0, ',', '.');
+            })
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_partial', function ($row) {
+                return number_format($row['mom_prev_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_current_partial', function ($row) {
+                return number_format($row['mom_current_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_remaining', function ($row) {
+                return number_format($row['mom_prev_remaining'], 0, ',', '.');
+            })
+            ->editColumn('mom_gap', function ($row) {
+                return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getPowerHouseSemesterTargets(Request $request)
+    {
+        $semesterPeriod = $this->resolveSemesterPeriod($request->get('semester'));
+        $year = $semesterPeriod['year'];
+        $semester = $semesterPeriod['semester'];
+        $periodLabel = $semesterPeriod['start_date']->format('d M Y') . ' s/d ' . $semesterPeriod['end_date']->format('d M Y');
+        $semesterLabel = 'Semester ' . $semester . ' ' . $year;
+
+        if (!Schema::hasTable('target_ph_semesters')) {
+            $rows = DB::table('users as u')
+                ->where('u.role', 'PH')
+                ->where('u.name', '!=', 'self service')
+                ->orderBy('u.name')
+                ->select('u.name as team_powerhouse')
+                ->get()
+                ->map(function ($row) use ($semesterLabel, $periodLabel) {
+                    return [
+                        'team_powerhouse' => $row->team_powerhouse,
+                        'semester_label' => $semesterLabel,
+                        'period_label' => $periodLabel,
+                        'target' => 'Rp 0',
+                    ];
+                });
+
+            return DataTables::of($rows)
+                ->addIndexColumn()
+                ->make(true);
+        }
+
+        $rows = DB::table('users as u')
+            ->leftJoin('target_ph_semesters as tps', function ($join) use ($year, $semester) {
+                $join->on('u.name', '=', 'tps.team_powerhouse')
+                    ->where('tps.year', '=', $year)
+                    ->where('tps.semester', '=', $semester);
+            })
+            ->where('u.role', 'PH')
+            ->where('u.name', '!=', 'self service')
+            ->orderBy('u.name')
+            ->select(
+                'u.name as team_powerhouse',
+                DB::raw("'" . $semesterLabel . "' as semester_label"),
+                DB::raw("'" . $periodLabel . "' as period_label"),
+                DB::raw('COALESCE(tps.target, 0) as target')
+            )
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'team_powerhouse' => $row->team_powerhouse,
+                    'semester_label' => $row->semester_label,
+                    'period_label' => $row->period_label,
+                    'target' => 'Rp ' . number_format((float) $row->target, 0, ',', '.'),
+                ];
+            });
+
+        return DataTables::of($rows)
+            ->addIndexColumn()
             ->make(true);
     }
 
