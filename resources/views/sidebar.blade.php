@@ -597,8 +597,8 @@
                 </li>
                 @endif --}}
                 @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
-                <li class="nav-item {{ (request()->routeIs('panenpoin.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoin.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
+                <li class="nav-item {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-layer-group"></i>
                         <p>
                             Program Campaign
@@ -608,20 +608,21 @@
 
                     <ul class="nav nav-treeview">
 
-                        <!-- Program Panen Poin -->
-                        <li class="nav-item {{ request()->routeIs('panenpoin.*') ? 'menu-open' : '' }} ml-2">
-                            <a href="#" class="nav-link {{ request()->routeIs('panenpoin.*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-coins" style="color:#28a745;"></i>
+
+                        <!-- Program Panen Poin V2 -->
+                        <li class="nav-item {{ request()->routeIs('panenpoinv2.*') ? 'menu-open' : '' }} ml-2">
+                            <a href="#" class="nav-link {{ request()->routeIs('panenpoinv2.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-coins" style="color:#20c997;"></i>
                                 <p>
-                                    Program Panen Poin
+                                    Program Panen Poin V2
                                     <i class="right fas fa-angle-left"></i>
                                 </p>
                             </a>
 
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="{{ route('panenpoin.index') }}"
-                                    class="nav-link {{ request()->routeIs('panenpoin.index') ? 'active' : '' }}"
+                                    <a href="{{ route('panenpoinv2.index') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoinv2.index') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
                                         <p>Input Data</p>
@@ -629,8 +630,8 @@
                                 </li>
 
                                 <li class="nav-item">
-                                    <a href="{{ route('panenpoin.report') }}"
-                                    class="nav-link {{ request()->routeIs('panenpoin.report') ? 'active' : '' }}"
+                                    <a href="{{ route('panenpoinv2.report') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoinv2.report') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-chart-bar nav-icon" style="color:#ffc107;"></i>
                                         <p>Report Poin</p>
@@ -638,8 +639,8 @@
                                 </li>
 
                                 <li class="nav-item">
-                                    <a href="{{ route('panenpoin.report-canvasser') }}"
-                                    class="nav-link {{ request()->routeIs('panenpoin.report-canvasser') ? 'active' : '' }}"
+                                    <a href="{{ route('panenpoinv2.report-canvasser') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoinv2.report-canvasser') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-users nav-icon" style="color:#17a2b8;"></i>
                                         <p>Report Canvasser</p>
@@ -647,8 +648,8 @@
                                 </li>
 
                                 <li class="nav-item">
-                                    <a href="{{ route('panenpoin.report-ph') }}"
-                                    class="nav-link {{ request()->routeIs('panenpoin.report-ph') ? 'active' : '' }}"
+                                    <a href="{{ route('panenpoinv2.report-ph') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoinv2.report-ph') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-user-shield nav-icon" style="color:#6f42c1;"></i>
                                         <p>Report Powerhouse</p>
@@ -656,8 +657,8 @@
                                 </li>
 
                                 <li class="nav-item">
-                                    <a href="{{ route('panenpoin.list-akun') }}"
-                                    class="nav-link {{ request()->routeIs('panenpoin.list-akun') ? 'active' : '' }}"
+                                    <a href="{{ route('panenpoinv2.list-akun') }}"
+                                    class="nav-link {{ request()->routeIs('panenpoinv2.list-akun') ? 'active' : '' }}"
                                     style="padding-left: 45px;">
                                         <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
                                         <p>List Akun</p>
