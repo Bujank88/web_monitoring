@@ -363,8 +363,8 @@
             <select id="remark" name="remark" class="form-control">
                 <option value="">Semua Remark</option>
                 <option value="Rookie">🥉 Rookie (0-100)</option>
-                <option value="Rising Star">🥈 Rising Star (101-200)</option>
-                <option value="Champion">🥇 Champion (201+)</option>
+                <option value="Rising Star">🥈 Rising Star (101-300)</option>
+                <option value="Champion">🥇 Champion (301+)</option>
             </select>
             <small>Pilih kategori untuk melihat performa canvasser</small>
         </div>
@@ -597,4 +597,6 @@
     });
 </script>
 @endsection
+
+
 

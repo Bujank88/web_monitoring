@@ -91,6 +91,8 @@ class PanenPoinV2Controller extends Controller
             
             // Auto-create akun di akun_panen_poin_v2
             $emailClient = strtolower(trim($request->akun_myads_pelanggan));
+
+
             
             // Cek apakah akun sudah ada
             $existingAkun = AkunPanenPoinV2::where('user_id', Auth::id())
@@ -173,8 +175,12 @@ class PanenPoinV2Controller extends Controller
     {
         logUserLogin();
         $months = $this->getPanenPoinV2ReportMonths();
+        $prizes = DB::table('prizes_v2')
+            ->where('stock', '>', 0)
+            ->orderBy('point')
+            ->get();
 
-        return view('panenpoinv2.reportpoin', compact('months'));
+        return view('panenpoinv2.reportpoin', compact('months', 'prizes'));
     }
 
     // Tampilkan halaman report canvasser (ringkasan)
@@ -326,6 +332,7 @@ class PanenPoinV2Controller extends Controller
                 ->select(
                     'summary_panen_poin_v2.nama_canvasser',
                     'summary_panen_poin_v2.email_client',
+                    'akun_panen_poin_v2.id as akun_id',
                     'summary_panen_poin_v2.nomor_hp_client',
                     'summary_panen_poin_v2.source',
                     DB::raw('CAST(summary_panen_poin_v2.total_settlement AS DECIMAL(15,2)) as total_settlement_raw'),
@@ -501,6 +508,7 @@ class PanenPoinV2Controller extends Controller
             
             foreach ($canvassers as $canvasser) {
                 $clientEmails = [];
+                $leadsMasterEmails = [];
                 
                 // Ambil email dari user_panen_poin_v2 yang diinput oleh canvasser ini
                 $panenPoinData = UserPanenPoinV2::where('user_id', $canvasser->id)
@@ -522,8 +530,11 @@ class PanenPoinV2Controller extends Controller
                     ->get();
                 
                 foreach ($leadsData as $lead) {
+                    $leadEmail = strtolower(trim($lead->email));
+                    $leadsMasterEmails[$leadEmail] = true;
+
                     $clientEmails[] = [
-                        'email' => strtolower(trim($lead->email)),
+                        'email' => $leadEmail,
                         'nomor_hp' => $lead->mobile_phone ?? '-',
                         'source' => 'leads_master'
                     ];
@@ -532,6 +543,17 @@ class PanenPoinV2Controller extends Controller
                 if (empty($clientEmails)) {
                     continue;
                 }
+
+                $clientEmails = collect($clientEmails)
+                    ->reject(function ($client) use ($leadsMasterEmails) {
+                        return $client['source'] === 'user_panen_poin_v2'
+                            && isset($leadsMasterEmails[$client['email']]);
+                    })
+                    ->unique(function ($client) {
+                        return $client['email'] . '|' . $client['source'];
+                    })
+                    ->values()
+                    ->all();
                 
                 $emails = array_column($clientEmails, 'email');
                 
@@ -573,7 +595,7 @@ class PanenPoinV2Controller extends Controller
                 }
                 
                 $packagePoint = DB::table('data_paket_seasonal as a')
-                    ->join('panen_poin_package as b', function ($join) {
+                    ->join('panen_poin_package_v2 as b', function ($join) {
                         $join->on(
                             DB::raw('LOWER(TRIM(a.name))'),
                             '=',
@@ -587,7 +609,7 @@ class PanenPoinV2Controller extends Controller
                     
                 
                 // Hitung total poin yang sudah di-redeem dari table prize_redeem (bulan ini)
-                // $totalPoinRedeem = DB::table('prize_redeems')
+                // $totalPoinRedeem = DB::table('prize_redeems_v2')
                 //     ->where('user_id', $canvasser->id)
                 //     ->whereMonth('created_at', Carbon::now()->month)
                 //     ->whereYear('created_at', Carbon::now()->year)
@@ -610,7 +632,7 @@ class PanenPoinV2Controller extends Controller
                     $totalPoinRedeem = 0;
 
                     if ($userPoin) {
-                        $totalPoinRedeem = DB::table('prize_redeems')
+                        $totalPoinRedeem = DB::table('prize_redeems_v2')
                             ->where('user_id', $userPoin->id)
                             ->whereMonth('created_at', Carbon::now()->month)
                             ->whereYear('created_at', Carbon::now()->year)
@@ -666,6 +688,26 @@ class PanenPoinV2Controller extends Controller
                     $totalProcessed++;
                 }
             }
+
+            $leadEmails = DB::table('leads_master')
+                ->selectRaw('LOWER(TRIM(email)) as email')
+                ->whereNotNull('email')
+                ->pluck('email')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($leadEmails)) {
+                DB::table('summary_panen_poin_v2')
+                    ->where('source', 'user_panen_poin_v2')
+                    ->whereIn(DB::raw('LOWER(TRIM(email_client))'), $leadEmails)
+                    ->delete();
+
+
+            }
+
+
             
             \Log::info("Summary Panen Poin V2 refreshed. Total: {$totalProcessed}, Updated: {$totalUpdated}, Inserted: {$totalInserted}");
             
@@ -686,9 +728,9 @@ class PanenPoinV2Controller extends Controller
     {
         if ($poinSisa >= 0 && $poinSisa <= 100) {
             return 'Rookie';
-        } elseif ($poinSisa >= 101 && $poinSisa <= 200) {
+        } elseif ($poinSisa >= 101 && $poinSisa <= 300) {
             return 'Rising Star';
-        } elseif ($poinSisa >= 201) {
+        } elseif ($poinSisa >= 301) {
             return 'Champion';
         }
         return 'Rookie'; // default
@@ -704,7 +746,7 @@ class PanenPoinV2Controller extends Controller
             $currentYear = Carbon::now()->year;
             
             // Hitung total poin yang sudah di-redeem user ini bulan ini
-            $totalPoinRedeem = DB::table('prize_redeems')
+            $totalPoinRedeem = DB::table('prize_redeems_v2')
                 ->where('user_id', $userId)
                 ->whereMonth('created_at', $currentMonth)
                 ->whereYear('created_at', $currentYear)
@@ -906,11 +948,11 @@ class PanenPoinV2Controller extends Controller
             ];
             
             // Kirim Email
-            $this->sendEmailNotification($data);
+            // $this->sendEmailNotification($data);
             
             // Kirim WhatsApp
             if ($nomorHp) {
-                $this->sendWhatsAppNotification($nomorHp, $data);
+                // $this->sendWhatsAppNotification($nomorHp, $data);
             }
             
             \Log::info("Notification sent successfully to: {$akun->email_client}");
@@ -1080,7 +1122,7 @@ class PanenPoinV2Controller extends Controller
             $poinSisaBulanLalu = $previousSummary->poin_sisa ?? 0;
             
             // Hitung total poin redeem bulan ini
-            $totalPoinRedeem = DB::table('prize_redeems')
+            $totalPoinRedeem = DB::table('prize_redeems_v2')
                 ->where('user_id', $userId)
                 ->whereMonth('created_at', Carbon::now()->month)
                 ->whereYear('created_at', Carbon::now()->year)
@@ -1140,6 +1182,75 @@ class PanenPoinV2Controller extends Controller
         }
     }
     
+    public function redeemPrize(Request $request)
+    {
+        $request->validate([
+            'akun_id' => 'required|integer',
+            'prize_id' => 'required|integer',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $akun = AkunPanenPoinV2::findOrFail($request->akun_id);
+            $prize = DB::table('prizes_v2')->where('id', $request->prize_id)->lockForUpdate()->first();
+
+            if (!$prize) {
+                throw new \Exception('Hadiah tidak ditemukan.');
+            }
+
+            if ((int) $prize->stock <= 0) {
+                throw new \Exception('Stok hadiah habis.');
+            }
+
+            $summary = DB::table('summary_panen_poin_v2')
+                ->whereRaw('LOWER(TRIM(email_client)) = ?', [strtolower(trim($akun->email_client))])
+                ->whereMonth('created_at', Carbon::now()->month)
+                ->whereYear('created_at', Carbon::now()->year)
+                ->first();
+
+            if (!$summary) {
+                throw new \Exception('Summary poin akun ini tidak ditemukan.');
+            }
+
+            $availablePoints = ($summary->poin - ($summary->poin_redeem ?? 0) + ($summary->poin_package ?? 0));
+
+            if ($availablePoints < $prize->point) {
+                throw new \Exception('Poin tidak cukup untuk redeem hadiah ini.');
+            }
+
+            DB::table('prize_redeems_v2')->insert([
+                'user_id' => $akun->id,
+                'prize_id' => $prize->id,
+                'point_used' => $prize->point,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('prizes_v2')
+                ->where('id', $prize->id)
+                ->update([
+                    'stock' => DB::raw('stock - 1'),
+                    'updated_at' => now(),
+                ]);
+
+            $this->updateSummaryAfterRedeem($akun->id);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Redeem berhasil disimpan.'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
     // Helper: Determine source dari user data
     private function getSourceFromUserData($userId, $email)
     {
@@ -1157,6 +1268,20 @@ class PanenPoinV2Controller extends Controller
             ->where('email', $email)
             ->value('source') ?? 'leads_master';
     }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

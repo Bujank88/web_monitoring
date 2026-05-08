@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schedule;
 use App\Http\Controllers\FrontController;
 use App\Http\Controllers\GetDataController;
 use App\Http\Controllers\PanenPoinController;
+use App\Http\Controllers\PanenPoinV2Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
@@ -154,6 +155,10 @@ Schedule::call(function () {
 // Schedule::call(function () {
 //     app(PanenPoinController::class)->refreshSummaryPanenPoin();
 // })->everyFiveMinutes()->name('refreshSummaryPanenPoin');
+
+Schedule::call(function () {
+    app(PanenPoinV2Controller::class)->refreshSummaryPanenPoinV2();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoinV2');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();

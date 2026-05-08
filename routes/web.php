@@ -247,6 +247,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('panen-poin-v2/refresh-summary', [PanenPoinV2Controller::class, 'refreshSummaryPanenPoinV2'])->name('panenpoinv2.refresh');
     Route::get('panen-poin-v2/list-akun', [PanenPoinV2Controller::class, 'listAkun'])->name('panenpoinv2.list-akun');
     Route::get('panen-poin-v2/akun-data', [PanenPoinV2Controller::class, 'getAkunData'])->name('panenpoinv2.akun-data');
+    Route::post('panen-poin-v2/redeem', [PanenPoinV2Controller::class, 'redeemPrize'])->name('panenpoinv2.redeem');
 
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
@@ -357,3 +358,4 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
+
