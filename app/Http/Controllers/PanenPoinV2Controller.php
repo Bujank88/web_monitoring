@@ -386,6 +386,7 @@ class PanenPoinV2Controller extends Controller
                 ->get()
                 ->map(function($item) {
                     return [
+                        'akun_id' => $item->akun_id,
                         'nama_canvasser' => $item->nama_canvasser,
                         'email_client' => $item->email_client,
                         'nomor_hp_client' => $item->nomor_hp_client,
@@ -754,16 +755,20 @@ class PanenPoinV2Controller extends Controller
             
             \Log::info("Total poin redeem for user {$userId}: {$totalPoinRedeem}");
             
-            // Update semua record summary user ini di bulan ini
+            $akun = AkunPanenPoinV2::find($userId);
+            if (!$akun) {
+                throw new \Exception('Akun Panen Poin V2 tidak ditemukan');
+            }
+
             $summaries = DB::table('summary_panen_poin_v2')
-                ->where('user_id', $userId)
+                ->whereRaw('LOWER(TRIM(email_client)) = ?', [strtolower(trim($akun->email_client))])
                 ->whereMonth('created_at', $currentMonth)
                 ->whereYear('created_at', $currentYear)
                 ->get();
             
             $updatedCount = 0;
             foreach ($summaries as $summary) {
-                $poinSisa = $summary->poin - $totalPoinRedeem;
+                $poinSisa = $summary->poin - $totalPoinRedeem + ($summary->poin_package ?? 0);
                 $remark = $this->calculateRemark($poinSisa);
                 
                 DB::table('summary_panen_poin_v2')
@@ -948,11 +953,11 @@ class PanenPoinV2Controller extends Controller
             ];
             
             // Kirim Email
-            // $this->sendEmailNotification($data);
+            $this->sendEmailNotification($data);
             
             // Kirim WhatsApp
             if ($nomorHp) {
-                // $this->sendWhatsAppNotification($nomorHp, $data);
+                $this->sendWhatsAppNotification($nomorHp, $data);
             }
             
             \Log::info("Notification sent successfully to: {$akun->email_client}");
@@ -1122,8 +1127,9 @@ class PanenPoinV2Controller extends Controller
             $poinSisaBulanLalu = $previousSummary->poin_sisa ?? 0;
             
             // Hitung total poin redeem bulan ini
+            $akun = AkunPanenPoinV2::whereRaw('LOWER(TRIM(email_client)) = ?', [strtolower(trim($email))])->first();
             $totalPoinRedeem = DB::table('prize_redeems_v2')
-                ->where('user_id', $userId)
+                ->where('user_id', $akun->id ?? 0)
                 ->whereMonth('created_at', Carbon::now()->month)
                 ->whereYear('created_at', Carbon::now()->year)
                 ->sum('point_used') ?? 0;
@@ -1270,6 +1276,8 @@ class PanenPoinV2Controller extends Controller
     }
 
 }
+
+
 
 
 

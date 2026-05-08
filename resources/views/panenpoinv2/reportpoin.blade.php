@@ -403,6 +403,7 @@
                                 <th>Poin Redeem</th>
                                 <th>Poin Sisa</th>
                                 <th>Remark</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -420,6 +421,44 @@
         <div class="alert alert-info">
             <i class="fas fa-info-circle mr-2"></i>
             <strong>Keterangan:</strong> Setiap Rp 250.000 settlement = 1 poin. Data menampilkan bulan berjalan dengan akumulasi poin dari bulan sebelumnya di tahun yang sama.
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="redeemModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Redeem Poin V2</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="redeemForm">
+                @csrf
+                <div class="modal-body">
+                    <input type="hidden" id="redeemAkunId" name="akun_id">
+                    <div class="form-group">
+                        <label>Email Client</label>
+                        <input type="text" id="redeemEmail" class="form-control" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pilih Hadiah</label>
+                        <select id="redeemPrize" name="prize_id" class="form-control" required>
+                            <option value="">Pilih hadiah</option>
+                            @foreach ($prizes as $prize)
+                            <option value="{{ $prize->id }}" data-point="{{ $prize->point }}" data-stock="{{ $prize->stock }}">{{ $prize->name }} - {{ $prize->point }} poin (stok: {{ $prize->stock }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <small id="redeemHelp" class="text-muted">Hanya hadiah dengan poin cukup yang bisa dipilih.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger">Redeem</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -538,6 +577,15 @@
                         }
                         return data;
                     }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    render: function(data, type, row) {
+                        var disabled = !row.akun_id || parseInt(row.poin_sisa, 10) <= 0 ? 'disabled' : '';
+                        return '<button type="button" class="btn btn-sm btn-danger btn-redeem" data-akun-id="' + (row.akun_id || '') + '" data-email="' + row.email_client + '" data-poin-sisa="' + row.poin_sisa + '" ' + disabled + '><i class="fas fa-gift"></i> Redeem</button>';
+                    }
                 }
             ],
             order: [
@@ -586,6 +634,51 @@
             table.ajax.reload();
         });
 
+        $(document).on('click', '.btn-redeem', function() {
+            var akunId = $(this).data('akun-id');
+            var email = $(this).data('email');
+            var poinSisa = parseInt($(this).data('poin-sisa'), 10) || 0;
+
+            $('#redeemAkunId').val(akunId);
+            $('#redeemEmail').val(email);
+            $('#redeemPoints').val(poinSisa + ' Poin');
+            $('#redeemPrize').val('');
+
+            $('#redeemPrize option').each(function() {
+                if (!$(this).val()) {
+                    $(this).prop('disabled', false).show();
+                    return;
+                }
+
+                var point = parseInt($(this).data('point'), 10) || 0;
+                var stock = parseInt($(this).data('stock'), 10) || 0;
+                var allowed = stock > 0 && point <= poinSisa;
+                $(this).prop('disabled', !allowed);
+                $(this).toggle(allowed);
+            });
+
+            $('#redeemModal').modal('show');
+        });
+
+        $('#redeemForm').on('submit', function(e) {
+            e.preventDefault();
+
+            $.ajax({
+                url: "{{ route('panenpoinv2.redeem') }}",
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    $('#redeemModal').modal('hide');
+                    alert(response.message);
+                    table.ajax.reload(null, false);
+                },
+                error: function(xhr) {
+                    var message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Redeem gagal diproses.';
+                    alert(message);
+                }
+            });
+        });
+
         // Export button click
         $('#btn-export').click(function() {
             var tanggal = $('#tanggal').val();
@@ -597,6 +690,13 @@
     });
 </script>
 @endsection
+
+
+
+
+
+
+
 
 
 
