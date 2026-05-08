@@ -175,12 +175,8 @@ class PanenPoinV2Controller extends Controller
     {
         logUserLogin();
         $months = $this->getPanenPoinV2ReportMonths();
-        $prizes = DB::table('prizes_v2')
-            ->where('stock', '>', 0)
-            ->orderBy('point')
-            ->get();
 
-        return view('panenpoinv2.reportpoin', compact('months', 'prizes'));
+        return view('panenpoinv2.reportpoin', compact('months'));
     }
 
     // Tampilkan halaman report canvasser (ringkasan)
