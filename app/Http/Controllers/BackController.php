@@ -90,7 +90,7 @@ class BackController extends Controller
         $leadAggByUser = collect();
         $visitAggByName = collect();
         $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
-
+        
         if (!empty($allTeamUserIds)) {
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
@@ -225,11 +225,11 @@ class BackController extends Controller
             $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
             $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
             $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
-            $target = (float) ($targetByTeam[$phUser->name]->target ?? 0);
+            $target = (float) ($targetByTeam[$userId]->target ?? 0);
             $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
                 ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
                 : '-';
-
+            
             $result[] = [
                 'team_powerhouse' => $phUser->name,
                 'jumlah_akun' => $jumlahAkun,
