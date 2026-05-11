@@ -126,7 +126,7 @@
         ],
     ];
 
-    $pdfGuide = asset('assets/pdf/tips-sales/tips-sales-guide.pdf');
+    $pdfGuide = asset('assets/pdf/tips-sales-guide.pdf');
 @endphp
 
 @section('css')
