@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 
 class BackController extends Controller
@@ -343,6 +345,147 @@ class BackController extends Controller
         return back()->withErrors([
             'email' => 'Email atau Password Anda salah.',
         ])->withInput();
+    }
+
+    public function storeUploadAutomatechReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-automatech';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('automatech-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.automatech-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $totalHarga = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.automatech-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::table('automatech_reports')->upsert(
+            $payload,
+            ['id_iklan'],
+            [
+                'tgl_tayang',
+                'judul_pesan_iklan',
+                'operator_seluler',
+                'kategori_iklan',
+                'tipe_kanal',
+                'detil_status',
+                'sukses',
+                'gagal',
+                'total_harga',
+                'source_file_name',
+                'upload_batch',
+                'updated_at',
+            ]
+        );
+
+        return redirect()
+            ->route('admin.upload.automatech-report')
+            ->with('success', count($payload) . ' baris report Automatech berhasil diimport dari ' . $storedPath . '.');
+    }
+
+    private function parseAutomatechReportDate($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            if (is_numeric($value)) {
+                return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('Y-m-d');
+            }
+
+            return Carbon::parse((string) $value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function parseAutomatechReportInteger($value): int
+    {
+        $normalized = preg_replace('/[^\d]/', '', (string) $value);
+
+        return $normalized === '' ? 0 : (int) $normalized;
+    }
+
+    private function parseAutomatechReportStatus(?string $detailStatus): array
+    {
+        $success = 0;
+        $failed = 0;
+        $detailStatus = (string) $detailStatus;
+
+        if (preg_match('/Sukses\s*:\s*([\d\.,]+)/i', $detailStatus, $matches)) {
+            $success = $this->parseAutomatechReportInteger($matches[1]);
+        }
+
+        if (preg_match('/Gagal\s*:\s*([\d\.,]+)/i', $detailStatus, $matches)) {
+            $failed = $this->parseAutomatechReportInteger($matches[1]);
+        }
+
+        return [$success, $failed];
     }
 
     public function getPadiUmkmData(Request $request)

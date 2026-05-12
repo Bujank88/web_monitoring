@@ -322,6 +322,9 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
 });
 
 Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::get('/upload-report-automatech', [FrontController::class, 'uploadAutomatechReport'])->name('admin.upload.automatech-report');
+    Route::get('/upload-report-automatech/template', [FrontController::class, 'downloadAutomatechReportTemplate'])->name('admin.upload.automatech-report.template');
+    Route::post('/upload-report-automatech', [BackController::class, 'storeUploadAutomatechReport'])->name('admin.upload.automatech-report.store');
     Route::get('report-balance-top-up', [ReportController::class, 'reportBalanceTopUp'])->name('report-balance-top-up');
     Route::get('report-balance-top-up/data', [ReportController::class, 'reportBalanceTopUpData'])->name('report-balance-top-up.data');
 });
@@ -357,4 +360,5 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
+
 

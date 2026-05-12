@@ -237,8 +237,8 @@
                     </a>
                 </li>
                 @elseif($isAutomatech)
-                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
                                 <p>
                                     Automatech
@@ -260,6 +260,15 @@
                             <p>Report Saldo Automatech</p>
                         </a>
                     </li>
+                    @if($isAdmin)
+                    <li class="nav-item">
+                        <a href="{{ route('admin.upload.automatech-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report Automatech</p>
+                        </a>
+                    </li>
+                    @endif
                     </ul>
                 </li>
                 
@@ -518,8 +527,8 @@
                 </li>
                 @endif
                 @if($isAdmin || $isAutomatech)
-                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
                                 <p>
                                     Automatech
@@ -541,6 +550,15 @@
                             <p>Report Saldo Automatech</p>
                         </a>
                     </li>
+                    @if($isAdmin)
+                    <li class="nav-item">
+                        <a href="{{ route('admin.upload.automatech-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report Automatech</p>
+                        </a>
+                    </li>
+                    @endif
                     </ul>
                 </li>
                 @endif

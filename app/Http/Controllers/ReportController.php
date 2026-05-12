@@ -879,31 +879,13 @@ class ReportController extends Controller
 
         return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
-
-    protected function automatechCouponClickSubquery()
+    protected function automatechUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
     {
-        return DB::table('em_coupon_click_soadb')
-            ->select(
-                'campaign_id',
-                DB::raw('SUM(COALESCE(total, 0)) as total_click')
-            )
-            ->groupBy('campaign_id');
-    }
-
-    protected function automatechCampaignBaseQuery(Carbon $startDate, Carbon $endDate, ?string $remark = null)
-    {
-        $query = DB::table('automatech as a')
-            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
-            ->leftJoinSub($this->automatechCouponClickSubquery(), 'acc', function ($join) {
-                $join->on('acc.campaign_id', '=', 'b.id_iklan');
-            })
-            ->whereBetween('b.created_at', [$startDate, $endDate]);
-
-        if (!empty($remark)) {
-            $query->where('a.remark', $remark);
-        }
-
-        return $query;
+        return DB::table('automatech_reports as ar')
+            ->whereBetween('ar.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
     }
 
     public function reportSaldoSbpData(Request $request)
@@ -1468,54 +1450,40 @@ class ReportController extends Controller
         [$year, $monthNum] = explode('-', $month);
         $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
         $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
-        $remark = $request->get('remark');
 
-        $baseQuery = $this->automatechCampaignBaseQuery($startDate, $endDate, $remark);
+        $baseQuery = $this->automatechUploadedReportBaseQuery($startDate, $endDate);
 
         $query = (clone $baseQuery)
             ->select(
-                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
-                'b.broadcast_date',
-                'a.email_myads as email',
-                'b.id_iklan',
-                'b.nama_iklan',
-                'b.nama_brand as nama_instansi',
-                'b.area_provinsi',
-                'b.tipe_iklan as campaign_type',
-                'b.tipe_inventori as inventory_type',
-                'b.total',
-                'b.sukses as success',
-                'b.gagal as failed',
-                'b.delivered',
-                'b.read',
-                DB::raw('CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) as click'),
-                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
-                'b.pesan as pesan',
-                'b.status as campaign_status',
-                'a.remark'
+                DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                'ar.id_iklan',
+                'ar.judul_pesan_iklan',
+                'ar.operator_seluler',
+                'ar.kategori_iklan',
+                'ar.tipe_kanal',
+                'ar.sukses as success',
+                'ar.gagal as failed',
+                'ar.total_harga',
+                'ar.detil_status',
+                'ar.source_file_name'
             );
 
         $summaryRow = (clone $baseQuery)
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%SMS%' THEN CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) ELSE 0 END) as click_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%SMS%' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WABA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WHATSAPP%' THEN CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) ELSE 0 END) as click_waba")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_inventori, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WABA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WA%' OR UPPER(TRIM(CONCAT_WS(' ', COALESCE(b.tipe_iklan, ''), COALESCE(b.tipe_inventori, '')))) LIKE '%WHATSAPP%' THEN CAST(COALESCE(b.sukses, 0) AS UNSIGNED) ELSE 0 END) as success_waba")
+            ->selectRaw('SUM(COALESCE(ar.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(ar.gagal, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(ar.total_harga, 0)) as total_harga')
             ->first();
 
-        $clickSms = (float) ($summaryRow->click_sms ?? 0);
-        $successSms = (float) ($summaryRow->success_sms ?? 0);
-        $clickWaba = (float) ($summaryRow->click_waba ?? 0);
-        $successWaba = (float) ($summaryRow->success_waba ?? 0);
-
         $summary = [
-            'ctr_sms' => $successSms > 0 ? ($clickSms / $successSms) * 100 : 0,
-            'ctr_waba' => $successWaba > 0 ? ($clickWaba / $successWaba) * 100 : 0,
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
         ];
 
         return datatables()->of($query)
             ->with('summary', $summary)
-            ->editColumn('balance_terpakai', function ($row) {
-                return 'Rp ' . number_format($row->balance_terpakai, 0, ',', '.');
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
             })
             ->make(true);
     }
@@ -1967,34 +1935,26 @@ class ReportController extends Controller
         try {
             $month = $request->get('month', now()->format('Y-m'));
             [$year, $monthNum] = explode('-', $month);
-            $remark = $request->get('remark');
             $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
             $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
 
-            $query = $this->automatechCampaignBaseQuery($startDate, $endDate, $remark)
+            $data = $this->automatechUploadedReportBaseQuery($startDate, $endDate)
                 ->select(
-                    DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
-                    'b.broadcast_date',
-                    'a.email_myads as email',
-                    'b.id_iklan',
-                    'b.nama_iklan',
-                    'b.nama_brand as nama_instansi',
-                    'b.area_provinsi',
-                    'b.tipe_iklan as campaign_type',
-                    'b.tipe_inventori as inventory_type',
-                    'b.total',
-                    'b.sukses as success',
-                    'b.gagal as failed',
-                    'b.delivered',
-                    'b.read',
-                    DB::raw('CAST(COALESCE(acc.total_click, 0) AS UNSIGNED) as click'),
-                    'b.balance_terpakai',
-                    'b.pesan as pesan',
-                    'b.status as campaign_status',
-                    'a.remark'
-                );
-
-            $data = $query->orderByRaw('COALESCE(b.broadcast_date, b.created_at) DESC')->get();
+                    DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                    'ar.id_iklan',
+                    'ar.judul_pesan_iklan',
+                    'ar.operator_seluler',
+                    'ar.kategori_iklan',
+                    'ar.tipe_kanal',
+                    'ar.sukses as success',
+                    'ar.gagal as failed',
+                    'ar.total_harga',
+                    'ar.detil_status',
+                    'ar.source_file_name'
+                )
+                ->orderByDesc('ar.tgl_tayang')
+                ->orderByDesc('ar.id_iklan')
+                ->get();
 
             if ($data->isEmpty()) {
                 return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
@@ -2003,36 +1963,27 @@ class ReportController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            $titleRemark = $remark ?: 'Semua';
-            $sheet->setCellValue('A1', 'REPORT CAMPAIGN AUTOMATECH - ' . strtoupper($titleRemark) . ' - ' . $month);
-            $sheet->mergeCells('A1:S1');
+            $sheet->setCellValue('A1', 'REPORT AUTOMATECH - ' . $month);
+            $sheet->mergeCells('A1:K1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $headers = [
-                'Tanggal Iklan',
-                'Broadcast Date',
-                'Email',
+                'Tanggal Tayang',
                 'ID Iklan',
-                'Nama Iklan',
-                'Nama Instansi',
-                'Area Provinsi',
-                'Campaign Type',
-                'Inventory Type',
-                'Total',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
                 'Success',
                 'Failed',
-                'Delivered',
-                'Read',
-                'Click',
-                'Balance Terpakai',
-                'Pesan',
-                'Campaign Status',
-                'Remark'
+                'Total Harga',
+                'Detil Status',
+                'Source File',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:S3')->applyFromArray([
+            $sheet->getStyle('A3:K3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -2050,40 +2001,32 @@ class ReportController extends Controller
             foreach ($data as $row) {
                 $sheet->fromArray([
                     $row->tanggal_iklan,
-                    $row->broadcast_date,
-                    $row->email,
                     $row->id_iklan,
-                    $row->nama_iklan,
-                    $row->nama_instansi,
-                    $row->area_provinsi,
-                    $row->campaign_type,
-                    $row->inventory_type,
-                    $row->total,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
                     $row->success,
                     $row->failed,
-                    $row->delivered,
-                    $row->read,
-                    $row->click,
-                    $row->balance_terpakai,
-                    $row->pesan,
-                    $row->campaign_status,
-                    $row->remark,
+                    $row->total_harga,
+                    $row->detil_status,
+                    $row->source_file_name,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'S') as $col) {
+            foreach (range('A', 'K') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            $fileName = 'Report_Campaign_Automatech_' . ($remark ?: 'Semua') . '_' . $month . '.xlsx';
+            $fileName = 'Report_Automatech_' . $month . '.xlsx';
 
             return response()->streamDownload(function () use ($spreadsheet) {
                 $writer = new Xlsx($spreadsheet);
                 $writer->save('php://output');
             }, $fileName);
         } catch (\Exception $e) {
-            \Log::error('Export Campaign Automatech Error: ' . $e->getMessage());
+            \Log::error('Export Automatech Error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal export data');
         }
     }

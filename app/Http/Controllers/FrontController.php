@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\DB;
 use Session;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\File;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class FrontController extends Controller
 {
@@ -137,6 +142,65 @@ class FrontController extends Controller
             "Grup Manajemen User Klien"
         ];
         return view('admin.upload', compact('myAdsUploads'));
+    }
+    public function uploadAutomatechReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/automatech-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.automatech-report.template');
+
+        return view('admin.upload-automatech-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function downloadAutomatechReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'TOTAL HARGA'],
+            ['1649001', '11 May 2026', 'WABA PROMO DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '132000'],
+            ['1649002', '12 May 2026', 'SMS PROMO DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '98000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:H1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'H') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan MyADS Dummy.xlsx');
     }
     public function monitoring_padi_umkm()
     {
@@ -423,3 +487,6 @@ class FrontController extends Controller
         return view('auth.loglogin');
     }
 }
+
+
+
