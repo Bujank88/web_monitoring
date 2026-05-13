@@ -1415,21 +1415,28 @@ class ReportController extends Controller
                 'mr.kategori_iklan',
                 'mr.tipe_kanal',
                 'mr.sukses as success',
-                'mr.gagal as failed',
+                DB::raw('(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as failed'),
+                'mr.refunded',
+                'mr.read',
+                'mr.click',
                 'mr.total_harga',
-                'mr.detil_status',
-                'mr.source_file_name'
+                'mr.detil_status'
             );
 
         $summaryRow = (clone $baseQuery)
             ->selectRaw('SUM(COALESCE(mr.sukses, 0)) as total_success')
-            ->selectRaw('SUM(COALESCE(mr.gagal, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(mr.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(mr.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(mr.click, 0)) as total_click')
             ->selectRaw('SUM(COALESCE(mr.total_harga, 0)) as total_harga')
             ->first();
 
         $summary = [
             'total_success' => (int) ($summaryRow->total_success ?? 0),
             'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
             'total_harga' => (int) ($summaryRow->total_harga ?? 0),
         ];
 
@@ -1460,21 +1467,28 @@ class ReportController extends Controller
                 'ar.kategori_iklan',
                 'ar.tipe_kanal',
                 'ar.sukses as success',
-                'ar.gagal as failed',
+                DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                'ar.refunded',
+                'ar.read',
+                'ar.click',
                 'ar.total_harga',
-                'ar.detil_status',
-                'ar.source_file_name'
+                'ar.detil_status'
             );
 
         $summaryRow = (clone $baseQuery)
             ->selectRaw('SUM(COALESCE(ar.sukses, 0)) as total_success')
-            ->selectRaw('SUM(COALESCE(ar.gagal, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(ar.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(ar.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(ar.click, 0)) as total_click')
             ->selectRaw('SUM(COALESCE(ar.total_harga, 0)) as total_harga')
             ->first();
 
         $summary = [
             'total_success' => (int) ($summaryRow->total_success ?? 0),
             'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
             'total_harga' => (int) ($summaryRow->total_harga ?? 0),
         ];
 
@@ -1813,10 +1827,12 @@ class ReportController extends Controller
                     'mr.kategori_iklan',
                     'mr.tipe_kanal',
                     'mr.sukses as success',
-                    'mr.gagal as failed',
+                    DB::raw('(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as failed'),
+                    'mr.refunded',
+                    'mr.read',
+                    'mr.click',
                     'mr.total_harga',
-                    'mr.detil_status',
-                    'mr.source_file_name'
+                    'mr.detil_status'
                 )
                 ->orderByDesc('mr.tgl_tayang')
                 ->orderByDesc('mr.id_iklan')
@@ -1830,7 +1846,7 @@ class ReportController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             $sheet->setCellValue('A1', 'REPORT MAXIM - ' . $month);
-            $sheet->mergeCells('A1:K1');
+            $sheet->mergeCells('A1:M1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -1843,13 +1859,15 @@ class ReportController extends Controller
                 'Tipe Kanal',
                 'Success',
                 'Failed',
+                'Refunded',
+                'Read',
+                'Click',
                 'Total Harga',
                 'Detil Status',
-                'Source File',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:K3')->applyFromArray([
+            $sheet->getStyle('A3:M3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -1874,14 +1892,16 @@ class ReportController extends Controller
                     $row->tipe_kanal,
                     $row->success,
                     $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
                     $row->total_harga,
                     $row->detil_status,
-                    $row->source_file_name,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'K') as $col) {
+            foreach (range('A', 'M') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -1915,10 +1935,12 @@ class ReportController extends Controller
                     'ar.kategori_iklan',
                     'ar.tipe_kanal',
                     'ar.sukses as success',
-                    'ar.gagal as failed',
+                    DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                    'ar.refunded',
+                    'ar.read',
+                    'ar.click',
                     'ar.total_harga',
-                    'ar.detil_status',
-                    'ar.source_file_name'
+                    'ar.detil_status'
                 )
                 ->orderByDesc('ar.tgl_tayang')
                 ->orderByDesc('ar.id_iklan')
@@ -1932,7 +1954,7 @@ class ReportController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             $sheet->setCellValue('A1', 'REPORT AUTOMATECH - ' . $month);
-            $sheet->mergeCells('A1:K1');
+            $sheet->mergeCells('A1:M1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -1945,13 +1967,15 @@ class ReportController extends Controller
                 'Tipe Kanal',
                 'Success',
                 'Failed',
+                'Refunded',
+                'Read',
+                'Click',
                 'Total Harga',
                 'Detil Status',
-                'Source File',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:K3')->applyFromArray([
+            $sheet->getStyle('A3:M3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -1976,14 +2000,16 @@ class ReportController extends Controller
                     $row->tipe_kanal,
                     $row->success,
                     $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
                     $row->total_harga,
                     $row->detil_status,
-                    $row->source_file_name,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'K') as $col) {
+            foreach (range('A', 'M') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
