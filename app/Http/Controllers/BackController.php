@@ -488,6 +488,92 @@ class BackController extends Controller
         return [$success, $failed];
     }
 
+    public function storeUploadMaximReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-maxim';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('maxim-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.maxim-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $totalHarga = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.maxim-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('maxim_reports')->delete();
+            DB::table('maxim_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.maxim-report')
+            ->with('success', count($payload) . ' baris report Maxim berhasil diimport dari ' . $storedPath . '.');
+    }
+
     public function getPadiUmkmData(Request $request)
     {
         if ($request->has('tanggal') && !empty($request->tanggal)) {
