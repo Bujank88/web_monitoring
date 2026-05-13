@@ -202,6 +202,66 @@ class FrontController extends Controller
             $writer->save('php://output');
         }, 'Template Laporan MyADS Dummy.xlsx');
     }
+
+    public function uploadMaximReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/maxim-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.maxim-report.template');
+
+        return view('admin.upload-maxim-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function downloadMaximReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'TOTAL HARGA'],
+            ['1749001', '12 May 2026', 'WABA MAXIM DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 145 Gagal: 10', '154000'],
+            ['1749002', '13 May 2026', 'SMS MAXIM DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 88 Gagal: 6', '88000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:H1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'H') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan Maxim Dummy.xlsx');
+    }
     public function monitoring_padi_umkm()
     {
         logUserLogin();

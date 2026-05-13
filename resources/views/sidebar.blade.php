@@ -194,8 +194,8 @@
                     </a>
                 </li>
                 @elseif($isMaxim)
-                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
                                 <p>
                                     Maxim
@@ -217,6 +217,15 @@
                             <p>Report Saldo Maxim</p>
                         </a>
                     </li>
+                    @if($isAdmin)
+                    <li class="nav-item">
+                        <a href="{{ route('admin.upload.maxim-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report Maxim</p>
+                        </a>
+                    </li>
+                    @endif
                     </ul>
                 </li>
                 
@@ -500,8 +509,8 @@
                 </li>
                 @endif
                 @if($isAdmin || $isMaxim)
-                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
                                 <p>
                                     Maxim
@@ -523,6 +532,15 @@
                             <p>Report Saldo Maxim</p>
                         </a>
                     </li>
+                    @if($isAdmin)
+                    <li class="nav-item">
+                        <a href="{{ route('admin.upload.maxim-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report Maxim</p>
+                        </a>
+                    </li>
+                    @endif
                     </ul>
                 </li>
                 @endif
@@ -878,3 +896,4 @@
         </nav>
     </div>
 </aside>
+

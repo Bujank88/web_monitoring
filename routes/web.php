@@ -322,6 +322,9 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
 });
 
 Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::get('/upload-maxim-report', [FrontController::class, 'uploadMaximReport'])->name('admin.upload.maxim-report');
+    Route::get('/upload-maxim-report/template', [FrontController::class, 'downloadMaximReportTemplate'])->name('admin.upload.maxim-report.template');
+    Route::post('/upload-maxim-report', [BackController::class, 'storeUploadMaximReport'])->name('admin.upload.maxim-report.store');
     Route::get('/upload-report-automatech', [FrontController::class, 'uploadAutomatechReport'])->name('admin.upload.automatech-report');
     Route::get('/upload-report-automatech/template', [FrontController::class, 'downloadAutomatechReportTemplate'])->name('admin.upload.automatech-report.template');
     Route::post('/upload-report-automatech', [BackController::class, 'storeUploadAutomatechReport'])->name('admin.upload.automatech-report.store');
