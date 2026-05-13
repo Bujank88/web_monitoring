@@ -174,12 +174,12 @@ class FrontController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray([
-            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'TOTAL HARGA'],
-            ['1649001', '11 May 2026', 'WABA PROMO DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '132000'],
-            ['1649002', '12 May 2026', 'SMS PROMO DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '98000'],
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1649001', '11 May 2026', 'WABA PROMO DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '5000', '92', '37', '132000'],
+            ['1649002', '12 May 2026', 'SMS PROMO DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '2000', '41', '18', '98000'],
         ], null, 'A1');
 
-        $sheet->getStyle('A1:H1')->applyFromArray([
+        $sheet->getStyle('A1:K1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -193,14 +193,14 @@ class FrontController extends Controller
             ],
         ]);
 
-        foreach (range('A', 'H') as $col) {
+        foreach (range('A', 'K') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
         return response()->streamDownload(function () use ($spreadsheet) {
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
-        }, 'Template Laporan MyADS Dummy.xlsx');
+        }, 'Template Laporan Automatech Dummy.xlsx');
     }
 
     public function uploadMaximReport()
@@ -234,12 +234,12 @@ class FrontController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheet->fromArray([
-            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'TOTAL HARGA'],
-            ['1749001', '12 May 2026', 'WABA MAXIM DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 145 Gagal: 10', '154000'],
-            ['1749002', '13 May 2026', 'SMS MAXIM DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 88 Gagal: 6', '88000'],
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1749001', '12 May 2026', 'WABA MAXIM DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 145 Gagal: 10', '7000', '101', '41', '154000'],
+            ['1749002', '13 May 2026', 'SMS MAXIM DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 88 Gagal: 6', '1000', '33', '12', '88000'],
         ], null, 'A1');
 
-        $sheet->getStyle('A1:H1')->applyFromArray([
+        $sheet->getStyle('A1:K1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -253,7 +253,7 @@ class FrontController extends Controller
             ],
         ]);
 
-        foreach (range('A', 'H') as $col) {
+        foreach (range('A', 'K') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 

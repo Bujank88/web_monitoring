@@ -387,7 +387,10 @@ class BackController extends Controller
             $kategoriIklan = trim((string) ($row['E'] ?? ''));
             $tipeKanal = trim((string) ($row['F'] ?? ''));
             $detilStatus = trim((string) ($row['G'] ?? ''));
-            $totalHarga = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
 
             if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
                 continue;
@@ -409,6 +412,9 @@ class BackController extends Controller
                 'detil_status' => $detilStatus !== '' ? $detilStatus : null,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
                 'total_harga' => $totalHarga,
                 'source_file_name' => $file->getClientOriginalName(),
                 'upload_batch' => $uploadBatch,
@@ -435,6 +441,9 @@ class BackController extends Controller
                 'detil_status',
                 'sukses',
                 'gagal',
+                'refunded',
+                'read',
+                'click',
                 'total_harga',
                 'source_file_name',
                 'upload_batch',
@@ -528,7 +537,10 @@ class BackController extends Controller
             $kategoriIklan = trim((string) ($row['E'] ?? ''));
             $tipeKanal = trim((string) ($row['F'] ?? ''));
             $detilStatus = trim((string) ($row['G'] ?? ''));
-            $totalHarga = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
 
             if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
                 continue;
@@ -550,6 +562,9 @@ class BackController extends Controller
                 'detil_status' => $detilStatus !== '' ? $detilStatus : null,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
                 'total_harga' => $totalHarga,
                 'source_file_name' => $file->getClientOriginalName(),
                 'upload_batch' => $uploadBatch,

@@ -145,9 +145,9 @@
                                 <th>Tipe Kanal</th>
                                 <th>Success</th>
                                 <th>Failed</th>
+                                <th>Read</th>
+                                <th>Click</th>
                                 <th>Total Harga</th>
-                                <th>Detil Status</th>
-                                <th>Source File</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -194,19 +194,9 @@
                 { data: 'tipe_kanal', name: 'ar.tipe_kanal' },
                 { data: 'success', name: 'ar.sukses' },
                 { data: 'failed', name: 'ar.gagal' },
-                { data: 'total_harga', name: 'ar.total_harga' },
-                {
-                    data: 'detil_status',
-                    name: 'ar.detil_status',
-                    render: function(data) {
-                        if (!data) return '';
-                        var text = data.toString();
-                        if (text.length <= 60) return text;
-                        var shortText = text.substring(0, 60) + '...';
-                        return '<span title="' + text.replace(/"/g, '&quot;') + '">' + shortText + '</span>';
-                    }
-                },
-                { data: 'source_file_name', name: 'ar.source_file_name' }
+                { data: 'read', name: 'ar.read' },
+                { data: 'click', name: 'ar.click' },
+                { data: 'total_harga', name: 'ar.total_harga' }
             ],
             order: [[0, 'desc']],
             pageLength: 25,
