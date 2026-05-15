@@ -604,7 +604,13 @@ class PanenPoinV2Controller extends Controller
                     $poinSisaBulanLalu = $previousMonthPoints[$email] ?? 0;
                     $totalpackagePoint = $packagePoint[$email] ?? 0;
 
-                    if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
+                    if ($totalSettlement == 0 && $poinSisaBulanLalu == 0 && $totalpackagePoint == 0) {
+                        DB::table('summary_panen_poin_v2')
+                            ->where('user_id', $canvasser->id)
+                            ->where('email_client', $email)
+                            ->whereMonth('created_at', $nowJakarta->month)
+                            ->whereYear('created_at', $nowJakarta->year)
+                            ->delete();
                         continue;
                     }
 
@@ -1094,6 +1100,18 @@ class PanenPoinV2Controller extends Controller
                 ->whereMonth('created_at', $nowJakarta->month)
                 ->whereYear('created_at', $nowJakarta->year)
                 ->sum('point_used') ?? 0;
+
+            if ($totalSettlement == 0 && $poinSisaBulanLalu == 0) {
+                DB::table('summary_panen_poin_v2')
+                    ->where('user_id', $userId)
+                    ->where('email_client', $email)
+                    ->whereMonth('created_at', $nowJakarta->month)
+                    ->whereYear('created_at', $nowJakarta->year)
+                    ->delete();
+                \Log::info("Summary deleted for email with no current-month data: {$email}");
+                return;
+            }
+
 
             $poinBulanIni = floor($totalSettlement / 250000);
             $poinAkumulasi = $poinSisaBulanLalu;
