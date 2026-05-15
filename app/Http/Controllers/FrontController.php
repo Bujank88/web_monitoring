@@ -143,6 +143,18 @@ class FrontController extends Controller
         ];
         return view('admin.upload', compact('myAdsUploads'));
     }
+    public function downloadTipsSalesPdf()
+    {
+        $filePath = public_path('images/tips-sales-guide.pdf');
+
+        if (!File::exists($filePath)) {
+            abort(404, 'File PDF contoh wording tidak ditemukan.');
+        }
+
+        return response()->download($filePath, 'Contoh Wording Tips Sales.pdf', [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
     public function uploadAutomatechReport()
     {
         logUserLogin();
@@ -547,6 +559,8 @@ class FrontController extends Controller
         return view('auth.loglogin');
     }
 }
+
+
 
 
 

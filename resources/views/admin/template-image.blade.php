@@ -126,7 +126,7 @@
         ],
     ];
 
-    $pdfGuide = asset('images/tips-sales-guide.pdf');
+    $pdfGuide = route('tips-sales.pdf');
 @endphp
 
 @section('css')
