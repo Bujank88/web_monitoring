@@ -429,27 +429,10 @@ class BackController extends Controller
                 ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
         }
 
-        DB::table('automatech_reports')->upsert(
-            $payload,
-            ['id_iklan'],
-            [
-                'tgl_tayang',
-                'judul_pesan_iklan',
-                'operator_seluler',
-                'kategori_iklan',
-                'tipe_kanal',
-                'detil_status',
-                'sukses',
-                'gagal',
-                'refunded',
-                'read',
-                'click',
-                'total_harga',
-                'source_file_name',
-                'upload_batch',
-                'updated_at',
-            ]
-        );
+        DB::transaction(function () use ($payload) {
+            DB::table('automatech_reports')->delete();
+            DB::table('automatech_reports')->insert($payload);
+        });
 
         return redirect()
             ->route('admin.upload.automatech-report')
@@ -467,7 +450,16 @@ class BackController extends Controller
                 return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('Y-m-d');
             }
 
-            return Carbon::parse((string) $value)->format('Y-m-d');
+            $dateString = trim((string) $value);
+
+            foreach (['m/d/Y', 'n/j/Y', 'd/m/Y', 'j/n/Y'] as $format) {
+                try {
+                    return Carbon::createFromFormat($format, $dateString)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                }
+            }
+
+            return Carbon::parse($dateString)->format('Y-m-d');
         } catch (\Throwable $e) {
             return null;
         }

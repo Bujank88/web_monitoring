@@ -182,6 +182,7 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH'])->group(function () {
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::view('faq-l0', 'faq.l0')->name('faq-l0');
     Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
+    Route::get('tips-sales/pdf', [FrontController::class, 'downloadTipsSalesPdf'])->name('tips-sales.pdf');
 
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
@@ -363,5 +364,6 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
+
 
 
