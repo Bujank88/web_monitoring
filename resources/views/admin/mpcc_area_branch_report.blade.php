@@ -84,9 +84,6 @@
                     <div class="card summary-card border-left-info"><div class="card-body"><div class="text-xs text-uppercase text-info font-weight-bold">Total MPCC</div><div class="h5 mb-0 font-weight-bold" id="totalMpccCount">0</div></div></div>
                 </div>
                 <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card summary-card border-left-warning"><div class="card-body"><div class="text-xs text-uppercase text-warning font-weight-bold">Target Top Up</div><div class="h5 mb-0 font-weight-bold" id="totalTargetTopup">0</div></div></div>
-                </div>
-                <div class="col-md-3 col-sm-6 mb-3">
                     <div class="card summary-card border-left-danger"><div class="card-body"><div class="text-xs text-uppercase text-danger font-weight-bold">Actual Visit</div><div class="h5 mb-0 font-weight-bold" id="totalActualVisit">0</div></div></div>
                 </div>
                 <div class="col-md-3 col-sm-6 mb-3">
@@ -238,7 +235,6 @@ $(function () {
         let totalMpcc = 0;
         let totalLeads = 0;
         let totalAkun = 0;
-        let totalTargetTopup = 0;
         let totalActualVisit = 0;
         let totalTargetVisit = 0;
         let totalTargetLeads = 0;
@@ -255,7 +251,6 @@ $(function () {
             totalMpcc += parseInt(row.jumlah_mpcc) || 0;
             totalLeads += parseInt(row.jumlah_leads) || 0;
             totalAkun += parseInt(row.jumlah_akun) || 0;
-            totalTargetTopup += parseInt(row.target_topup) || 0;
             totalActualVisit += parseInt(row.actual_visit) || 0;
             totalTargetVisit += parseInt(row.target_visit) || 0;
             totalTargetLeads += parseInt(row.target_leads) || 0;
@@ -272,7 +267,6 @@ $(function () {
         $('#totalAreaCount').text(areas.size);
         $('#totalBranchCount').text(branches.size);
         $('#totalMpccCount').text(totalMpcc);
-        $('#totalTargetTopup').text(totalTargetTopup.toLocaleString('id-ID'));
         $('#totalActualVisit').text(totalActualVisit.toLocaleString('id-ID'));
         $('#totalLeadsCount').text(totalLeads.toLocaleString('id-ID'));
         $('#totalAkunCount').text(totalAkun.toLocaleString('id-ID'));

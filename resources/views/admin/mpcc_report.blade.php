@@ -637,7 +637,7 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="10" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">MPCC Report | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">MPCC Report | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -647,7 +647,6 @@
                                 <th style="text-align: center;">Jumlah Akun</th>
                                 <th style="text-align: center;">new akun to leads (%)</th>
                                 <th style="text-align: center;">Top Up</th>
-                                <th style="text-align: center;">Poin</th>
                                 <th style="text-align: center;">Tgl Transaksi Terakhir</th>
                             </tr>
                         </thead>
@@ -660,7 +659,6 @@
                                 <td id="totalJumlahAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalPercentageNewAkunToLead" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalTopUp" style="text-align: center; padding: 12px;">0</td>
-                                <td id="totalPoin" style="text-align: center; padding: 12px;">0</td>
                                 <td style="text-align: center; padding: 12px;">-</td>
                             </tr>
                         </tfoot>
@@ -770,7 +768,7 @@
                     d.start_date = $('#startDatePH').val();
                     d.end_date = $('#endDatePH').val();
                 }
-            },
+            },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'referral_code', name: 'referral_code', className: 'text-center' },
@@ -779,29 +777,10 @@
                 { data: 'jumlah_akun', name: 'jumlah_akun', className: 'text-center' },
                 { data: 'percentage_new_akun_to_lead', name: 'percentage_new_akun_to_lead', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
-                { data: 'poin', name: 'poin', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
             rowCallback: function(row, data, index) {
                 applyPercentageCellStyle($('td', row).eq(5), data.percentage_new_akun_to_lead);
-
-                // Highlight poin cells dengan warna biru gradient untuk nilai > 0
-                var poinCell = $('td', row).eq(7);
-                var poinValue = parseInt(poinCell.text().trim());
-                
-                if (poinValue > 0) {
-                    poinCell.css({
-                        'background': 'linear-gradient(135deg, #c3e7ff 0%, #90caf9 100%)',
-                        'color': '#0d47a1',
-                        'font-weight': '600'
-                    });
-                } else {
-                    poinCell.css({
-                        'background': 'linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%)',
-                        'color': '#c62828',
-                        'font-weight': '600'
-                    });
-                }
 
                 // Calculate totals after each row is rendered
                 calculateTotals();
@@ -942,16 +921,12 @@
         function calculateTotals() {
             let totalAkun = 0;
             let totalLeads = 0;
-            let totalVisit = 0;
-            let totalPercentageLeadToVisit = 0;
             let totalPercentageNewAkunToLead = 0;
             let totalTopup = 0;
-            let totalPoin = 0;
 
             table.rows().data().each(function(row) {
                 totalAkun += parseInt(row.jumlah_akun) || 0;
                 totalLeads += parseInt(row.jumlah_leads) || 0;
-                totalVisit += parseInt(row.jumlah_visit) || 0;
 
                 const topupText = String(row.total_topup || '').trim();
                 const topupMatch = topupText.match(/[\d.,]+/);
@@ -960,7 +935,6 @@
                     totalTopup += parseFloat(topupValue) || 0;
                 }
 
-                totalPoin += parseInt(row.poin) || 0;
             });
 
             totalPercentageNewAkunToLead = totalLeads > 0 ? (totalAkun / totalLeads) * 100 : 0;
@@ -980,8 +954,6 @@
             } else {
                 $('#totalTopUp').text('Rp 0');
             }
-            
-            $('#totalPoin').text(totalPoin);
         }
 
         function calculatePerformanceTotals() {
@@ -1097,6 +1069,7 @@
     });
 </script>
 @endsection
+
 
 
 
