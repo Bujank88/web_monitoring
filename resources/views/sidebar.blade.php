@@ -22,6 +22,7 @@
                 $isB2b = $user->role === 'b2b';
                 $isMaxim = $user->role === 'Maxim';
                 $isAutomatech = $user->role === 'Automatech';
+                $isMpcc = $user->role === 'MPCC';
                 @endphp
 
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -40,8 +41,8 @@
                 <span class="badge badge-primary">B2B</span>
                 @elseif($isMaxim)
                 <span class="badge badge-warning">MAXIM</span>
-                @elseif($isAutomatech)
-                <span class="badge badge-warning">AUTOMATECH</span>
+                @elseif($isMpcc)
+                <span class="badge badge-info">MPCC</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
                 @elseif($isTreg)
@@ -245,6 +246,62 @@
                         <p>Logout</p>
                     </a>
                 </li>
+                @elseif($isMpcc)
+                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
+                        <p>
+                            MPCC
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-chart-bar" style="color:#ffc107;"></i>
+                                <p>MPCC Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report.area-branch') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.area-branch*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-sitemap" style="color:#20c997;"></i>
+                                <p>MPCC Area Branch</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.index') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
+                        <p>Data Leads & Akun</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-pen" style="color:rgb(1, 240, 172);"></i>
+                        <p>New Leads</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create-existing') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
+                        <p>New/Eksisting Akun</p>
+                    </a>
+                </li>
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}" class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
                 @elseif($isAutomatech)
                 <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}">
@@ -300,7 +357,7 @@
                 @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
-                @if($isAdmin || $isTsel || $isCanv || $isPH)
+                @if($isAdmin || $isTsel || $isCanv || $isPH || $isMpcc)
                 <li class="nav-header">ALL DASHBOARD</li>
                 <li class="nav-item">
                     <a href="{{ route('daily.topup.channel') }}"
@@ -367,6 +424,32 @@
                 </li>
 
                 @endif
+                @if($isAdmin)
+                {{-- <li class="nav-header">MPCC</li> --}}
+                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
+                        <p>
+                            MPCC
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-chart-bar" style="color:#ffc107;"></i>
+                                <p>MPCC Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report.area-branch') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.area-branch*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-sitemap" style="color:#20c997;"></i>
+                                <p>MPCC Area Branch</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @endif
                 {{--<li class="nav-item {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-ticket-alt" style="color:#17a2b8;"></i>
@@ -422,7 +505,7 @@
                     </a>
                 </li>
                 @endif
-                @if($isAdmin || $isCanv || $isPH)
+                @if($isAdmin || $isCanv || $isPH || $isMpcc)
                 <li class="nav-item">
                     <a href="{{ route('faq-l0') }}"
                         class="nav-link waves-effect {{ request()->routeIs('faq-l0') ? 'active' : '' }}">
@@ -431,7 +514,7 @@
                     </a>
                 </li>
                 @endif
-                @if(!$isCanv)
+                @if(!$isCanv && !$isMpcc)
                 <li class="nav-item">
                     <a href="{{ route('calendar') }}"
                         class="nav-link waves-effect {{ request()->routeIs('calendar') ? 'active' : '' }}">
@@ -632,7 +715,7 @@
                     </a>
                 </li>
                 @endif --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc)
                 <li class="nav-item {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-layer-group"></i>
@@ -779,7 +862,7 @@
                 </li>
 
                 @endif
-                @if($isAdmin || $isCanv || $isPH)
+                @if($isAdmin || $isCanv || $isPH || $isMpcc)
                 <li class="nav-header">EVENT APRIL</li>
                 <li class="nav-item">
                     <a href="{{ route('logbook-event.index') }}"
@@ -868,7 +951,7 @@
                 
             
                 
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc)
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
                         class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -881,7 +964,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"
@@ -896,4 +979,10 @@
         </nav>
     </div>
 </aside>
+
+
+
+
+
+
 

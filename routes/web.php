@@ -261,6 +261,24 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
 });
 
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
+    Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
+    Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
+    Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
+    Route::get('leads-master/data', [LeadsMasterController::class, 'data'])->name('leads-master.data');
+    Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
+    Route::post('leads-master/store-existing', [LeadsMasterController::class, 'storeExisting'])->name('leads-master.store-existing');
+    Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show');
+    Route::get('leads-master/{lead}/edit', [LeadsMasterController::class, 'edit'])->name('leads-master.edit')->whereNumber('lead');
+    Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
+    Route::get('/mpcc-report', [FrontController::class, 'monitoringMpccReport'])->name('mpcc.report');
+    Route::get('/mpcc-report/data', [BackController::class, 'getMpccVoucherReport'])->name('mpcc.report.data');
+    Route::get('/mpcc-report/performance-data', [BackController::class, 'getMpccDealTopupMom'])->name('mpcc.report.performance-data');
+    Route::get('/mpcc-report/export', [BackController::class, 'exportMpccVoucher'])->name('mpcc.report.export');
+    Route::get('/mpcc-report-area-branch', [FrontController::class, 'monitoringMpccAreaBranchReport'])->name('mpcc.report.area-branch');
+    Route::get('/mpcc-report-area-branch/data', [BackController::class, 'getMpccAreaBranchReport'])->name('mpcc.report.area-branch.data');
+    Route::get('/mpcc-report-area-branch/export', [BackController::class, 'exportMpccAreaBranchReport'])->name('mpcc.report.area-branch.export');
+});
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
     // AM Level UP Routes
     Route::get('am-level-up/input', [AmLevelUpController::class, 'index'])->name('amlevelup.index');
@@ -364,6 +382,11 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
+
+
+
+
+
 
 
 
