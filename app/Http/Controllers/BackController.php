@@ -2394,10 +2394,23 @@ class BackController extends Controller
         $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
             return strtoupper($code);
         })->values()->all();
+        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->values()->all();
 
         $startDateFormatted = $startDate->copy()->format('Y-m-d');
         $endDateFormatted = $endDate->copy()->format('Y-m-d');
         $transactionDateExpr = "DATE(COALESCE(rp.paid_date, rp.tgl_transaksi))";
+        $targetMonth = (int) $startDate->copy()->month;
+        $targetYear = (int) $startDate->copy()->year;
+
+        $targetByUser = DB::table('mpcc_targets')
+            ->whereIn('user_id', $userIds)
+            ->where('year', $targetYear)
+            ->where('month', $targetMonth)
+            ->select('user_id', 'target_amount')
+            ->get()
+            ->keyBy('user_id');
 
         $topUpStatsByCode = DB::table('report_balance_top_up as rp')
             ->join('data_voucher as dv', 'rp.no_invoice', '=', 'dv.id_transaksi')
@@ -2466,10 +2479,11 @@ class BackController extends Controller
             $momCurrentPartial = (float) ($momByCode[$voucherCode]->mom_current_partial ?? 0);
             $momPrevRemaining = (float) ($momByCode[$voucherCode]->mom_prev_remaining ?? 0);
             $momGap = $momCurrentPartial - $momPrevPartial;
+            $target = (float) ($targetByUser[$mpccUser->id]->target_amount ?? 0);
 
             $result[] = [
                 'team_powerhouse' => $mpccUser->name,
-                'target' => 0,
+                'target' => $target,
                 'deal_topup_new_akun' => $newAkunCount,
                 'deal_topup_existing_akun' => $existingAkunCount,
                 'top_up_new_akun_rp' => $newAkunRp,
