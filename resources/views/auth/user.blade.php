@@ -207,7 +207,20 @@
                             <option value="b2b">B2B</option>
                             <option value="Maxim">Maxim</option>
                             <option value="Automatech">Automatech</option>
+                            <option value="MPCC">MPCC</option>
                         </select>
+                    </div>
+
+                    <div id="mpcc_fields" style="display: none;">
+                        <div class="form-group">
+                            <label for="area">Area <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="area" name="area">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="branch">Branch <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="branch" name="branch">
+                        </div>
                     </div>
                     
                     {{-- <div class="form-group" id="treg_group" style="display: none;">
@@ -370,12 +383,22 @@
             $('#modalUserLabel').text('Tambah User');
             $('#formUser')[0].reset();
             $('#user_id').val('');
+            toggleRoleFields();
             // $('#treg_group').hide();
         });
 
-        // Show/hide treg dropdown based on role
-        $('#role').change(function() {
-            if ($(this).val() === 'Treg') {
+        function toggleRoleFields() {
+            const role = $('#role').val();
+            const isMpcc = role === 'MPCC';
+
+            $('#mpcc_fields').toggle(isMpcc);
+            $('#area, #branch').prop('required', isMpcc);
+
+            if (!isMpcc) {
+                $('#area, #branch').val('');
+            }
+
+            if (role === 'Treg') {
                 // $('#treg_group').show();
                 // $('#treg_id').attr('required', true);
             } else {
@@ -383,7 +406,9 @@
                 // $('#treg_id').attr('required', false);
                 // $('#treg_id').val('');
             }
-        });
+        }
+
+        $('#role').change(toggleRoleFields);
 
         // Form submit handler
         $('#formUser').submit(function(e) {
@@ -449,6 +474,9 @@
                     $('#email').val(user.email);
                     $('#nohp').val(user.nohp);
                     $('#role').val(user.role);
+                    $('#area').val(user.area || '');
+                    $('#branch').val(user.branch || '');
+                    toggleRoleFields();
                     
                     if (user.role === 'Treg') {
                         $('#treg_group').show();
@@ -503,3 +531,7 @@
 </script>
 
 @endsection
+
+
+
+
