@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Topup;
 use App\Models\LeadsMaster;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -2526,4 +2527,445 @@ class ReportController extends Controller
             return redirect()->back()->with('error', 'Gagal export Internal');
         }
     }
+    public function reportCdsi(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Report Campaign CDSI';
+
+        return view('mitra-sbp.report-cdsi', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    protected function cdsiUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
+    {
+        if (!Schema::hasTable('cdsi_reports')) {
+            return null;
+        }
+
+        return DB::table('cdsi_reports as cr')
+            ->whereBetween('cr.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
+    }
+
+    public function reportCdsiData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = $this->cdsiUploadedReportBaseQuery($startDate, $endDate);
+
+        if ($baseQuery === null) {
+            return datatables()->of(collect([]))
+                ->with('summary', [
+                    'total_success' => 0,
+                    'total_failed' => 0,
+                    'total_refunded' => 0,
+                    'total_click' => 0,
+                    'total_harga' => 0,
+                ])
+                ->make(true);
+        }
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
+                'cr.id_iklan',
+                'cr.judul_pesan_iklan',
+                'cr.operator_seluler',
+                'cr.kategori_iklan',
+                'cr.tipe_kanal',
+                'cr.sukses as success',
+                DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
+                'cr.refunded',
+                'cr.read',
+                'cr.click',
+                'cr.total_harga',
+                'cr.detil_status'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(COALESCE(cr.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(cr.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(cr.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(cr.click, 0)) as total_click')
+            ->selectRaw('SUM(COALESCE(cr.total_harga, 0)) as total_harga')
+            ->first();
+
+        $summary = [
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportCdsiDormant(Request $request)
+    {
+        logUserLogin();
+
+        $pageTitle = 'Data Dormant CDSI';
+
+        return view('mitra-sbp.report-cdsi-dormant', compact('pageTitle'));
+    }
+
+    protected function cdsiDormantBaseQuery()
+    {
+        $dormantQuery = DB::table('cdsi_data_dorman as cdd')
+            ->selectRaw('cdd.email as email')
+            ->selectRaw('cdd.nomor as nomor')
+            ->selectRaw('cdd.nama_instansi as nama_instansi')
+            ->selectRaw('DATE(cdd.last_tgl_transaksi) as last_tgl_transaksi')
+            ->selectRaw('COALESCE(cdd.total_settlement, 0) as total_settlement');
+
+        $nonTopupQuery = DB::table('cdsi_data_non_topup as cdnt')
+            ->selectRaw('cdnt.email as email')
+            ->selectRaw('cdnt.nomor as nomor')
+            ->selectRaw('cdnt.nama_instansi as nama_instansi')
+            ->selectRaw('NULL as last_tgl_transaksi')
+            ->selectRaw('0 as total_settlement');
+
+        return DB::query()->fromSub(
+            $dormantQuery->unionAll($nonTopupQuery),
+            'cd'
+        );
+    }
+
+    public function reportCdsiDormantData(Request $request)
+    {
+        $baseQuery = $this->cdsiDormantBaseQuery();
+
+        $query = (clone $baseQuery)
+            ->select(
+                'cd.email',
+                'cd.nomor',
+                'cd.nama_instansi',
+                'cd.last_tgl_transaksi',
+                DB::raw('COALESCE(cd.total_settlement, 0) as total_settlement')
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('COUNT(*) as total_data')
+            ->selectRaw('SUM(COALESCE(cd.total_settlement, 0)) as total_settlement')
+            ->first();
+
+        $summary = [
+            'total_data' => (int) ($summaryRow->total_data ?? 0),
+            'total_settlement' => (int) ($summaryRow->total_settlement ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('total_settlement', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_settlement, 0, ',', '.');
+            })
+            ->orderColumn('email', 'cd.email $1')
+            ->orderColumn('nomor', 'cd.nomor $1')
+            ->orderColumn('nama_instansi', 'cd.nama_instansi $1')
+            ->orderColumn('last_tgl_transaksi', 'cd.last_tgl_transaksi $1')
+            ->orderColumn('total_settlement', 'cd.total_settlement $1')
+            ->make(true);
+    }
+
+    public function exportCdsi(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $baseQuery = $this->cdsiUploadedReportBaseQuery($startDate, $endDate);
+
+            if ($baseQuery === null) {
+                return redirect()->back()->with('error', 'Tabel cdsi_reports belum tersedia. Jalankan migration atau upload report CDSI terlebih dahulu.');
+            }
+
+            $data = $baseQuery
+                ->select(
+                    DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
+                    'cr.id_iklan',
+                    'cr.judul_pesan_iklan',
+                    'cr.operator_seluler',
+                    'cr.kategori_iklan',
+                    'cr.tipe_kanal',
+                    'cr.sukses as success',
+                    DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
+                    'cr.refunded',
+                    'cr.read',
+                    'cr.click',
+                    'cr.total_harga',
+                    'cr.detil_status'
+                )
+                ->orderByDesc('cr.tgl_tayang')
+                ->orderByDesc('cr.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT CDSI - ' . $month);
+            $sheet->mergeCells('A1:M1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:M3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'M') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_CDSI_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export CDSI Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+    public function reportCdsiProvince(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Top Up Active';
+
+        return view('mitra-sbp.report-cdsi-province', compact('months', 'month', 'pageTitle'));
+    }
+
+    protected function cdsiProvinceTopupBaseQuery(string $month)
+    {
+        $monthDate = Carbon::createFromFormat('Y-m', $month);
+        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+
+        return DB::table('report_balance_top_up as rp')
+            ->select(
+                'rp.data_province_name',
+                'rp.user_id',
+                'rp.email_client',
+                DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement_klien'),
+                DB::raw('COUNT(*) as transaction_count'),
+                DB::raw('MAX(rp.tgl_transaksi) as tgl_transaksi')
+            )
+            ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+            ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+            ->whereNotNull('rp.data_province_name')
+            ->whereNotNull('rp.email_client')
+            ->whereNotNull('rp.total_settlement_klien')
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client');
+    }
+
+    public function reportCdsiProvinceData(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $search = $request->input('search.value');
+
+            $baseQuery = $this->cdsiProvinceTopupBaseQuery($month)
+                ->orderBy('total_settlement_klien', 'desc');
+
+            if ($search) {
+                $baseQuery->where(function ($q) use ($search) {
+                    $q->where('rp.data_province_name', 'like', "%$search%")
+                        ->orWhere('rp.email_client', 'like', "%$search%")
+                        ->orWhere('rp.user_id', 'like', "%$search%");
+                });
+            }
+
+            $allData = (clone $baseQuery)->get();
+            $totals = [
+                'total_provinces' => $allData->unique('data_province_name')->count(),
+                'total_user_ids' => $allData->unique('user_id')->count(),
+                'total_emails' => $allData->unique('email_client')->count(),
+                'total_settlement' => $allData->sum('total_settlement_klien'),
+                'total_settlement_format' => 'Rp ' . number_format($allData->sum('total_settlement_klien'), 0, ',', '.'),
+            ];
+
+            return datatables()->of($baseQuery)
+                ->addColumn('tanggal_format', function ($row) {
+                    return Carbon::parse($row->tgl_transaksi)->translatedFormat('F Y');
+                })
+                ->addColumn('total_settlement_format', function ($row) {
+                    return 'Rp ' . number_format($row->total_settlement_klien, 0, ',', '.');
+                })
+                ->with('totals', $totals)
+                ->make(true);
+        } catch (\Exception $e) {
+            \Log::error('Error in reportCdsiProvinceData: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function exportCdsiProvince(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $monthDate = Carbon::createFromFormat('Y-m', $month);
+            $displayMonth = $monthDate->translatedFormat('F Y');
+
+            $data = $this->cdsiProvinceTopupBaseQuery($month)
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderBy('total_settlement_klien', 'desc')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Provinsi' => $row->data_province_name,
+                    'User ID' => $row->user_id,
+                    'Email' => $row->email_client,
+                    'Bulan' => Carbon::parse($row->tgl_transaksi)->translatedFormat('F Y'),
+                    'Total Settlement' => ' ' . number_format((float) $row->total_settlement_klien, 0, ',', '.'),
+                ];
+            }
+
+            $fileName = 'CDSI_Daily_TopUp_Per_Province_' . str_replace(' ', '_', $displayMonth) . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = ['Provinsi', 'User ID', 'Email', 'Bulan', 'Total Settlement'];
+                $sheet->fromArray($headers, null, 'A1');
+                $sheet->getStyle('A1:E1')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'DC3545'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    ],
+                ]);
+
+                $rowNumber = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray(array_values($item), null, 'A' . $rowNumber);
+                    $rowNumber++;
+                }
+
+                $sheet->getColumnDimension('A')->setWidth(25);
+                $sheet->getColumnDimension('B')->setWidth(15);
+                $sheet->getColumnDimension('C')->setWidth(35);
+                $sheet->getColumnDimension('D')->setWidth(18);
+                $sheet->getColumnDimension('E')->setWidth(20);
+
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Error in exportCdsiProvince: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
 }
+
+

@@ -321,7 +321,16 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(fu
     Route::get('report-saldo-automatech/data', [ReportController::class, 'reportSaldoAutomatechData'])->name('report-saldo-automatech.data');
 });
 
-
+Route::middleware(['auth', 'checkrole:Admin,CDSI'])->group(function () {
+    Route::get('report-cdsi', [ReportController::class, 'reportCdsi'])->name('report-cdsi');
+    Route::get('report-cdsi/data', [ReportController::class, 'reportCdsiData'])->name('report-cdsi.data');
+    Route::get('report-cdsi/export', [ReportController::class, 'exportCdsi'])->name('report-cdsi.export');
+    Route::get('report-cdsi-dormant', [ReportController::class, 'reportCdsiDormant'])->name('report-cdsi-dormant');
+    Route::get('report-cdsi-dormant/data', [ReportController::class, 'reportCdsiDormantData'])->name('report-cdsi-dormant.data');
+    Route::get('report-cdsi-province', [ReportController::class, 'reportCdsiProvince'])->name('report-cdsi-province');
+    Route::get('report-cdsi-province/data', [ReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
+    Route::get('report-cdsi-province/export', [ReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
+});
 Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
     
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
@@ -347,6 +356,9 @@ Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
     Route::get('/upload-report-automatech', [FrontController::class, 'uploadAutomatechReport'])->name('admin.upload.automatech-report');
     Route::get('/upload-report-automatech/template', [FrontController::class, 'downloadAutomatechReportTemplate'])->name('admin.upload.automatech-report.template');
     Route::post('/upload-report-automatech', [BackController::class, 'storeUploadAutomatechReport'])->name('admin.upload.automatech-report.store');
+    Route::get('/upload-report-cdsi', [FrontController::class, 'uploadCdsiReport'])->name('admin.upload.cdsi-report');
+    Route::get('/upload-report-cdsi/template', [FrontController::class, 'downloadCdsiReportTemplate'])->name('admin.upload.cdsi-report.template');
+    Route::post('/upload-report-cdsi', [BackController::class, 'storeUploadCdsiReport'])->name('admin.upload.cdsi-report.store');
     Route::get('report-balance-top-up', [ReportController::class, 'reportBalanceTopUp'])->name('report-balance-top-up');
     Route::get('report-balance-top-up/data', [ReportController::class, 'reportBalanceTopUpData'])->name('report-balance-top-up.data');
 });
@@ -382,6 +394,8 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
+
+
 
 
 

@@ -215,6 +215,66 @@ class FrontController extends Controller
         }, 'Template Laporan Automatech Dummy.xlsx');
     }
 
+
+    public function uploadCdsiReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/cdsi-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.cdsi-report.template');
+
+        return view('admin.upload-cdsi-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function downloadCdsiReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1849001', '11 May 2026', 'WABA CDSI DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 105 Gagal: 9', '3000', '75', '29', '118000'],
+            ['1849002', '12 May 2026', 'SMS CDSI DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 87 Gagal: 11', '1000', '38', '14', '91000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan CDSI Dummy.xlsx');
+    }
     public function uploadMaximReport()
     {
         logUserLogin();
