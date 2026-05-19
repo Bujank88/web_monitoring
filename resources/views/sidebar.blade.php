@@ -726,7 +726,7 @@
                     </ul>
                 </li>
 
-                <li class="nav-header">System Management</li>
+                
                 @endif
                 @endif
                 @if($isAdmin || $isPH)
@@ -994,6 +994,7 @@
                 </li>
                 @endif
                 @if($isAdmin)
+                <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ route('users.page') }}"
                         class="nav-link waves-effect {{ request()->routeIs('users.page') ? 'active' : '' }}">
