@@ -323,6 +323,8 @@
                             badgeClass = 'badge-warning';
                         } else if (data === 'Automatech') {
                             badgeClass = 'badge-warning';
+                        } else if (data === 'CDSI') {
+                            badgeClass = 'badge-danger';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;
                     }
@@ -531,6 +533,7 @@
 </script>
 
 @endsection
+
 
 
 

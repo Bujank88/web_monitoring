@@ -22,9 +22,9 @@
                 $isB2b = $user->role === 'b2b';
                 $isMaxim = $user->role === 'Maxim';
                 $isAutomatech = $user->role === 'Automatech';
+                $isCdsi = $user->role === 'CDSI';
                 $isMpcc = $user->role === 'MPCC';
                 @endphp
-
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
                 <span class="badge badge-warning">SUPER ADMIN</span>
                 @elseif($isAdmin)
@@ -39,6 +39,8 @@
                 <span class="badge badge-success">Internal</span>
                 @elseif($isB2b)
                 <span class="badge badge-primary">B2B</span>
+                @elseif($isCdsi)
+                <span class="badge badge-danger">CDSI</span>
                 @elseif($isMaxim)
                 <span class="badge badge-warning">MAXIM</span>
                 @elseif($isMpcc)
@@ -60,24 +62,24 @@
                 @if($isTcd)
                 <li class="nav-header">AGENCY ADVERTISING</li>
                 <li class="nav-item {{ request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
-                                <p>
-                                    Agency Advertising
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
+                    <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
+                        <p>
+                            Agency Advertising
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
                     <ul class="nav nav-treeview">
-                    <li class="nav-item">
-                        <a href="{{ route('report-agency-advertising') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
-                            <p>Report Agency Advertising</p>
-                        </a>
-                    </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-agency-advertising') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                                <p>Report Agency Advertising</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
-                
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -105,13 +107,6 @@
                         </p>
                     </a>
                     <ul class="nav nav-treeview">
-                        {{-- <li class="nav-item">
-                            <a href="{{ route('amlevelup.index') }}"
-                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.index') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="fas fa-plus-circle nav-icon" style="color:#17a2b8;"></i>
-                                <p>Input Data</p>
-                            </a>
-                        </li> --}}
                         <li class="nav-item">
                             <a href="{{ route('amlevelup.summary') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('amlevelup.summary') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -119,15 +114,9 @@
                                 <p>Report Poin</p>
                             </a>
                         </li>
-                        {{-- <li class="nav-item">
-                            <a href="{{ route('amlevelup.list-akun') }}"
-                                class="nav-link waves-effect {{ request()->routeIs('amlevelup.list-akun') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="fas fa-user-check nav-icon" style="color:#28a745;"></i>
-                                <p>Daftar Akun</p>
-                            </a>
-                        </li> --}}
                     </ul>
                 </li>
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -147,37 +136,38 @@
                 @elseif($isInternal)
                 <li class="nav-header">Internal</li>
                 <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
-                                <p>
-                                    Mitra SBP
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
+                    <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
+                        <p>
+                            Mitra SBP
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
                     <ul class="nav nav-treeview">
-                    <li class="nav-item">
-                        <a href="{{ route('mitra-sbp') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-chart-column" style="color:rgb(173, 252, 157);"></i>
-                            <p>Performance Report</p>
-                        </a>
-                    </li> 
-                    <li class="nav-item">
-                        <a href="{{ route('report-campaign-sbp') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
-                            <p>Report Campaign</p>
-                        </a>
-                    </li> 
-                    <li class="nav-item">
-                        <a href="{{ route('report-saldo-sbp') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
-                            <p>Report Saldo</p>
-                        </a>
-                    </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mitra-sbp') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-column" style="color:rgb(173, 252, 157);"></i>
+                                <p>Performance Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-campaign-sbp') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
+                                <p>Report Campaign</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-sbp') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-saldo-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -195,41 +185,32 @@
                     </a>
                 </li>
                 @elseif($isMaxim)
-                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
-                                <p>
-                                    Maxim
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
+                <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
+                        <p>
+                            Maxim
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
                     <ul class="nav nav-treeview">
-                    <li class="nav-item">
-                        <a href="{{ route('report-maxim') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
-                            <p>Report Maxim</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('report-saldo-maxim') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
-                            <p>Report Saldo Maxim</p>
-                        </a>
-                    </li>
-                    @if($isAdmin)
-                    <li class="nav-item">
-                        <a href="{{ route('admin.upload.maxim-report') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
-                            <p>Upload Report Maxim</p>
-                        </a>
-                    </li>
-                    @endif
+                        <li class="nav-item">
+                            <a href="{{ route('report-maxim') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                                <p>Report Maxim</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-maxim') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo Maxim</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
-                
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -288,6 +269,7 @@
                         <p>New/Eksisting Akun</p>
                     </a>
                 </li>
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -303,41 +285,82 @@
                     </a>
                 </li>
                 @elseif($isAutomatech)
-                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
-                                <p>
-                                    Automatech
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
+                <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
+                        <p>
+                            Automatech
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
                     <ul class="nav nav-treeview">
-                    <li class="nav-item">
-                        <a href="{{ route('report-automatech') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
-                            <p>Report Automatech</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('report-saldo-automatech') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
-                            <p>Report Saldo Automatech</p>
-                        </a>
-                    </li>
-                    @if($isAdmin)
-                    <li class="nav-item">
-                        <a href="{{ route('admin.upload.automatech-report') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
-                            <p>Upload Report Automatech</p>
-                        </a>
-                    </li>
-                    @endif
+                        <li class="nav-item">
+                            <a href="{{ route('report-automatech') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                                <p>Report Automatech</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-automatech') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-saldo-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo Automatech</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
-                
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isCdsi)
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
+                        <p>
+                            CDSI
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-column" style="color:#f59e0b;"></i>
+                                <p>Report CDSI</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi-dormant') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi-dormant*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bed" style="color:#6f42c1;"></i>
+                                <p>Data Dormant</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi-province') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi-province*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-map-location-dot" style="color:#22c55e;"></i>
+                                <p>Top Up Active</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
@@ -662,6 +685,49 @@
                     @endif
                     </ul>
                 </li>
+                @if($isAdmin)
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
+                        <p>
+                            CDSI
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-column" style="color:#f59e0b;"></i>
+                                <p>Report CDSI</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi-dormant') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi-dormant*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bed" style="color:#6f42c1;"></i>
+                                <p>Data Dormant</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-cdsi-province') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-cdsi-province*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-map-location-dot" style="color:#22c55e;"></i>
+                                <p>Top Up Active</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.upload.cdsi-report') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('admin.upload.cdsi-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                                <p>Upload Report CDSI</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                @endif
                 @endif
                 @if($isAdmin || $isPH)
                     <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
@@ -927,9 +993,6 @@
                     </a>
                 </li>
                 @endif
-                @if($isAdmin || $isTreg || $isTsel ||$isCanv || $isPH)
-                <li class="nav-header">System Management</li>
-                @endif
                 @if($isAdmin)
                 <li class="nav-item">
                     <a href="{{ route('users.page') }}"
@@ -979,6 +1042,12 @@
         </nav>
     </div>
 </aside>
+
+
+
+
+
+
 
 
 
