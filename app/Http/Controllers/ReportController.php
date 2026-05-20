@@ -1420,6 +1420,8 @@ class ReportController extends Controller
                 'mr.refunded',
                 'mr.read',
                 'mr.click',
+                DB::raw('CASE WHEN COALESCE(mr.sukses, 0) > 0 THEN (COALESCE(mr.read, 0) / mr.sukses) * 100 ELSE 0 END as percentage_read'),
+                DB::raw('CASE WHEN COALESCE(mr.read, 0) > 0 THEN (COALESCE(mr.click, 0) / mr.read) * 100 ELSE 0 END as percentage_click'),
                 'mr.total_harga',
                 'mr.detil_status'
             );
@@ -1443,6 +1445,12 @@ class ReportController extends Controller
 
         return datatables()->of($query)
             ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
             ->editColumn('total_harga', function ($row) {
                 return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
             })
@@ -1495,6 +1503,12 @@ class ReportController extends Controller
 
         return datatables()->of($query)
             ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
             ->editColumn('total_harga', function ($row) {
                 return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
             })
@@ -1832,6 +1846,8 @@ class ReportController extends Controller
                     'mr.refunded',
                     'mr.read',
                     'mr.click',
+                    DB::raw('CASE WHEN COALESCE(mr.sukses, 0) > 0 THEN (COALESCE(mr.read, 0) / mr.sukses) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN COALESCE(mr.read, 0) > 0 THEN (COALESCE(mr.click, 0) / mr.read) * 100 ELSE 0 END as percentage_click'),
                     'mr.total_harga',
                     'mr.detil_status'
                 )
@@ -1847,7 +1863,7 @@ class ReportController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             $sheet->setCellValue('A1', 'REPORT MAXIM - ' . $month);
-            $sheet->mergeCells('A1:M1');
+            $sheet->mergeCells('A1:O1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -1863,12 +1879,14 @@ class ReportController extends Controller
                 'Refunded',
                 'Read',
                 'Click',
+                'Percentage Read',
+                'Percentage Click',
                 'Total Harga',
                 'Detil Status',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:M3')->applyFromArray([
+            $sheet->getStyle('A3:O3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -1896,13 +1914,15 @@ class ReportController extends Controller
                     $row->refunded,
                     $row->read,
                     $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
                     $row->total_harga,
                     $row->detil_status,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'M') as $col) {
+            foreach (range('A', 'O') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -1955,7 +1975,7 @@ class ReportController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             $sheet->setCellValue('A1', 'REPORT AUTOMATECH - ' . $month);
-            $sheet->mergeCells('A1:M1');
+            $sheet->mergeCells('A1:O1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -1971,12 +1991,14 @@ class ReportController extends Controller
                 'Refunded',
                 'Read',
                 'Click',
+                'Percentage Read',
+                'Percentage Click',
                 'Total Harga',
                 'Detil Status',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:M3')->applyFromArray([
+            $sheet->getStyle('A3:O3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -2004,13 +2026,15 @@ class ReportController extends Controller
                     $row->refunded,
                     $row->read,
                     $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
                     $row->total_harga,
                     $row->detil_status,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'M') as $col) {
+            foreach (range('A', 'O') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -2622,6 +2646,12 @@ class ReportController extends Controller
 
         return datatables()->of($query)
             ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
             ->editColumn('total_harga', function ($row) {
                 return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
             })
@@ -2737,7 +2767,7 @@ class ReportController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
 
             $sheet->setCellValue('A1', 'REPORT CDSI - ' . $month);
-            $sheet->mergeCells('A1:M1');
+            $sheet->mergeCells('A1:O1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -2753,12 +2783,14 @@ class ReportController extends Controller
                 'Refunded',
                 'Read',
                 'Click',
+                'Percentage Read',
+                'Percentage Click',
                 'Total Harga',
                 'Detil Status',
             ];
             $sheet->fromArray($headers, null, 'A3');
 
-            $sheet->getStyle('A3:M3')->applyFromArray([
+            $sheet->getStyle('A3:O3')->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF'],
@@ -2786,13 +2818,15 @@ class ReportController extends Controller
                     $row->refunded,
                     $row->read,
                     $row->click,
+                    round((float) $row->percentage_read, 2) . '%',
+                    round((float) $row->percentage_click, 2) . '%',
                     $row->total_harga,
                     $row->detil_status,
                 ], null, 'A' . $rowNum);
                 $rowNum++;
             }
 
-            foreach (range('A', 'M') as $col) {
+            foreach (range('A', 'O') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
@@ -2967,5 +3001,8 @@ class ReportController extends Controller
         }
     }
 }
+
+
+
 
 
