@@ -109,6 +109,7 @@
                                     <th>No</th>
                                     <th>Area</th>
                                     <th>Branch</th>
+                                    <th>Cluster</th>
                                     <th>Jumlah MPCC</th>
                                     <th>Target Revenue Cluster (B)</th>
                                     <th>Target Revenue Branch (B)</th>
@@ -126,7 +127,7 @@
                             <tbody></tbody>
                             <tfoot>
                                 <tr style="font-weight: 700; background: #f8f9fc;">
-                                    <th colspan="3" style="text-align:center;">TOTAL</th>
+                                    <th colspan="4" style="text-align:center;">TOTAL</th>
                                     <th id="tfootJumlahMpcc">0</th>
                                     <th id="tfootTargetRevenueCluster">0</th>
                                     <th id="tfootTargetRevenueBranch">0</th>
@@ -174,6 +175,7 @@ $(function () {
             { data: 'DT_RowIndex', className: 'text-center' },
             { data: 'area', className: 'text-center' },
             { data: 'branch', className: 'text-center' },
+            { data: 'cluster', className: 'text-center' },
             { data: 'jumlah_mpcc', className: 'text-center' },
             { data: 'target_revenue_cluster_billion', className: 'text-center' },
             { data: 'target_revenue_branch_billion', className: 'text-center' },
@@ -188,7 +190,7 @@ $(function () {
             { data: 'tgl_transaksi_terakhir', className: 'text-center' }
         ],
         rowCallback: function (row, data) {
-            applyAchievementStyle($('td', row).eq(13), data.achievement);
+            applyAchievementStyle($('td', row).eq(14), data.achievement);
         },
         drawCallback: function () {
             calculateTotals();
@@ -243,10 +245,12 @@ $(function () {
         let totalRevenueBranch = 0;
         let totalTopupValue = 0;
         const areas = new Set();
+        const clusters = new Set();
         const branches = new Set();
 
         table.rows().data().each(function (row) {
             areas.add(row.area);
+            clusters.add(row.cluster);
             branches.add(row.branch);
             totalMpcc += parseInt(row.jumlah_mpcc) || 0;
             totalLeads += parseInt(row.jumlah_leads) || 0;
@@ -304,5 +308,6 @@ $(function () {
 });
 </script>
 @endsection
+
 
 

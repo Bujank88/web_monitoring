@@ -2768,6 +2768,7 @@ class BackController extends Controller
             $headers = [
                 'Area',
                 'Branch',
+                'Cluster',
                 'Jumlah MPCC',
                 'Target Revenue Cluster (B)',
                 'Target Revenue Branch (B)',
@@ -2788,13 +2789,14 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
                 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
             ];
-            $sheet->getStyle('A1:N1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
 
             $rowNumber = 2;
             foreach ($rows as $row) {
                 $sheet->fromArray([
                     $row['area'],
                     $row['branch'],
+                    $row['cluster'],
                     $row['jumlah_mpcc'],
                     $row['target_revenue_cluster_billion'],
                     $row['target_revenue_branch_billion'],
@@ -2811,7 +2813,7 @@ class BackController extends Controller
                 $rowNumber++;
             }
 
-            foreach (range('A', 'N') as $column) {
+            foreach (range('A', 'O') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
@@ -2863,7 +2865,6 @@ class BackController extends Controller
             ->get()
             ->keyBy('user_id');
 
-
         $visitAggByName = DB::table('bookings')
             ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
             ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
@@ -2871,6 +2872,7 @@ class BackController extends Controller
             ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
             ->get()
             ->keyBy('nama');
+
         $targetRows = DB::table('mpcc_branch_targets')
             ->where('year', $targetYear)
             ->where('month', $targetMonth)
@@ -2879,26 +2881,117 @@ class BackController extends Controller
                 return [$this->normalizeMpccBranchKey($row->branch) => $row];
             });
 
+        $branchClusterCounts = $mpccUsers
+            ->map(function ($user) {
+                $rawBranch = trim((string) ($user->branch ?: '-'));
+
+                return [
+                    'branch' => $this->resolveMpccBranchName($rawBranch),
+                    'cluster' => $this->resolveMpccClusterName($rawBranch),
+                ];
+            })
+            ->groupBy('cluster')
+            ->map(function ($items) {
+                return max(1, $items->unique('branch')->count());
+            });
+
+        $clusterTargetTotals = $targetRows
+            ->flatMap(function ($row) {
+                $branch = trim((string) ($row->branch ?: '-'));
+                $clusters = $this->resolveMpccTargetClusters($branch);
+                $clusterCount = max(1, count($clusters));
+
+                return collect($clusters)->map(function ($cluster) use ($row, $clusterCount) {
+                    return [
+                        'cluster' => $cluster,
+                        'target_revenue_cluster_billion' => (float) ($row->target_revenue_cluster_billion ?? 0) / $clusterCount,
+                        'target_revenue_branch_billion' => (float) ($row->target_revenue_branch_billion ?? 0) / $clusterCount,
+                        'target_visit' => (int) round(((int) ($row->target_visit ?? 0)) / $clusterCount),
+                        'target_leads' => (int) round(((int) ($row->target_leads ?? 0)) / $clusterCount),
+                        'target_registrasi' => (int) round(((int) ($row->target_registrasi ?? 0)) / $clusterCount),
+                        'target_topup' => (int) round(((int) ($row->target_topup ?? 0)) / $clusterCount),
+                    ];
+                });
+            })
+            ->groupBy('cluster')
+            ->map(function ($items) {
+                return [
+                    'target_revenue_cluster_billion' => (float) $items->sum('target_revenue_cluster_billion'),
+                    'target_revenue_branch_billion' => (float) $items->sum('target_revenue_branch_billion'),
+                    'target_visit' => (int) $items->sum('target_visit'),
+                    'target_leads' => (int) $items->sum('target_leads'),
+                    'target_registrasi' => (int) $items->sum('target_registrasi'),
+                    'target_topup' => (int) $items->sum('target_topup'),
+                ];
+            });
         $grouped = [];
+        $jakartaArea = trim((string) ($mpccUsers->first(function ($user) {
+            return str_contains($this->normalizeMpccBranchKey($user->branch ?? null), 'jakarta');
+        })->area ?? 'Area 2'));
+
+        foreach (['Cluster Jakarta Barat', 'Cluster Jakarta Utara', 'Cluster Jakarta Pusat Selatan', 'Cluster Jakarta Timur'] as $cluster) {
+            $groupKey = $jakartaArea . '||' . $cluster . '||Jakarta';
+            $clusterTarget = $clusterTargetTotals->get($cluster, [
+                'target_revenue_cluster_billion' => 0,
+                'target_revenue_branch_billion' => 0,
+                'target_visit' => 0,
+                'target_leads' => 0,
+                'target_registrasi' => 0,
+                'target_topup' => 0,
+            ]);
+            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
+
+            $grouped[$groupKey] = [
+                'area' => $jakartaArea,
+                'cluster' => $cluster,
+                'branch' => 'Jakarta',
+                'jumlah_mpcc' => 0,
+                'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
+                'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
+                'target_visit' => (int) round(($clusterTarget['target_visit'] ?? 0) / $clusterBranchCount),
+                'target_leads' => (int) round(($clusterTarget['target_leads'] ?? 0) / $clusterBranchCount),
+                'target_registrasi' => (int) round(($clusterTarget['target_registrasi'] ?? 0) / $clusterBranchCount),
+                'target_topup' => (int) round(($clusterTarget['target_topup'] ?? 0) / $clusterBranchCount),
+                'actual_visit' => 0,
+                'jumlah_leads' => 0,
+                'jumlah_akun' => 0,
+                'achievement' => 0,
+                'total_topup' => 0,
+                'tgl_transaksi_terakhir' => '-',
+                '_last_transaction_at' => null,
+            ];
+        }
+
         foreach ($mpccUsers as $mpccUser) {
             $voucherCode = strtoupper($mpccUser->voucher_code);
             $voucherInfo = $voucherData->get($voucherCode);
             $area = trim((string) ($mpccUser->area ?: '-'));
-            $branch = trim((string) ($mpccUser->branch ?: '-'));
-            $groupKey = $area . '||' . $branch;
-            $target = $targetRows->get($this->normalizeMpccBranchKey($branch));
+            $rawBranch = trim((string) ($mpccUser->branch ?: '-'));
+            $branch = $this->resolveMpccBranchName($rawBranch);
+            $cluster = $this->resolveMpccClusterName($rawBranch);
+            $groupKey = $area . '||' . $cluster . '||' . $branch;
+            $clusterTarget = $clusterTargetTotals->get($cluster, [
+                'target_revenue_cluster_billion' => 0,
+                'target_revenue_branch_billion' => 0,
+                'target_visit' => 0,
+                'target_leads' => 0,
+                'target_registrasi' => 0,
+                'target_topup' => 0,
+            ]);
+            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
 
             if (!isset($grouped[$groupKey])) {
                 $grouped[$groupKey] = [
                     'area' => $area,
+                    'cluster' => $cluster,
                     'branch' => $branch,
                     'jumlah_mpcc' => 0,
-                    'target_revenue_cluster_billion' => (float) ($target->target_revenue_cluster_billion ?? 0),
-                    'target_revenue_branch_billion' => (float) ($target->target_revenue_branch_billion ?? 0),
-                    'target_visit' => (int) ($target->target_visit ?? 0),
-                    'target_leads' => (int) ($target->target_leads ?? 0),
-                    'target_registrasi' => (int) ($target->target_registrasi ?? 0),
-                    'target_topup' => (int) ($target->target_topup ?? 0),
+                    'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
+                    'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
+                    'target_visit' => (int) round(($clusterTarget['target_visit'] ?? 0) / $clusterBranchCount),
+                    'target_leads' => (int) round(($clusterTarget['target_leads'] ?? 0) / $clusterBranchCount),
+                    'target_registrasi' => (int) round(($clusterTarget['target_registrasi'] ?? 0) / $clusterBranchCount),
+                    'target_topup' => (int) round(($clusterTarget['target_topup'] ?? 0) / $clusterBranchCount),
                     'actual_visit' => 0,
                     'jumlah_leads' => 0,
                     'jumlah_akun' => 0,
@@ -2940,9 +3033,71 @@ class BackController extends Controller
                     : 0;
                 return $row;
             })
-            ->sortBy(['area', 'branch'])
+            ->sortBy(['area', 'cluster', 'branch'])
             ->values()
             ->all();
+    }
+
+    private function resolveMpccClusterName(?string $branch): string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        $clusterMap = [
+            'kota palembang' => 'Cluster Kota Palembang',
+            'palembang' => 'Cluster Kota Palembang',
+            'kota pekanbaru' => 'Cluster Kota Pekanbaru',
+            'pekanbaru' => 'Cluster Kota Pekanbaru',
+            'kota medan' => 'Cluster Kota Medan',
+            'medan' => 'Cluster Kota Medan',
+            'kota makassar' => 'Cluster Kota Makassar',
+            'makassar' => 'Cluster Kota Makassar',
+            'kota samarinda' => 'Cluster Kota Samarinda',
+            'samarinda' => 'Cluster Kota Samarinda',
+            'jakarta barat' => 'Cluster Jakarta Barat',
+            'western jakarta' => 'Cluster Jakarta Barat',
+            'jakarta utara' => 'Cluster Jakarta Utara',
+            'northern jakarta' => 'Cluster Jakarta Utara',
+            'jakarta pusat' => 'Cluster Jakarta Pusat Selatan',
+            'jakarta selatan' => 'Cluster Jakarta Pusat Selatan',
+            'southern jakarta' => 'Cluster Jakarta Pusat Selatan',
+            'jakarta timur' => 'Cluster Jakarta Timur',
+            'eastern jakarta' => 'Cluster Jakarta Timur',
+            'kota bandung' => 'Cluster Kota Bandung',
+            'bandung' => 'Cluster Kota Bandung',
+            'denpasar' => 'Cluster Bali Tengah',
+            'bali tengah' => 'Cluster Bali Tengah',
+            'surabaya' => 'Cluster Surabaya',
+            'semarang' => 'Cluster Semarang',
+        ];
+
+        foreach ($clusterMap as $keyword => $clusterName) {
+            if ($normalized !== '' && str_contains($normalized, $keyword)) {
+                return $clusterName;
+            }
+        }
+
+        return 'Cluster Lainnya';
+    }
+
+    private function resolveMpccTargetClusters(?string $branch): array
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        if ($normalized !== '' && str_contains($normalized, 'jakarta')) {
+            return ['Cluster Jakarta Barat', 'Cluster Jakarta Utara', 'Cluster Jakarta Pusat Selatan', 'Cluster Jakarta Timur'];
+        }
+        return [$this->resolveMpccClusterName($branch)];
+    }
+
+    private function resolveMpccBranchName(?string $branch): string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        if ($normalized !== '' && str_contains($normalized, 'jakarta')) {
+            return 'Jakarta';
+        }
+
+        return trim((string) ($branch ?: '-'));
     }
 
     private function normalizeMpccBranchKey(?string $branch): string
@@ -3005,6 +3160,8 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
+
+
 
 
 
