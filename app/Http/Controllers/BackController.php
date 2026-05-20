@@ -326,6 +326,8 @@ class BackController extends Controller
                     return redirect()->route('race_summary_treg');
                 case 'cvsr':
                     return redirect()->route('presensi.index');
+                case 'MPCC':
+                    return redirect()->route('mpcc.report');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
                 case 'Maxim':
