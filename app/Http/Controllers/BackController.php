@@ -2432,7 +2432,6 @@ class BackController extends Controller
             $voucherCode = strtoupper($mpccUser->voucher_code);
             $voucherInfo = $voucherData->get($voucherCode);
             $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
-            $jumlahVisit = (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
             $jumlahAkun = (int) ($voucherInfo->jumlah_akun ?? 0);
             $totalTopup = (float) ($voucherInfo->total_topup ?? 0);
             $poin = floor($totalTopup / 1000000);
@@ -2932,7 +2931,10 @@ class BackController extends Controller
         })->area ?? 'Area 2'));
 
         foreach (['Cluster Jakarta Barat', 'Cluster Jakarta Utara', 'Cluster Jakarta Pusat Selatan', 'Cluster Jakarta Timur'] as $cluster) {
-            $groupKey = $jakartaArea . '||' . $cluster . '||Jakarta';
+            $branchName = in_array($cluster, ['Cluster Jakarta Barat', 'Cluster Jakarta Utara'], true)
+                ? 'Jakarta Northern'
+                : 'Jakarta Southern';
+            $groupKey = $jakartaArea . '||' . $cluster . '||' . $branchName;
             $clusterTarget = $clusterTargetTotals->get($cluster, [
                 'target_revenue_cluster_billion' => 0,
                 'target_revenue_branch_billion' => 0,
@@ -2941,13 +2943,11 @@ class BackController extends Controller
                 'target_registrasi' => 0,
                 'target_topup' => 0,
             ]);
-            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
 
             $grouped[$groupKey] = [
                 'area' => $jakartaArea,
                 'cluster' => $cluster,
-                'branch' => 'Jakarta',
-                'jumlah_mpcc' => 0,
+                'branch' => $branchName,
                 'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
                 'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
                 'target_visit' => (int) round(($clusterTarget['target_visit'] ?? 0) / $clusterBranchCount),
@@ -3095,13 +3095,16 @@ class BackController extends Controller
     {
         $normalized = $this->normalizeMpccBranchKey($branch);
 
-        if ($normalized !== '' && str_contains($normalized, 'jakarta')) {
-            return 'Jakarta';
+        if ($normalized === 'northern jakarta') {
+            return 'Jakarta Northern';
+        }
+
+        if ($normalized === 'southern jakarta') {
+            return 'Jakarta Southern';
         }
 
         return trim((string) ($branch ?: '-'));
     }
-
     private function normalizeMpccBranchKey(?string $branch): string
     {
         return strtolower(trim((string) $branch));
