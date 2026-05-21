@@ -286,7 +286,7 @@
                 </div>
             </div>
 
-            @if(auth()->user()->hasRole('Admin') || auth()->user()->role === 'PH')
+            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC']))
             <div class="row">
                 <div class="col-md-12">
                     <div class="form-group">
@@ -399,15 +399,14 @@
         const today = new Date().toISOString().split('T')[0];
         $('#modalScheduleDate').attr('min', today);
 
-        // Check apakah user adalah PH
-        const isPH = {{ (auth()->user()->hasRole('Admin') || auth()->user()->role === 'PH') ? 'true' : 'false' }};
-
+        // Check apakah user wajib mengatur jadwal kunjungan
+        const requiresSchedule = {{ (auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC'])) ? 'true' : 'false' }};
         // Ketika modal ditutup dengan X, jangan clear data jika sudah ada
         $('#modalScheduleVisit').on('hidden.bs.modal', function() {
             const hasSchedule = $('#schedule_tanggal').val() && $('#schedule_waktu_mulai').val();
-            if (!hasSchedule && isPH && $('#btnScheduleVisit:visible').length > 0) {
+            if (!hasSchedule && requiresSchedule && $('#btnScheduleVisit:visible').length > 0) {
                 // Jangan lakukan apa-apa, user bisa batal tanpa schedule untuk admin
-                // Tapi untuk PH, akan dicek saat submit
+                // Tapi untuk role yang wajib, akan dicek saat submit
             }
         });
 
@@ -475,12 +474,12 @@
 
         // Form submission
         $('#formNewLead').on('submit', function(e) {
-            // Cek apakah user adalah PH
+            // Cek apakah user wajib mengatur jadwal kunjungan
             const tanggal = $('#schedule_tanggal').val();
             const waktuMulai = $('#schedule_waktu_mulai').val();
             const waktuSelesai = $('#schedule_waktu_selesai').val();
 
-            if (isPH && (!tanggal || !waktuMulai || !waktuSelesai)) {
+            if (requiresSchedule && (!tanggal || !waktuMulai || !waktuSelesai)) {
                 e.preventDefault();
                 
                 Swal.fire({
