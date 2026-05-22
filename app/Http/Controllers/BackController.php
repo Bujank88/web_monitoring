@@ -2943,10 +2943,12 @@ class BackController extends Controller
                 'target_registrasi' => 0,
                 'target_topup' => 0,
             ]);
+            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
 
             $grouped[$groupKey] = [
                 'area' => $jakartaArea,
                 'cluster' => $cluster,
+                'jumlah_mpcc' => 0,
                 'branch' => $branchName,
                 'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
                 'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
