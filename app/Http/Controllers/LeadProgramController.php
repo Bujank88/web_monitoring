@@ -576,6 +576,7 @@ class LeadProgramController extends Controller
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $canvaserIds)
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -598,6 +599,7 @@ class LeadProgramController extends Controller
                     [$startOfMonth, $endOfMonthFormatted]
                 )
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -617,6 +619,7 @@ class LeadProgramController extends Controller
                 ->where('dt.status', 'APPROVE')
                 ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -644,6 +647,7 @@ class LeadProgramController extends Controller
             $momByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $canvaserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
