@@ -228,8 +228,9 @@
                     </a>
                 </li>
                 @elseif($isMpcc)
-                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'active' : '' }}">
+                <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
                         <p>
                             MPCC
@@ -247,6 +248,12 @@
                             <a href="{{ route('mpcc.report.area-branch') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.area-branch*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fas fa-sitemap" style="color:#20c997;"></i>
                                 <p>MPCC Area Branch</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report.pilot-city') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.pilot-city') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-table" style="color:#6f42c1;"></i>
+                                <p>MPCC Pilot City</p>
                             </a>
                         </li>
                     </ul>
@@ -380,7 +387,7 @@
                 @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
-                @if($isAdmin || $isTsel || $isCanv || $isPH || $isMpcc)
+                @if($isAdmin || $isTsel || $isCanv || $isPH)
                 <li class="nav-header">ALL DASHBOARD</li>
                 <li class="nav-item">
                     <a href="{{ route('daily.topup.channel') }}"
@@ -402,6 +409,35 @@
                         <i class="nav-icon fa-solid fa-lightbulb" style="color:rgb(255, 193, 7);"></i>
                         <p>Tips Sales</p>
                     </a>
+                </li>
+                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
+                        <p>
+                            MPCC
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-chart-bar" style="color:#ffc107;"></i>
+                                <p>MPCC Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report.area-branch') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.area-branch*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-sitemap" style="color:#20c997;"></i>
+                                <p>MPCC Area Branch</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('mpcc.report.pilot-city') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.pilot-city') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-table" style="color:#6f42c1;"></i>
+                                <p>MPCC Pilot City</p>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 @endif
                 @if($isAdmin || $isTsel || $isPH)
@@ -446,32 +482,6 @@
                     </ul>
                 </li>
 
-                @endif
-                @if($isAdmin)
-                {{-- <li class="nav-header">MPCC</li> --}}
-                <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*')) ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
-                        <p>
-                            MPCC
-                            <i class="right fas fa-angle-left"></i>
-                        </p>
-                    </a>
-                    <ul class="nav nav-treeview">
-                        <li class="nav-item">
-                            <a href="{{ route('mpcc.report') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="nav-icon fas fa-chart-bar" style="color:#ffc107;"></i>
-                                <p>MPCC Report</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route('mpcc.report.area-branch') }}" class="nav-link waves-effect {{ request()->routeIs('mpcc.report.area-branch*') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="nav-icon fas fa-sitemap" style="color:#20c997;"></i>
-                                <p>MPCC Area Branch</p>
-                            </a>
-                        </li>
-                    </ul>
-                </li>
                 @endif
                 {{--<li class="nav-item {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'active' : '' }}">
@@ -928,7 +938,7 @@
                 </li>
 
                 @endif
-                @if($isAdmin || $isCanv || $isPH || $isMpcc)
+                @if($isAdmin || $isCanv || $isPH)
                 <li class="nav-header">EVENT APRIL</li>
                 <li class="nav-item">
                     <a href="{{ route('logbook-event.index') }}"
