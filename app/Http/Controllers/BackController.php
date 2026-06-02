@@ -2823,6 +2823,61 @@ class BackController extends Controller
         }, $fileName);
     }
 
+    public function showMpccPilotCityReport(Request $request)
+    {
+        $availableYears = DB::table('mpcc_branch_targets')
+            ->select('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->merge(
+                DB::table('mpcc_targets')
+                    ->select('year')
+                    ->distinct()
+                    ->pluck('year')
+            )
+            ->push(Carbon::now()->year)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $availableMonths = $availableYears
+            ->flatMap(function ($year) {
+                return collect(range(1, 12))->map(function ($month) use ($year) {
+                    $value = sprintf('%04d-%02d', $year, $month);
+
+                    return [
+                        'value' => $value,
+                        'label' => Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y'),
+                    ];
+                })->reverse()->values();
+            })
+            ->values();
+
+        $defaultMonth = Carbon::now()->format('Y-m');
+        if (!$availableMonths->contains(fn($month) => $month['value'] === $defaultMonth)) {
+            $defaultMonth = $availableMonths->first()['value'] ?? $defaultMonth;
+        }
+        $selectedMonth = $request->get('month', $defaultMonth);
+
+        if (!preg_match('/^\d{4}-\d{2}$/', (string) $selectedMonth)) {
+            $selectedMonth = $defaultMonth;
+        }
+
+        $monthDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        $report = $this->buildMpccPilotCityReport($monthDate);
+
+        return view('admin.mpcc_pilot_city_report', [
+            'availableMonths' => $availableMonths,
+            'selectedMonth' => $selectedMonth,
+            'reportConfig' => $report['config'],
+            'reportRows' => $report['rows'],
+            'missingDataNotes' => $report['missing_data_notes'],
+            'sourceNotes' => $report['source_notes'],
+            'periodLabel' => $monthDate->translatedFormat('F Y'),
+        ]);
+    }
+
     private function buildMpccAreaBranchRows(Carbon $startDate, Carbon $endDate): array
     {
         $mpccUsers = $this->getMpccUsersWithVoucherCodes();
@@ -3040,6 +3095,271 @@ class BackController extends Controller
             ->sortBy(['area', 'cluster', 'branch'])
             ->values()
             ->all();
+    }
+
+    private function buildMpccPilotCityReport(Carbon $monthDate): array
+    {
+        $config = $this->getMpccPilotCityConfig();
+        $cityKeys = collect($config)
+            ->flatMap(function ($group) {
+                return collect($group['cities'])->pluck('key');
+            })
+            ->values()
+            ->all();
+
+        $stats = [];
+        foreach ($cityKeys as $cityKey) {
+            $stats[$cityKey] = [
+                'mpcc' => 0,
+                'revenue_commitment' => 0,
+                'visits' => 0,
+                'leads' => 0,
+                'customers' => 0,
+                'total_topup' => 0,
+            ];
+        }
+
+        $startDate = $monthDate->copy()->startOfMonth();
+        $endDate = $monthDate->copy()->endOfMonth();
+        $targetMonth = (int) $monthDate->month;
+        $targetYear = (int) $monthDate->year;
+
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
+            return strtoupper($code);
+        })->values()->all();
+        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->values()->all();
+
+        $voucherData = collect();
+        $leadAggByUser = collect();
+        $visitAggByName = collect();
+
+        if (!empty($voucherCodes)) {
+            $transactionDateExpr = "DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))";
+
+            $voucherData = DB::table('report_balance_top_up as rb')
+                ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+                ->select(
+                    DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                    DB::raw('COUNT(DISTINCT LOWER(rb.email_client)) as jumlah_akun'),
+                    DB::raw('SUM(CAST(rb.amount AS DECIMAL(15,2))) as total_topup')
+                )
+                ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+                ->whereBetween(DB::raw($transactionDateExpr), [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+                ->get()
+                ->keyBy('voucher_code');
+        }
+
+        if (!empty($userIds)) {
+            $leadAggByUser = DB::table('leads_master')
+                ->whereIn('user_id', $userIds)
+                ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+                ->groupBy('user_id')
+                ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+                ->get()
+                ->keyBy('user_id');
+
+            $visitAggByName = DB::table('bookings')
+                ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
+                ->whereBetween('tanggal', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->groupBy('nama')
+                ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+                ->get()
+                ->keyBy('nama');
+        }
+
+        $targetRows = DB::table('mpcc_branch_targets')
+            ->where('year', $targetYear)
+            ->where('month', $targetMonth)
+            ->select('branch', 'target_revenue_branch_billion')
+            ->get();
+
+        foreach ($targetRows as $targetRow) {
+            $cityKey = $this->resolveMpccPilotCityKey($targetRow->branch);
+            if (!$cityKey || !isset($stats[$cityKey])) {
+                continue;
+            }
+
+            $branchTargetRevenue = (float) ($targetRow->target_revenue_branch_billion ?? 0);
+            $stats[$cityKey]['revenue_commitment'] += $branchTargetRevenue;
+        }
+
+        foreach ($mpccUsers as $mpccUser) {
+            $cityKey = $this->resolveMpccPilotCityKey($mpccUser->branch);
+            if (!$cityKey || !isset($stats[$cityKey])) {
+                continue;
+            }
+
+            $voucherCode = strtoupper($mpccUser->voucher_code);
+            $voucherInfo = $voucherData->get($voucherCode);
+
+            $stats[$cityKey]['mpcc']++;
+            $stats[$cityKey]['visits'] += (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
+            $stats[$cityKey]['leads'] += (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
+            $stats[$cityKey]['customers'] += (int) ($voucherInfo->jumlah_akun ?? 0);
+            $stats[$cityKey]['total_topup'] += (float) ($voucherInfo->total_topup ?? 0);
+        }
+
+        $rows = [
+            [
+                'section' => 'basic',
+                'label' => 'MPCC',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'mpcc'),
+            ],
+            [
+                'section' => 'basic',
+                'label' => 'Local SBP',
+                'values' => $this->buildUnavailableMetricRow($cityKeys),
+            ],
+            [
+                'section' => 'basic',
+                'label' => 'Number of resellers onboarded',
+                'values' => $this->buildUnavailableMetricRow($cityKeys),
+            ],
+            [
+                'section' => 'commitment',
+                'label' => 'Revenue commitment',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'revenue_commitment'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of visits',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'visits'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of leads',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'leads'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of customers',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'customers'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => 'Total top-up',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'total_topup'),
+            ],
+        ];
+
+        return [
+            'config' => $config,
+            'rows' => $rows,
+            'missing_data_notes' => [
+                'Mapping formal `Area VP` dan `pilot city` belum ditemukan di tabel database, jadi saat ini dipasang manual mengikuti contoh yang Anda kirim.',
+                'Baris `Local SBP` belum bisa diisi akurat per pilot city karena tabel `mitra_sbp` hanya punya `area` dan `regional`, belum ada pemetaan langsung ke branch/kota pilot.',
+                'Baris `Number of resellers onboarded` belum ada definisi dan sumber tabel/kolom yang tegas. Saya belum menemukan field `reseller` atau status `onboarded` yang bisa dihitung langsung.',
+            ],
+            'source_notes' => [
+                'MPCC diambil dari `users.role = MPCC` dan dikelompokkan berdasarkan branch/kota pilot.',
+                'Revenue commitment hanya diambil dari `mpcc_branch_targets.target_revenue_branch_billion` pada bulan yang dipilih dan ditampilkan dengan nilai aslinya.',
+                'Visits diambil dari `bookings`, leads dari `leads_master`, customers dari transaksi voucher unik di `report_balance_top_up + data_voucher`, dan total top-up dari penjumlahan `report_balance_top_up.amount`.',
+            ],
+        ];
+    }
+
+    private function getMpccPilotCityConfig(): array
+    {
+        return [
+            [
+                'vp' => 'P. Saki Hamsat Bramono',
+                'area' => '1',
+                'cities' => [
+                    ['key' => 'palembang', 'label' => 'Palembang'],
+                    ['key' => 'medan', 'label' => 'Medan'],
+                    ['key' => 'pekanbaru', 'label' => 'Pekanbaru'],
+                ],
+            ],
+            [
+                'vp' => 'B. Tuty R. Afriza',
+                'area' => '2',
+                'cities' => [
+                    ['key' => 'bandung', 'label' => 'Bandung'],
+                    ['key' => 'jakarta', 'label' => 'Jakarta'],
+                ],
+            ],
+            [
+                'vp' => 'P. Suryo Hadiyanto',
+                'area' => '3',
+                'cities' => [
+                    ['key' => 'semarang', 'label' => 'Semarang'],
+                    ['key' => 'denpasar', 'label' => 'Denpasar'],
+                    ['key' => 'surabaya', 'label' => 'Surabaya'],
+                ],
+            ],
+            [
+                'vp' => 'P. Murhalis',
+                'area' => '4',
+                'cities' => [
+                    ['key' => 'samarinda', 'label' => 'Samarinda'],
+                    ['key' => 'makassar', 'label' => 'Makassar'],
+                ],
+            ],
+        ];
+    }
+
+    private function resolveMpccPilotCityKey(?string $branch): ?string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        $cityMap = [
+            'palembang' => 'palembang',
+            'medan' => 'medan',
+            'pekanbaru' => 'pekanbaru',
+            'bandung' => 'bandung',
+            'northern jakarta' => 'jakarta',
+            'southern jakarta' => 'jakarta',
+            'jakarta barat' => 'jakarta',
+            'jakarta utara' => 'jakarta',
+            'jakarta pusat' => 'jakarta',
+            'jakarta selatan' => 'jakarta',
+            'jakarta timur' => 'jakarta',
+            'semarang' => 'semarang',
+            'denpasar' => 'denpasar',
+            'surabaya' => 'surabaya',
+            'samarinda' => 'samarinda',
+            'makassar' => 'makassar',
+        ];
+
+        foreach ($cityMap as $keyword => $cityKey) {
+            if ($normalized !== '' && str_contains($normalized, $keyword)) {
+                return $cityKey;
+            }
+        }
+
+        return null;
+    }
+
+    private function formatMpccPilotCityMetricRow(array $cityKeys, array $stats, string $metric): array
+    {
+        $formatted = [];
+
+        foreach ($cityKeys as $cityKey) {
+            $value = $stats[$cityKey][$metric] ?? 0;
+
+            switch ($metric) {
+                case 'revenue_commitment':
+                    $formatted[] = 'Rp ' . number_format((float) $value, 0, ',', '.');
+                    break;
+                case 'total_topup':
+                    $formatted[] = 'Rp ' . number_format((float) $value, 0, ',', '.');
+                    break;
+                default:
+                    $formatted[] = number_format((int) $value, 0, ',', '.');
+                    break;
+            }
+        }
+
+        return $formatted;
+    }
+
+    private function buildUnavailableMetricRow(array $cityKeys): array
+    {
+        return array_fill(0, count($cityKeys), '-');
     }
 
     private function resolveMpccClusterName(?string $branch): string

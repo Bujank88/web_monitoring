@@ -278,6 +278,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
     Route::get('/mpcc-report-area-branch', [FrontController::class, 'monitoringMpccAreaBranchReport'])->name('mpcc.report.area-branch');
     Route::get('/mpcc-report-area-branch/data', [BackController::class, 'getMpccAreaBranchReport'])->name('mpcc.report.area-branch.data');
     Route::get('/mpcc-report-area-branch/export', [BackController::class, 'exportMpccAreaBranchReport'])->name('mpcc.report.area-branch.export');
+    Route::get('/mpcc-report-pilot-city', [BackController::class, 'showMpccPilotCityReport'])->name('mpcc.report.pilot-city');
 });
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
     // AM Level UP Routes
