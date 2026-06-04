@@ -180,6 +180,46 @@ class FrontController extends Controller
         return view('admin.upload-automatech-report', compact('uploadedFiles', 'templateFile'));
     }
 
+    public function uploadAvalonKemangBogorReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/avalon-kemang-bogor-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.avalon-kemang-bogor-report.template');
+        $pageTitle = 'Upload Report Avalon Kemang Bogor';
+        $uploadTitle = 'Upload Excel Report Avalon Kemang Bogor';
+        $uploadDescription = 'Upload file report Avalon Kemang Bogor khusus admin. Format file mengikuti template yang sudah disediakan.';
+        $storeRoute = 'admin.upload.avalon-kemang-bogor-report.store';
+        $emptyUploadText = 'Belum ada file report Avalon Kemang Bogor yang diupload.';
+        $templateButtonText = 'Download Template Laporan Avalon';
+
+        return view('admin.upload-automatech-report', compact(
+            'uploadedFiles',
+            'templateFile',
+            'pageTitle',
+            'uploadTitle',
+            'uploadDescription',
+            'storeRoute',
+            'emptyUploadText',
+            'templateButtonText'
+        ));
+    }
+
     public function downloadAutomatechReportTemplate()
     {
         $spreadsheet = new Spreadsheet();
@@ -213,6 +253,41 @@ class FrontController extends Controller
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
         }, 'Template Laporan Automatech Dummy.xlsx');
+    }
+
+    public function downloadAvalonKemangBogorReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['2649001', '11 May 2026', 'AVALON KEMANG BOGOR DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '5000', '92', '37', '132000'],
+            ['2649002', '12 May 2026', 'AVALON KEMANG BOGOR DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '2000', '41', '18', '98000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan Avalon Kemang Bogor Dummy.xlsx');
     }
 
 

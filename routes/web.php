@@ -320,6 +320,11 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(fu
     Route::get('report-automatech/export', [ReportController::class, 'exportAutomatech'])->name('report-automatech.export');
     Route::get('report-saldo-automatech', [ReportController::class, 'reportSaldoAutomatech'])->name('report-saldo-automatech');
     Route::get('report-saldo-automatech/data', [ReportController::class, 'reportSaldoAutomatechData'])->name('report-saldo-automatech.data');
+    Route::get('report-avalon-kemang-bogor', [ReportController::class, 'reportAvalonKemangBogor'])->name('report-avalon-kemang-bogor');
+    Route::get('report-avalon-kemang-bogor/data', [ReportController::class, 'reportAvalonKemangBogorData'])->name('report-avalon-kemang-bogor.data');
+    Route::get('report-avalon-kemang-bogor/export', [ReportController::class, 'exportAvalonKemangBogor'])->name('report-avalon-kemang-bogor.export');
+    Route::get('report-saldo-avalon-kemang-bogor', [ReportController::class, 'reportSaldoAvalonKemangBogor'])->name('report-saldo-avalon-kemang-bogor');
+    Route::get('report-saldo-avalon-kemang-bogor/data', [ReportController::class, 'reportSaldoAvalonKemangBogorData'])->name('report-saldo-avalon-kemang-bogor.data');
 });
 
 Route::middleware(['auth', 'checkrole:Admin,CDSI'])->group(function () {
@@ -357,6 +362,9 @@ Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
     Route::get('/upload-report-automatech', [FrontController::class, 'uploadAutomatechReport'])->name('admin.upload.automatech-report');
     Route::get('/upload-report-automatech/template', [FrontController::class, 'downloadAutomatechReportTemplate'])->name('admin.upload.automatech-report.template');
     Route::post('/upload-report-automatech', [BackController::class, 'storeUploadAutomatechReport'])->name('admin.upload.automatech-report.store');
+    Route::get('/upload-report-avalon-kemang-bogor', [FrontController::class, 'uploadAvalonKemangBogorReport'])->name('admin.upload.avalon-kemang-bogor-report');
+    Route::get('/upload-report-avalon-kemang-bogor/template', [FrontController::class, 'downloadAvalonKemangBogorReportTemplate'])->name('admin.upload.avalon-kemang-bogor-report.template');
+    Route::post('/upload-report-avalon-kemang-bogor', [BackController::class, 'storeUploadAvalonKemangBogorReport'])->name('admin.upload.avalon-kemang-bogor-report.store');
     Route::get('/upload-report-cdsi', [FrontController::class, 'uploadCdsiReport'])->name('admin.upload.cdsi-report');
     Route::get('/upload-report-cdsi/template', [FrontController::class, 'downloadCdsiReportTemplate'])->name('admin.upload.cdsi-report.template');
     Route::post('/upload-report-cdsi', [BackController::class, 'storeUploadCdsiReport'])->name('admin.upload.cdsi-report.store');
