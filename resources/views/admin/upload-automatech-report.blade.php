@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Upload Report Automatech @endsection
+@section('title') {{ $pageTitle ?? 'Upload Report Automatech' }} @endsection
 
 @section('css')
 <style>
@@ -50,13 +50,13 @@
         <div class="card upload-card h-100">
             <div class="card-header">
                 <h3 class="card-title mb-0" style="font-weight: 700;">
-                    <i class="fas fa-file-arrow-up mr-2"></i>Upload Excel Report Automatech
+                    <i class="fas fa-file-arrow-up mr-2"></i>{{ $uploadTitle ?? 'Upload Excel Report Automatech' }}
                 </h3>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-4">Upload file report Automatech khusus admin. Format file mengikuti template yang sudah disediakan.</p>
+                <p class="text-muted mb-4">{{ $uploadDescription ?? 'Upload file report Automatech khusus admin. Format file mengikuti template yang sudah disediakan.' }}</p>
 
-                <form action="{{ route('admin.upload.automatech-report.store') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route($storeRoute ?? 'admin.upload.automatech-report.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="form-group">
                         <label for="report_file">Pilih File Excel</label>
@@ -68,7 +68,7 @@
                         <h5 class="mb-2" style="font-weight: 700;">Contoh File</h5>
                         <p class="mb-3">Gunakan template berikut sebagai acuan sebelum upload.</p>
                         <a href="{{ $templateFile }}" class="btn btn-outline-primary" target="_blank">
-                            <i class="fas fa-file-excel mr-1"></i>Download Template Laporan MyADS
+                            <i class="fas fa-file-excel mr-1"></i>{{ $templateButtonText ?? 'Download Template Laporan MyADS' }}
                         </a>
                     </div>
 
@@ -89,7 +89,7 @@
             </div>
             <div class="card-body">
                 @if($uploadedFiles->isEmpty())
-                <div class="text-muted">Belum ada file report Automatech yang diupload.</div>
+                <div class="text-muted">{{ $emptyUploadText ?? 'Belum ada file report Automatech yang diupload.' }}</div>
                 @else
                 <div class="table-responsive">
                     <table class="table table-bordered recent-table mb-0">

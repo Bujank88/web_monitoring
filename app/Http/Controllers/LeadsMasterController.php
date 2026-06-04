@@ -422,7 +422,12 @@ class LeadsMasterController extends Controller
             'nama' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
             'remarks' => 'nullable|string|max:1000',
-            'myads_account' => 'required|string|max:255'
+            'myads_account' => 'required|string|max:255',
+            'schedule_lokasi' => 'nullable|string|max:255',
+            'schedule_tanggal' => 'nullable|date',
+            'schedule_waktu_mulai' => 'nullable|date_format:H:i',
+            'schedule_waktu_selesai' => 'nullable|date_format:H:i',
+            'schedule_keterangan' => 'nullable|string|max:1000'
         ];
 
         $messages = [
@@ -451,8 +456,32 @@ class LeadsMasterController extends Controller
             'data_type' => 'Eksisting Akun',
         ]);
 
+        $scheduleInfo = null;
+        if ($request->filled('schedule_tanggal') && $request->filled('schedule_waktu_mulai') && $request->filled('schedule_waktu_selesai')) {
+            $locationName = $validated['schedule_lokasi'] ?? $validated['company_name'] ?? '-';
 
-        return redirect()->route('leads-master.index')->with('success', 'Leads baru berhasil disimpan.');
+            DB::table('bookings')->insert([
+                'nama' => auth()->user()->name,
+                'lokasi' => $locationName,
+                'tanggal' => $validated['schedule_tanggal'],
+                'waktu_mulai' => $validated['schedule_waktu_mulai'],
+                'waktu_selesai' => $validated['schedule_waktu_selesai'],
+                'keterangan' => $validated['schedule_keterangan'] ?? 'Kunjungan dari akun existing: ' . $validated['company_name'],
+                'warna' => '#667eea',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $scheduleDate = \Carbon\Carbon::parse($validated['schedule_tanggal'])->translatedFormat('l, d F Y');
+            $scheduleInfo = "Jadwal: {$scheduleDate} ({$validated['schedule_waktu_mulai']} - {$validated['schedule_waktu_selesai']})";
+        }
+
+        $successMsg = 'Akun existing untuk ' . $validated['company_name'] . ' berhasil ditambahkan.';
+        if ($scheduleInfo) {
+            $successMsg .= "\n" . $scheduleInfo;
+        }
+
+        return redirect()->route('leads-master.index')->with('success_with_schedule', $successMsg);
     }
 
     public function storeEnterprise(Request $request)

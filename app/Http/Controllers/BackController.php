@@ -443,6 +443,98 @@ class BackController extends Controller
             ->with('success', count($payload) . ' baris report Automatech berhasil diimport dari ' . $storedPath . '.');
     }
 
+    public function storeUploadAvalonKemangBogorReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-avalon-kemang-bogor';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('avalon-kemang-bogor-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.avalon-kemang-bogor-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.avalon-kemang-bogor-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('automatech_reports')->delete();
+            DB::table('automatech_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.avalon-kemang-bogor-report')
+            ->with('success', count($payload) . ' baris report Avalon Kemang Bogor berhasil diimport dari ' . $storedPath . '.');
+    }
+
 
     public function storeUploadCdsiReport(Request $request)
     {

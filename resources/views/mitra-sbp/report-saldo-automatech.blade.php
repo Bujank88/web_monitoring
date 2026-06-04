@@ -81,7 +81,7 @@ $(function() {
         serverSide: true,
         responsive: true,
         ajax: {
-            url: "{{ route('report-saldo-automatech.data') }}",
+            url: "{{ route($dataRoute ?? 'report-saldo-automatech.data') }}",
             data: function(d) {
                 d.month = $('#month').val();
                 d.remark = $('#remark').val();

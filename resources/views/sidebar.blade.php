@@ -769,10 +769,44 @@
                             <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                             <p>Report Saldo</p>
                         </a>
-                    </li>
+                        </li>
                     </ul>
-            </li>
-        @endif
+                </li>
+                @endif
+                @if($isAdmin)
+                <li class="nav-item {{ request()->routeIs('report-avalon-kemang-bogor') || request()->routeIs('report-saldo-avalon-kemang-bogor') || request()->routeIs('admin.upload.avalon-kemang-bogor-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-avalon-kemang-bogor') || request()->routeIs('report-saldo-avalon-kemang-bogor') || request()->routeIs('admin.upload.avalon-kemang-bogor-report') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-city" style="color:#8e44ad;"></i>
+                                <p>
+                                    Avalon Kemang Bogor
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('report-avalon-kemang-bogor') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-avalon-kemang-bogor') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report Avalon Kemang Bogor</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-avalon-kemang-bogor') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-avalon-kemang-bogor') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo Avalon</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.upload.avalon-kemang-bogor-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.avalon-kemang-bogor-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report Avalon</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @endif
                 {{-- <li class="nav-item">
                     <a href="{{ route('logbook.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logbook.index') ? 'active' : '' }}">

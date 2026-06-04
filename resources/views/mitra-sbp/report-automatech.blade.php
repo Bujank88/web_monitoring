@@ -73,7 +73,7 @@
 
 @section('content')
 <div class="filter-card">
-    <h5><i class="fas fa-filter"></i> AUTOMATECH REPORT FILTER</h5>
+    <h5><i class="fas fa-filter"></i> {{ $filterTitle ?? 'AUTOMATECH REPORT FILTER' }}</h5>
     <div class="filter-row">
         <div class="filter-group">
             <label for="month">Month</label>
@@ -171,7 +171,7 @@
 
         function updateExportLink() {
             var month = $('#month').val();
-            var url = "{{ route('report-automatech.export') }}" + "?month=" + encodeURIComponent(month);
+            var url = "{{ route($exportRoute ?? 'report-automatech.export') }}" + "?month=" + encodeURIComponent(month);
             $('#btnExportCampaign').attr('href', url);
         }
 
@@ -180,7 +180,7 @@
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('report-automatech.data') }}",
+                url: "{{ route($dataRoute ?? 'report-automatech.data') }}",
                 data: function(d) {
                     d.month = $('#month').val();
                 }

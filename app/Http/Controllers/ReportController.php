@@ -805,6 +805,32 @@ class ReportController extends Controller
         return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
 
+    public function reportSaldoAvalonKemangBogor(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo Avalon Kemang Bogor';
+        $dataRoute = 'report-saldo-avalon-kemang-bogor.data';
+
+        return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute'));
+    }
+
     public function reportAgencyAdvertising(Request $request)
     {
         logUserLogin();
@@ -879,6 +905,34 @@ class ReportController extends Controller
         $pageTitle = 'Report Campaign Automatech';
 
         return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportAvalonKemangBogor(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Avalon Kemang Bogor';
+        $dataRoute = 'report-avalon-kemang-bogor.data';
+        $exportRoute = 'report-avalon-kemang-bogor.export';
+        $filterTitle = 'AVALON KEMANG BOGOR REPORT FILTER';
+
+        return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute', 'exportRoute', 'filterTitle'));
     }
     protected function automatechUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
     {
@@ -1275,6 +1329,11 @@ class ReportController extends Controller
             ->make(true);
     }
 
+    public function reportSaldoAvalonKemangBogorData(Request $request)
+    {
+        return $this->reportSaldoAutomatechData($request);
+    }
+
     public function reportCampaignSbpData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -1513,6 +1572,11 @@ class ReportController extends Controller
                 return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
             })
             ->make(true);
+    }
+
+    public function reportAvalonKemangBogorData(Request $request)
+    {
+        return $this->reportAutomatechData($request);
     }
 
     public function exportCampaignSbp(Request $request)
@@ -2046,6 +2110,117 @@ class ReportController extends Controller
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error('Export Automatech Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+    public function exportAvalonKemangBogor(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $data = $this->automatechUploadedReportBaseQuery($startDate, $endDate)
+                ->select(
+                    DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                    'ar.id_iklan',
+                    'ar.judul_pesan_iklan',
+                    'ar.operator_seluler',
+                    'ar.kategori_iklan',
+                    'ar.tipe_kanal',
+                    'ar.sukses as success',
+                    DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                    'ar.refunded',
+                    'ar.read',
+                    'ar.click',
+                    'ar.total_harga',
+                    'ar.detil_status'
+                )
+                ->orderByDesc('ar.tgl_tayang')
+                ->orderByDesc('ar.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT AVALON KEMANG BOGOR - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Avalon_Kemang_Bogor_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Avalon Kemang Bogor Error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal export data');
         }
     }
