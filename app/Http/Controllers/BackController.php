@@ -2687,6 +2687,14 @@ class BackController extends Controller
             ];
         }
 
+        usort($result, function ($left, $right) {
+            $totalComparison = $right['total_topup'] <=> $left['total_topup'];
+
+            return $totalComparison !== 0
+                ? $totalComparison
+                : strcasecmp($left['team_powerhouse'], $right['team_powerhouse']);
+        });
+
         return DataTables::of($result)
             ->addIndexColumn()
             ->addColumn('acv', function ($row) {
@@ -3583,7 +3591,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
 
 
 
