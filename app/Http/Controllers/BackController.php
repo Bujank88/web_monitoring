@@ -89,6 +89,11 @@ class BackController extends Controller
         $topUpExistingAkunByUser = collect();
         $momByUser = collect();
         $topUpAggByUser = collect();
+        $saldoTransferStatsByUser = collect();
+        $saldoTransferNewAkunByUser = collect();
+        $saldoTransferExistingAkunByUser = collect();
+        $saldoTransferMomByUser = collect();
+        $saldoTransferAggByUser = collect();
         $leadAggByUser = collect();
         $visitAggByName = collect();
         $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
@@ -182,6 +187,88 @@ class BackController extends Controller
                 )
                 ->get()
                 ->keyBy('user_id');
+
+            if (Schema::hasTable('saldo_transfer')) {
+                $saldoTransferStatsByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(st.id) as top_up_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as total_top_up_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferAggByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(DISTINCT LOWER(st.email_client)) as jumlah_akun'),
+                        DB::raw('MAX(st.tgl_transaksi) as tgl_transaksi_terakhir')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('saldo_transfer as st', function ($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                            ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->where('dt.status', 'APPROVE')
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startDateFormatted, $endDateFormatted]
+                    )
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(DISTINCT st.id) as top_up_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as top_up_new_akun_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('saldo_transfer as st', function ($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                            ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->where('dt.status', 'APPROVE')
+                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(st.id) as top_up_existing_akun_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as top_up_existing_akun_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferMomByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_prev_partial"),
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_current_partial"),
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_prev_remaining")
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+            }
         }
 
         $leadAggByUser = DB::table('leads_master')
@@ -204,14 +291,22 @@ class BackController extends Controller
         foreach ($phUsers as $phUser) {
             $userId = (int) $phUser->id;
 
-            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0);
-            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
-            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
-            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
-            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
-            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0);
-            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0);
-            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0);
+            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0)
+                + (int) ($saldoTransferNewAkunByUser[$userId]->top_up_count ?? 0);
+            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0)
+                + (int) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0)
+                + (float) ($saldoTransferNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0)
+                + (float) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0)
+                + (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_prev_remaining ?? 0);
 
             $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
             $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
@@ -224,12 +319,17 @@ class BackController extends Controller
             $momGap = $momCurrentPartial - $momPrevPartial;
             $poin = floor($totalTopup / 1000000);
 
-            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
+            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0)
+                + (int) ($saldoTransferAggByUser[$userId]->jumlah_akun ?? 0);
             $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
             $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
             $target = (float) ($targetByTeam[$userId]->target ?? 0);
-            $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
-                ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
+            $lastTransactionDates = array_filter([
+                $topUpAggByUser[$userId]->tgl_transaksi_terakhir ?? null,
+                $saldoTransferAggByUser[$userId]->tgl_transaksi_terakhir ?? null,
+            ]);
+            $tglFormatted = !empty($lastTransactionDates)
+                ? Carbon::parse(max($lastTransactionDates))->format('d M Y')
                 : '-';
             
             $result[] = [
@@ -2687,6 +2787,14 @@ class BackController extends Controller
             ];
         }
 
+        usort($result, function ($left, $right) {
+            $totalComparison = $right['total_topup'] <=> $left['total_topup'];
+
+            return $totalComparison !== 0
+                ? $totalComparison
+                : strcasecmp($left['team_powerhouse'], $right['team_powerhouse']);
+        });
+
         return DataTables::of($result)
             ->addIndexColumn()
             ->addColumn('acv', function ($row) {
@@ -3583,9 +3691,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
-
-
 
 
 

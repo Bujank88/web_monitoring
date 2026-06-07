@@ -207,7 +207,7 @@
     }
 
     /* Kolom Nomor */
-    .table tbody tr td:nth-child(1) {
+    #powerHouseTable tbody tr td:nth-child(1) {
         font-weight: 600;
         color: #667eea;
         background-color: #f0f2f9;
@@ -215,35 +215,35 @@
     }
 
     /* Kolom Referral Code */
-    .table tbody tr td:nth-child(2) {
+    #powerHouseTable tbody tr td:nth-child(4) {
         font-weight: 600;
         color: #333;
         letter-spacing: 0.5px;
     }
 
-    /* Kolom Canvasser */
-    .table tbody tr td:nth-child(3) {
+    /* Kolom Nama MPCC */
+    #powerHouseTable tbody tr td:nth-child(5) {
         font-weight: 500;
         color: #333;
     }
 
-    /* Kolom Jumlah New Akun */
-    .table tbody tr td:nth-child(4) {
+    /* Kolom Jumlah Leads */
+    #powerHouseTable tbody tr td:nth-child(6) {
         background-color: #e3f2fd;
         color: #1976d2;
         font-weight: 600;
     }
 
-    /* Kolom Jumlah Leads */
-    .table tbody tr td:nth-child(5) {
+    /* Kolom Jumlah Akun */
+    #powerHouseTable tbody tr td:nth-child(7) {
         background-color: #f3e5f5;
         color: #6a1b9a;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Kolom Jumlah Visit */
-    .table tbody tr td:nth-child(6) {
+    /* Kolom New Akun to Leads */
+    #powerHouseTable tbody tr td:nth-child(8) {
         background-color: #e8f5e9;
         color: #1b5e20;
         font-weight: 600;
@@ -251,23 +251,23 @@
     }
 
     /* Kolom Top Up */
-    .table tbody tr td:nth-child(7) {
+    #powerHouseTable tbody tr td:nth-child(9) {
         background: linear-gradient(135deg, #fff5e1 0%, #ffe0b2 100%);
         color: #e65100;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Kolom Insentif */
-    .table tbody tr td:nth-child(8) {
+    /* Kolom Tanggal Transaksi Terakhir */
+    #powerHouseTable tbody tr td:nth-child(10) {
         /* background: linear-gradient(135deg, #c8e6c9 0%, #81c784 100%); */
         color: #2e7d32;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Highlight untuk insentif dengan nilai 0 */
-    .table tbody tr td:nth-child(6):contains("-") {
+    /* Highlight untuk persentase tanpa nilai */
+    #powerHouseTable tbody tr td:nth-child(8):contains("-") {
         background: linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%);
         color: #c62828;
     }
@@ -523,24 +523,24 @@
         background-color: #ffffff;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(4),
-    #powerHousePerformanceTable tbody td:nth-child(5) {
+    #powerHousePerformanceTable tbody td:nth-child(6),
+    #powerHousePerformanceTable tbody td:nth-child(7) {
         background-color: #d1e7dd;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(6),
-    #powerHousePerformanceTable tbody td:nth-child(7),
     #powerHousePerformanceTable tbody td:nth-child(8),
-    #powerHousePerformanceTable tbody td:nth-child(9) {
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10),
+    #powerHousePerformanceTable tbody td:nth-child(11) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(10),
-    #powerHousePerformanceTable tbody td:nth-child(11),
     #powerHousePerformanceTable tbody td:nth-child(12),
-    #powerHousePerformanceTable tbody td:nth-child(13) {
+    #powerHousePerformanceTable tbody td:nth-child(13),
+    #powerHousePerformanceTable tbody td:nth-child(14),
+    #powerHousePerformanceTable tbody td:nth-child(15) {
         background-color: #d3ffcd;
         font-weight: 600;
     }
