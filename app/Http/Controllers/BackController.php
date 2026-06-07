@@ -2533,6 +2533,8 @@ class BackController extends Controller
                 : '-';
 
             $result[] = [
+                'area' => $mpccUser->area ?: '-',
+                'branch' => $mpccUser->branch ?: '-',
                 'referral_code' => $voucherCode,
                 'team_powerhouse' => $mpccUser->name,
                 'jumlah_akun' => $jumlahAkun,
@@ -2669,6 +2671,8 @@ class BackController extends Controller
             $target = (float) ($targetByUser[$mpccUser->id]->target_amount ?? 0);
 
             $result[] = [
+                'area' => $mpccUser->area ?: '-',
+                'branch' => $mpccUser->branch ?: '-',
                 'team_powerhouse' => $mpccUser->name,
                 'target' => $target,
                 'deal_topup_new_akun' => $newAkunCount,
@@ -3579,7 +3583,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
 
 
 
