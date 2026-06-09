@@ -675,8 +675,11 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="powerHousePerformanceCard">
-            <div class="card-header bg-gradient-info text-white">
+            <div class="card-header bg-gradient-info text-white d-flex justify-content-between align-items-center">
                 <h4 class="mb-0"><i class="fas fa-chart-line"></i> Report MPCC Deal Top Up & MOM</h4>
+                <button type="button" id="btnSaveMpccPerformanceImage" class="btn btn-success btn-sm" title="Save as Image">
+                    <i class="fas fa-image mr-2"></i> Save Image
+                </button>
             </div>
             <div class="card-body">
                 <div id="capturePowerHousePerformanceTable" class="table-responsive">
@@ -1056,16 +1059,15 @@
 
         updateFilterPeriodHeader();
 
-        // Handle Save Image Button
-        document.getElementById('btnSavePowerHouseImage').addEventListener('click', function () {
-            html2canvas(document.getElementById('capturePowerHouseTable'), { 
+        function saveElementAsImage(elementId, filePrefix) {
+            html2canvas(document.getElementById(elementId), {
                 scale: 2,
                 allowTaint: true,
                 useCORS: true
             })
                 .then(canvas => {
                     const link = document.createElement('a');
-                    link.download = 'powerhouse-report-' + new Date().getTime() + '.png';
+                    link.download = filePrefix + '-' + new Date().getTime() + '.png';
                     link.href = canvas.toDataURL();
                     link.click();
                 })
@@ -1073,6 +1075,93 @@
                     console.error('Error capturing image:', err);
                     alert('Gagal menyimpan gambar. Silakan coba lagi.');
                 });
+        }
+
+        function saveMpccPerformanceWithoutMom() {
+            const sourceWrap = document.getElementById('capturePowerHousePerformanceTable');
+            const sourceTable = document.getElementById('powerHousePerformanceTable');
+
+            if (!sourceWrap || !sourceTable) {
+                alert('Tabel performance tidak ditemukan.');
+                return;
+            }
+
+            const clonedWrap = sourceWrap.cloneNode(true);
+            const clonedTable = clonedWrap.querySelector('#powerHousePerformanceTable');
+
+            if (!clonedTable) {
+                alert('Gagal menyiapkan tabel untuk disimpan.');
+                return;
+            }
+
+            clonedTable.removeAttribute('id');
+
+            const allRows = clonedTable.querySelectorAll('tr');
+
+            if (allRows[0] && allRows[0].children[0]) {
+                allRows[0].children[0].setAttribute('colspan', '9');
+                allRows[0].children[0].innerHTML = allRows[0].children[0].innerHTML.replace('&amp; MOM ', '').replace('& MOM ', '');
+            }
+
+            if (allRows[1]) {
+                const momGroupCell = allRows[1].children[5];
+                if (momGroupCell) {
+                    momGroupCell.remove();
+                }
+            }
+
+            if (allRows[2]) {
+                const thirdHeaderCells = Array.from(allRows[2].children);
+                thirdHeaderCells.slice(-4).forEach(function(cell) {
+                    cell.remove();
+                });
+            }
+
+            clonedTable.querySelectorAll('tbody tr, tfoot tr').forEach(function(row) {
+                const cells = Array.from(row.children);
+                cells.slice(-4).forEach(function(cell) {
+                    cell.remove();
+                });
+            });
+
+            clonedWrap.style.maxWidth = 'fit-content';
+            clonedWrap.style.overflow = 'visible';
+            clonedWrap.style.backgroundColor = '#ffffff';
+            clonedWrap.style.padding = '0';
+            clonedWrap.style.position = 'fixed';
+            clonedWrap.style.left = '-99999px';
+            clonedWrap.style.top = '0';
+
+            document.body.appendChild(clonedWrap);
+
+            html2canvas(clonedWrap, {
+                scale: 2,
+                allowTaint: true,
+                useCORS: true
+            })
+                .then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = 'mpcc-deal-topup-without-mom-' + new Date().getTime() + '.png';
+                    link.href = canvas.toDataURL();
+                    link.click();
+                })
+                .catch(err => {
+                    console.error('Error capturing image:', err);
+                    alert('Gagal menyimpan gambar. Silakan coba lagi.');
+                })
+                .finally(() => {
+                    clonedWrap.remove();
+                });
+        }
+
+        // Save image for MPCC summary table
+        document.getElementById('btnSavePowerHouseImage').addEventListener('click', function () {
+            saveElementAsImage('capturePowerHouseTable', 'mpcc-report');
+        });
+
+        // Save image for MPCC Deal Top Up & MOM table only
+        document.getElementById('btnSaveMpccPerformanceImage').addEventListener('click', function () {
+            saveMpccPerformanceWithoutMom();
         });
     });
 </script>
