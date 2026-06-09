@@ -207,7 +207,7 @@
     }
 
     /* Kolom Nomor */
-    .table tbody tr td:nth-child(1) {
+    #powerHouseTable tbody tr td:nth-child(1) {
         font-weight: 600;
         color: #667eea;
         background-color: #f0f2f9;
@@ -215,35 +215,35 @@
     }
 
     /* Kolom Referral Code */
-    .table tbody tr td:nth-child(2) {
+    #powerHouseTable tbody tr td:nth-child(4) {
         font-weight: 600;
         color: #333;
         letter-spacing: 0.5px;
     }
 
-    /* Kolom Canvasser */
-    .table tbody tr td:nth-child(3) {
+    /* Kolom Nama MPCC */
+    #powerHouseTable tbody tr td:nth-child(5) {
         font-weight: 500;
         color: #333;
     }
 
-    /* Kolom Jumlah New Akun */
-    .table tbody tr td:nth-child(4) {
+    /* Kolom Jumlah Leads */
+    #powerHouseTable tbody tr td:nth-child(6) {
         background-color: #e3f2fd;
         color: #1976d2;
         font-weight: 600;
     }
 
-    /* Kolom Jumlah Leads */
-    .table tbody tr td:nth-child(5) {
+    /* Kolom Jumlah Akun */
+    #powerHouseTable tbody tr td:nth-child(7) {
         background-color: #f3e5f5;
         color: #6a1b9a;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Kolom Jumlah Visit */
-    .table tbody tr td:nth-child(6) {
+    /* Kolom New Akun to Leads */
+    #powerHouseTable tbody tr td:nth-child(8) {
         background-color: #e8f5e9;
         color: #1b5e20;
         font-weight: 600;
@@ -251,23 +251,23 @@
     }
 
     /* Kolom Top Up */
-    .table tbody tr td:nth-child(7) {
+    #powerHouseTable tbody tr td:nth-child(9) {
         background: linear-gradient(135deg, #fff5e1 0%, #ffe0b2 100%);
         color: #e65100;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Kolom Insentif */
-    .table tbody tr td:nth-child(8) {
+    /* Kolom Tanggal Transaksi Terakhir */
+    #powerHouseTable tbody tr td:nth-child(10) {
         /* background: linear-gradient(135deg, #c8e6c9 0%, #81c784 100%); */
         color: #2e7d32;
         font-weight: 600;
         font-size: 12px;
     }
 
-    /* Highlight untuk insentif dengan nilai 0 */
-    .table tbody tr td:nth-child(6):contains("-") {
+    /* Highlight untuk persentase tanpa nilai */
+    #powerHouseTable tbody tr td:nth-child(8):contains("-") {
         background: linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%);
         color: #c62828;
     }
@@ -523,24 +523,24 @@
         background-color: #ffffff;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(4),
-    #powerHousePerformanceTable tbody td:nth-child(5) {
+    #powerHousePerformanceTable tbody td:nth-child(6),
+    #powerHousePerformanceTable tbody td:nth-child(7) {
         background-color: #d1e7dd;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(6),
-    #powerHousePerformanceTable tbody td:nth-child(7),
     #powerHousePerformanceTable tbody td:nth-child(8),
-    #powerHousePerformanceTable tbody td:nth-child(9) {
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10),
+    #powerHousePerformanceTable tbody td:nth-child(11) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(10),
-    #powerHousePerformanceTable tbody td:nth-child(11),
     #powerHousePerformanceTable tbody td:nth-child(12),
-    #powerHousePerformanceTable tbody td:nth-child(13) {
+    #powerHousePerformanceTable tbody td:nth-child(13),
+    #powerHousePerformanceTable tbody td:nth-child(14),
+    #powerHousePerformanceTable tbody td:nth-child(15) {
         background-color: #d3ffcd;
         font-weight: 600;
     }
@@ -637,10 +637,12 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">MPCC Report | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="10" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">MPCC Report | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
+                                <th style="text-align: center;">Area</th>
+                                <th style="text-align: center;">Branch</th>
                                 <th style="text-align: center;">Referral Code</th>
                                 <th style="text-align: center;">Nama MPCC</th>
                                 <th style="text-align: center;">Jumlah Leads</th>
@@ -654,7 +656,7 @@
                         </tbody>
                         <tfoot>
                             <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
-                                <td colspan="3" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td colspan="5" style="text-align: right; padding: 12px;">TOTAL</td>
                                 <td id="totalJumlahLeads" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalPercentageNewAkunToLead" style="text-align: center; padding: 12px;">0%</td>
@@ -684,10 +686,12 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="13" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM MPCC | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="15" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM MPCC | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
+                                <th rowspan="2" style="text-align: center;">Area</th>
+                                <th rowspan="2" style="text-align: center;">Branch</th>
                                 <th rowspan="2" style="text-align: center;">Nama MPCC</th>
                                 <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
@@ -710,7 +714,7 @@
                         <tbody></tbody>
                         <tfoot>
                             <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
-                                <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td colspan="4" style="text-align: right; padding: 12px;">TOTAL</td>
                                 <td id="totalTargetPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupNewAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
@@ -774,6 +778,8 @@
             },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'area', name: 'area', className: 'text-center' },
+                { data: 'branch', name: 'branch', className: 'text-center' },
                 { data: 'referral_code', name: 'referral_code', className: 'text-center' },
                 { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
@@ -783,7 +789,7 @@
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
             rowCallback: function(row, data, index) {
-                applyPercentageCellStyle($('td', row).eq(5), data.percentage_new_akun_to_lead);
+                applyPercentageCellStyle($('td', row).eq(7), data.percentage_new_akun_to_lead);
 
                 // Calculate totals after each row is rendered
                 calculateTotals();
@@ -812,6 +818,8 @@
             },
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'area', name: 'area', className: 'text-center' },
+                { data: 'branch', name: 'branch', className: 'text-center' },
                 { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
                 { data: 'target', name: 'target', className: 'text-center' },
                 { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
@@ -826,14 +834,14 @@
                 { data: 'mom_gap', name: 'mom_gap', className: 'text-center' }
             ],
             createdRow: function(row) {
-                $('td', row).eq(2).css({
+                $('td', row).eq(4).css({
                     'background': 'linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%)',
                     'color': '#7a5d00',
                     'font-weight': '600'
                 });
             },
             rowCallback: function(row, data) {
-                applyPercentageCellStyle($('td', row).eq(8), data.acv);
+                applyPercentageCellStyle($('td', row).eq(10), data.acv);
             },
             drawCallback: function() {
                 calculatePerformanceTotals();
@@ -981,18 +989,18 @@
             $('#powerHousePerformanceTable tbody tr').each(function() {
                 const cells = $(this).find('td');
 
-                totalTarget += parseNumber(cells.eq(2).text().trim());
-                totalDealTopupNewAkun += parseInt(cells.eq(3).text().trim()) || 0;
-                totalDealTopupExistingAkun += parseInt(cells.eq(4).text().trim()) || 0;
+                totalTarget += parseNumber(cells.eq(4).text().trim());
+                totalDealTopupNewAkun += parseInt(cells.eq(5).text().trim()) || 0;
+                totalDealTopupExistingAkun += parseInt(cells.eq(6).text().trim()) || 0;
 
-                totalTopUpNewAkunRp += parseNumber(cells.eq(5).text().trim());
-                totalTopUpExistingAkunRp += parseNumber(cells.eq(6).text().trim());
-                totalTopup += parseNumber(cells.eq(7).text().trim());
+                totalTopUpNewAkunRp += parseNumber(cells.eq(7).text().trim());
+                totalTopUpExistingAkunRp += parseNumber(cells.eq(8).text().trim());
+                totalTopup += parseNumber(cells.eq(9).text().trim());
 
-                totalMomPrevPartial += parseNumber(cells.eq(9).text().trim());
-                totalMomCurrentPartial += parseNumber(cells.eq(10).text().trim());
-                totalMomPrevRemaining += parseNumber(cells.eq(11).text().trim());
-                totalMomGap += parseNumber(cells.eq(12).text().trim());
+                totalMomPrevPartial += parseNumber(cells.eq(11).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(12).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(13).text().trim());
+                totalMomGap += parseNumber(cells.eq(14).text().trim());
             });
 
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
