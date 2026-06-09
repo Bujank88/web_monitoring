@@ -1539,7 +1539,7 @@ class ReportController extends Controller
                 'ar.refunded',
                 'ar.read',
                 'ar.click',
-                DB::raw('CASE WHEN COALESCE(ar.sukses, 0) > 0 THEN (COALESCE(ar.read, 0) / ar.sukses) * 100 ELSE 0 END as percentage_read'),
+                DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
                 DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
                 'ar.total_harga',
                 'ar.detil_status'
@@ -2026,7 +2026,7 @@ class ReportController extends Controller
                     'ar.refunded',
                     'ar.read',
                     'ar.click',
-                    DB::raw('CASE WHEN COALESCE(ar.sukses, 0) > 0 THEN (COALESCE(ar.read, 0) / ar.sukses) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
                     DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
                     'ar.total_harga',
                     'ar.detil_status'
@@ -2139,7 +2139,7 @@ class ReportController extends Controller
                     'ar.refunded',
                     'ar.read',
                     'ar.click',
-                    DB::raw('CASE WHEN COALESCE(ar.sukses, 0) > 0 THEN (COALESCE(ar.read, 0) / ar.sukses) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
                     DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
                     'ar.total_harga',
                     'ar.detil_status'
@@ -3182,7 +3182,6 @@ class ReportController extends Controller
         }
     }
 }
-
 
 
 
