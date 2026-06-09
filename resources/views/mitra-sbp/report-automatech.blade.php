@@ -147,6 +147,8 @@
                                 <th>Failed</th>
                                 <th>Read</th>
                                 <th>Click</th>
+                                <th>Percentage Read</th>
+                                <th>Percentage Click</th>
                                 <th>Total Harga</th>
                             </tr>
                         </thead>
@@ -196,6 +198,8 @@
                 { data: 'failed', name: 'ar.gagal' },
                 { data: 'read', name: 'ar.read' },
                 { data: 'click', name: 'ar.click' },
+                { data: 'percentage_read', name: 'percentage_read', searchable: false },
+                { data: 'percentage_click', name: 'percentage_click', searchable: false },
                 { data: 'total_harga', name: 'ar.total_harga' }
             ],
             order: [[0, 'desc']],
