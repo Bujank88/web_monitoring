@@ -2680,9 +2680,6 @@ class BackController extends Controller
             return DataTables::of([])->addIndexColumn()->make(true);
         }
 
-        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
-            return strtoupper($code);
-        })->values()->all();
         $userIds = $mpccUsers->pluck('id')->map(function ($id) {
             return (int) $id;
         })->values()->all();
@@ -2702,36 +2699,36 @@ class BackController extends Controller
             ->keyBy('user_id');
 
         $topUpStatsByCode = DB::table('report_balance_top_up as rp')
-            ->join('data_voucher as dv', 'rp.no_invoice', '=', 'dv.id_transaksi')
+            ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
             ->select(
-                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                'lm.user_id',
                 DB::raw('COUNT(rp.id) as top_up_count'),
                 DB::raw('SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp')
             )
-            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->whereIn('lm.user_id', $userIds)
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
-            ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+            ->groupBy('lm.user_id')
             ->get()
-            ->keyBy('voucher_code');
+            ->keyBy('user_id');
 
         $topUpNewAkunByCode = DB::table('data_registarsi_status_approveorreject as dt')
             ->join('report_balance_top_up as rp', function ($join) {
                 $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                     ->whereRaw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
             })
-            ->join('data_voucher as dv', 'rp.no_invoice', '=', 'dv.id_transaksi')
+            ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
             ->where('dt.status', 'APPROVE')
-            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->whereIn('lm.user_id', $userIds)
             ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startDateFormatted, $endDateFormatted])
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
-            ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+            ->groupBy('lm.user_id')
             ->select(
-                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                'lm.user_id',
                 DB::raw('COUNT(DISTINCT rp.id) as top_up_count'),
                 DB::raw('SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp')
             )
             ->get()
-            ->keyBy('voucher_code');
+            ->keyBy('user_id');
 
         $momReference = $endDate->copy()->endOfDay();
         $currentMonthStart = $momReference->copy()->startOfMonth()->format('Y-m-d');
@@ -2743,30 +2740,29 @@ class BackController extends Controller
         $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
 
         $momByCode = DB::table('report_balance_top_up as rp')
-            ->join('data_voucher as dv', 'rp.no_invoice', '=', 'dv.id_transaksi')
-            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
-            ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+            ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+            ->whereIn('lm.user_id', $userIds)
+            ->groupBy('lm.user_id')
             ->select(
-                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                'lm.user_id',
                 DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
                 DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
                 DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
             )
             ->get()
-            ->keyBy('voucher_code');
+            ->keyBy('user_id');
 
         $result = [];
         foreach ($mpccUsers as $mpccUser) {
-            $voucherCode = strtoupper($mpccUser->voucher_code);
-            $topUpCount = (int) ($topUpStatsByCode[$voucherCode]->top_up_count ?? 0);
-            $newAkunCount = (int) ($topUpNewAkunByCode[$voucherCode]->top_up_count ?? 0);
-            $newAkunRp = (float) ($topUpNewAkunByCode[$voucherCode]->top_up_new_akun_rp ?? 0);
-            $totalTopup = (float) ($topUpStatsByCode[$voucherCode]->total_top_up_rp ?? 0);
+            $topUpCount = (int) ($topUpStatsByCode[$mpccUser->id]->top_up_count ?? 0);
+            $newAkunCount = (int) ($topUpNewAkunByCode[$mpccUser->id]->top_up_count ?? 0);
+            $newAkunRp = (float) ($topUpNewAkunByCode[$mpccUser->id]->top_up_new_akun_rp ?? 0);
+            $totalTopup = (float) ($topUpStatsByCode[$mpccUser->id]->total_top_up_rp ?? 0);
             $existingAkunCount = max($topUpCount - $newAkunCount, 0);
             $existingAkunRp = max($totalTopup - $newAkunRp, 0);
-            $momPrevPartial = (float) ($momByCode[$voucherCode]->mom_prev_partial ?? 0);
-            $momCurrentPartial = (float) ($momByCode[$voucherCode]->mom_current_partial ?? 0);
-            $momPrevRemaining = (float) ($momByCode[$voucherCode]->mom_prev_remaining ?? 0);
+            $momPrevPartial = (float) ($momByCode[$mpccUser->id]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByCode[$mpccUser->id]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByCode[$mpccUser->id]->mom_prev_remaining ?? 0);
             $momGap = $momCurrentPartial - $momPrevPartial;
             $target = (float) ($targetByUser[$mpccUser->id]->target_amount ?? 0);
 
@@ -3691,7 +3687,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
 
 
 
