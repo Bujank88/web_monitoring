@@ -33,6 +33,7 @@ return new class extends Migration
                 $table->decimal('komitmen', 5, 2)->default(0);
                 $table->integer('plan_min_topup')->default(0);
                 $table->text('remarks')->nullable();
+                $table->string('flag_event')->nullable();
                 
                 // Data dari report_balance_top_up (bulan/tahun sekarang)
                 $table->decimal('total_settlement_klien', 15, 2)->default(0);
@@ -47,6 +48,7 @@ return new class extends Migration
                 $table->index('email');
                 $table->index('created_at');
                 $table->index('data_type');
+                $table->index('flag_event');
                 $table->index('total_settlement_klien');
                 
                 // Foreign key

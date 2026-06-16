@@ -19,6 +19,7 @@ use App\Http\Controllers\LeadProgramController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\LocationPresensiController;
 use App\Http\Controllers\MitraSbpController;
+use App\Http\Controllers\CdsiReportController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -328,14 +329,21 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(fu
 });
 
 Route::middleware(['auth', 'checkrole:Admin,CDSI'])->group(function () {
-    Route::get('report-cdsi', [ReportController::class, 'reportCdsi'])->name('report-cdsi');
-    Route::get('report-cdsi/data', [ReportController::class, 'reportCdsiData'])->name('report-cdsi.data');
-    Route::get('report-cdsi/export', [ReportController::class, 'exportCdsi'])->name('report-cdsi.export');
-    Route::get('report-cdsi-dormant', [ReportController::class, 'reportCdsiDormant'])->name('report-cdsi-dormant');
-    Route::get('report-cdsi-dormant/data', [ReportController::class, 'reportCdsiDormantData'])->name('report-cdsi-dormant.data');
-    Route::get('report-cdsi-province', [ReportController::class, 'reportCdsiProvince'])->name('report-cdsi-province');
-    Route::get('report-cdsi-province/data', [ReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
-    Route::get('report-cdsi-province/export', [ReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
+    Route::get('cdsi/referrals', [CdsiReportController::class, 'referralIndex'])->name('cdsi.referrals');
+    Route::get('cdsi/referrals/data', [CdsiReportController::class, 'referralData'])->name('cdsi.referrals.data');
+    Route::get('cdsi/referrals/generate', [CdsiReportController::class, 'generateReferralCode'])->name('cdsi.referrals.generate');
+    Route::post('cdsi/referrals', [CdsiReportController::class, 'storeReferral'])->name('cdsi.referrals.store');
+    Route::get('cdsi/referral-topup-channel', [CdsiReportController::class, 'referralTopupChannel'])->name('cdsi.referral-topup-channel');
+    Route::get('cdsi/referral-topup-channel/data', [CdsiReportController::class, 'referralTopupChannelData'])->name('cdsi.referral-topup-channel.data');
+    Route::get('cdsi/referral-topup-channel/detail-data', [CdsiReportController::class, 'referralTopupChannelDetailData'])->name('cdsi.referral-topup-channel.detail-data');
+    Route::get('report-cdsi', [CdsiReportController::class, 'reportCdsi'])->name('report-cdsi');
+    Route::get('report-cdsi/data', [CdsiReportController::class, 'reportCdsiData'])->name('report-cdsi.data');
+    Route::get('report-cdsi/export', [CdsiReportController::class, 'exportCdsi'])->name('report-cdsi.export');
+    Route::get('report-cdsi-dormant', [CdsiReportController::class, 'reportCdsiDormant'])->name('report-cdsi-dormant');
+    Route::get('report-cdsi-dormant/data', [CdsiReportController::class, 'reportCdsiDormantData'])->name('report-cdsi-dormant.data');
+    Route::get('report-cdsi-province', [CdsiReportController::class, 'reportCdsiProvince'])->name('report-cdsi-province');
+    Route::get('report-cdsi-province/data', [CdsiReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
+    Route::get('report-cdsi-province/export', [CdsiReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
 });
 Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
     
