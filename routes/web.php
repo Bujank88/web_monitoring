@@ -328,7 +328,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(fu
     Route::get('report-saldo-avalon-kemang-bogor/data', [ReportController::class, 'reportSaldoAvalonKemangBogorData'])->name('report-saldo-avalon-kemang-bogor.data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,CDSI'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
     Route::get('cdsi/referrals', [CdsiReportController::class, 'referralIndex'])->name('cdsi.referrals');
     Route::get('cdsi/referrals/data', [CdsiReportController::class, 'referralData'])->name('cdsi.referrals.data');
     Route::get('cdsi/referrals/generate', [CdsiReportController::class, 'generateReferralCode'])->name('cdsi.referrals.generate');

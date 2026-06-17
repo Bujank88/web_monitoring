@@ -207,6 +207,8 @@
                             <option value="b2b">B2B</option>
                             <option value="Maxim">Maxim</option>
                             <option value="Automatech">Automatech</option>
+                            <option value="CDSI">CDSI</option>
+                            <option value="KSS">KSS</option>
                             <option value="MPCC">MPCC</option>
                         </select>
                     </div>
@@ -323,7 +325,7 @@
                             badgeClass = 'badge-warning';
                         } else if (data === 'Automatech') {
                             badgeClass = 'badge-warning';
-                        } else if (data === 'CDSI') {
+                        } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
                             badgeClass = 'badge-danger';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;

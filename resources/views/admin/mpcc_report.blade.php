@@ -642,7 +642,7 @@
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
                                 <th style="text-align: center;">Area</th>
-                                <th style="text-align: center;">Branch</th>
+                                <th style="text-align: center;">Cluster</th>
                                 <th style="text-align: center;">Referral Code</th>
                                 <th style="text-align: center;">Nama MPCC</th>
                                 <th style="text-align: center;">Jumlah Leads</th>
@@ -691,7 +691,7 @@
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
                                 <th rowspan="2" style="text-align: center;">Area</th>
-                                <th rowspan="2" style="text-align: center;">Branch</th>
+                                <th rowspan="2" style="text-align: center;">Cluster</th>
                                 <th rowspan="2" style="text-align: center;">Nama MPCC</th>
                                 <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
@@ -775,7 +775,8 @@
                     d.start_date = $('#startDatePH').val();
                     d.end_date = $('#endDatePH').val();
                 }
-            },
+            },
+
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'area', name: 'area', className: 'text-center' },

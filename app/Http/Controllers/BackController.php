@@ -369,7 +369,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC',
         ]);
         $data = [
             'name' => $request->name,
@@ -437,6 +437,8 @@ class BackController extends Controller
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
                 case 'CDSI':
+                case 'KSS':
+                case 'kss':
                     return redirect()->route('report-cdsi');
                 case 'b2b':
                     return redirect()->route('amlevelup.index');
@@ -3687,8 +3689,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
-
 
 
 
