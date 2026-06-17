@@ -275,6 +275,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
     Route::get('/mpcc-report', [FrontController::class, 'monitoringMpccReport'])->name('mpcc.report');
     Route::get('/mpcc-report/data', [BackController::class, 'getMpccVoucherReport'])->name('mpcc.report.data');
     Route::get('/mpcc-report/performance-data', [BackController::class, 'getMpccDealTopupMom'])->name('mpcc.report.performance-data');
+    Route::get('/mpcc-report/area-summary-data', [BackController::class, 'getMpccDealTopupAreaSummary'])->name('mpcc.report.area-summary-data');
     Route::get('/mpcc-report/export', [BackController::class, 'exportMpccVoucher'])->name('mpcc.report.export');
     Route::get('/mpcc-report-area-branch', [FrontController::class, 'monitoringMpccAreaBranchReport'])->name('mpcc.report.area-branch');
     Route::get('/mpcc-report-area-branch/data', [BackController::class, 'getMpccAreaBranchReport'])->name('mpcc.report.area-branch.data');

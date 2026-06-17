@@ -544,6 +544,38 @@
         background-color: #d3ffcd;
         font-weight: 600;
     }
+
+    #powerHouseAreaSummaryTable {
+        border: 0.5px solid #ccc;
+        box-shadow: none;
+    }
+
+    #powerHouseAreaSummaryTable th,
+    #powerHouseAreaSummaryTable td {
+        border: 0.5px solid #ccc !important;
+    }
+
+    #powerHouseAreaSummaryTable tbody tr:nth-child(odd) {
+        background-color: #f2f2f2;
+    }
+
+    #powerHouseAreaSummaryTable tbody tr:nth-child(even) {
+        background-color: #ffffff;
+    }
+
+    #powerHouseAreaSummaryTable tbody td:nth-child(4),
+    #powerHouseAreaSummaryTable tbody td:nth-child(5) {
+        background-color: #d1e7dd;
+        font-weight: 600;
+    }
+
+    #powerHouseAreaSummaryTable tbody td:nth-child(6),
+    #powerHouseAreaSummaryTable tbody td:nth-child(7),
+    #powerHouseAreaSummaryTable tbody td:nth-child(8),
+    #powerHouseAreaSummaryTable tbody td:nth-child(9) {
+        background-color: #f8d7da;
+        font-weight: 600;
+    }
 </style>
 @endsection
 
@@ -735,6 +767,51 @@
     </div>
 </div>
 
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card" id="powerHouseAreaSummaryCard">
+            <div class="card-header bg-gradient-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-layer-group"></i> Summary MPCC Per Area</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseAreaSummaryTable" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr style="background-color: #e8eaf6; font-weight: bold;">
+                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Summary Topup MPCC Per Area | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                            </tr>
+                            <tr>
+                                <th style="text-align: center; width: 5%;">No</th>
+                                <th style="text-align: center;">Area</th>
+                                <th style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
+                                <th style="text-align: center; background-color: #d1e7dd;">New Akun</th>
+                                <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
+                                <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Acv (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
+                                <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td id="totalAreaSummaryTarget" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryNewAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryExistingAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryNewAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryTopup" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryAcv" style="text-align: center; padding: 12px;">0%</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Last Updated Info -->
 <div class="row">
     <div class="col-12">
@@ -849,6 +926,41 @@
             }
         });
 
+        var areaSummaryTable = $('#powerHouseAreaSummaryTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: false,
+            ajax: {
+                url: "{{ route('mpcc.report.area-summary-data') }}",
+                type: 'GET',
+                data: function(d) {
+                    d.start_date = $('#startDatePH').val();
+                    d.end_date = $('#endDatePH').val();
+                }
+            },
+            columns: [
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'area', name: 'area', className: 'text-center' },
+                { data: 'target', name: 'target', className: 'text-center' },
+                { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
+                { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
+                { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
+                { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
+                { data: 'total_topup', name: 'total_topup', className: 'text-center' },
+                { data: 'acv', name: 'acv', className: 'text-center' }
+            ],
+            rowCallback: function(row, data) {
+                applyPercentageCellStyle($('td', row).eq(8), data.acv);
+            },
+            drawCallback: function() {
+                calculateAreaSummaryTotals();
+            }
+        });
+
         // Handle month filter change
         // $('#filterMonthPH').on('change', function() {
         //     // Update label bulan yang ditampilkan dengan text dari selected option
@@ -870,6 +982,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            areaSummaryTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -887,6 +1000,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            areaSummaryTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -1017,6 +1131,43 @@
             $('#totalMomCurrentPartial').text(Math.floor(totalMomCurrentPartial).toLocaleString('id-ID'));
             $('#totalMomPrevRemaining').text(Math.floor(totalMomPrevRemaining).toLocaleString('id-ID'));
             $('#totalMomGap').text(Math.floor(totalMomGap).toLocaleString('id-ID'));
+        }
+
+        function calculateAreaSummaryTotals() {
+            let totalTarget = 0;
+            let totalNewAkun = 0;
+            let totalExistingAkun = 0;
+            let totalNewAkunRp = 0;
+            let totalExistingAkunRp = 0;
+            let totalTopup = 0;
+
+            const parseNumber = (text) => {
+                if (!text) return 0;
+                const normalized = text.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.-]/g, '');
+                return parseFloat(normalized) || 0;
+            };
+
+            $('#powerHouseAreaSummaryTable tbody tr').each(function() {
+                const cells = $(this).find('td');
+
+                totalTarget += parseNumber(cells.eq(2).text().trim());
+                totalNewAkun += parseInt(cells.eq(3).text().trim()) || 0;
+                totalExistingAkun += parseInt(cells.eq(4).text().trim()) || 0;
+                totalNewAkunRp += parseNumber(cells.eq(5).text().trim());
+                totalExistingAkunRp += parseNumber(cells.eq(6).text().trim());
+                totalTopup += parseNumber(cells.eq(7).text().trim());
+            });
+
+            const totalAcv = totalTarget > 0 ? (totalTopup / totalTarget) * 100 : 0;
+
+            $('#totalAreaSummaryTarget').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
+            $('#totalAreaSummaryNewAkun').text(totalNewAkun);
+            $('#totalAreaSummaryExistingAkun').text(totalExistingAkun);
+            $('#totalAreaSummaryNewAkunRp').text(Math.floor(totalNewAkunRp).toLocaleString('id-ID'));
+            $('#totalAreaSummaryExistingAkunRp').text(Math.floor(totalExistingAkunRp).toLocaleString('id-ID'));
+            $('#totalAreaSummaryTopup').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
+            $('#totalAreaSummaryAcv').text(totalAcv.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%');
+            applyPercentageCellStyle($('#totalAreaSummaryAcv'), totalAcv);
         }
 
         function getSubMonthNoOverflow(dateObj) {

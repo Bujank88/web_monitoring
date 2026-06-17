@@ -2650,6 +2650,20 @@ class BackController extends Controller
             ];
         }
 
+        usort($result, function ($left, $right) {
+            $areaComparison = strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+            if ($areaComparison !== 0) {
+                return $areaComparison;
+            }
+
+            $branchComparison = strcasecmp((string) ($left['branch'] ?? ''), (string) ($right['branch'] ?? ''));
+            if ($branchComparison !== 0) {
+                return $branchComparison;
+            }
+
+            return strcasecmp((string) ($left['team_powerhouse'] ?? ''), (string) ($right['team_powerhouse'] ?? ''));
+        });
+
         return DataTables::of($result)
             ->addIndexColumn()
             ->editColumn('percentage_lead_to_visit', function ($row) {
@@ -2667,19 +2681,11 @@ class BackController extends Controller
             ->make(true);
     }
 
-    public function getMpccDealTopupMom(Request $request)
+    private function buildMpccPerformanceRows(Carbon $startDate, Carbon $endDate): array
     {
-        $startDate = $request->get('start_date')
-            ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
-
-        $endDate = $request->get('end_date')
-            ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
-
         $mpccUsers = $this->getMpccUsersWithVoucherCodes();
         if ($mpccUsers->isEmpty()) {
-            return DataTables::of([])->addIndexColumn()->make(true);
+            return [];
         }
 
         $userIds = $mpccUsers->pluck('id')->map(function ($id) {
@@ -2786,12 +2792,36 @@ class BackController extends Controller
         }
 
         usort($result, function ($left, $right) {
-            $totalComparison = $right['total_topup'] <=> $left['total_topup'];
+            $areaComparison = strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+            if ($areaComparison !== 0) {
+                return $areaComparison;
+            }
 
-            return $totalComparison !== 0
-                ? $totalComparison
-                : strcasecmp($left['team_powerhouse'], $right['team_powerhouse']);
+            $branchComparison = strcasecmp((string) ($left['branch'] ?? ''), (string) ($right['branch'] ?? ''));
+            if ($branchComparison !== 0) {
+                return $branchComparison;
+            }
+
+            return strcasecmp((string) ($left['team_powerhouse'] ?? ''), (string) ($right['team_powerhouse'] ?? ''));
         });
+
+        return $result;
+    }
+
+    public function getMpccDealTopupMom(Request $request)
+    {
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        $result = $this->buildMpccPerformanceRows($startDate, $endDate);
+        if (empty($result)) {
+            return DataTables::of([])->addIndexColumn()->make(true);
+        }
 
         return DataTables::of($result)
             ->addIndexColumn()
@@ -2824,6 +2854,72 @@ class BackController extends Controller
             })
             ->editColumn('mom_gap', function ($row) {
                 return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getMpccDealTopupAreaSummary(Request $request)
+    {
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        $rows = $this->buildMpccPerformanceRows($startDate, $endDate);
+        if (empty($rows)) {
+            return DataTables::of([])->addIndexColumn()->make(true);
+        }
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $area = $row['area'] ?: '-';
+            if (!isset($grouped[$area])) {
+                $grouped[$area] = [
+                    'area' => $area,
+                    'target' => 0,
+                    'deal_topup_new_akun' => 0,
+                    'deal_topup_existing_akun' => 0,
+                    'top_up_new_akun_rp' => 0,
+                    'top_up_existing_akun_rp' => 0,
+                    'total_topup' => 0,
+                ];
+            }
+
+            $grouped[$area]['target'] += (float) $row['target'];
+            $grouped[$area]['deal_topup_new_akun'] += (int) $row['deal_topup_new_akun'];
+            $grouped[$area]['deal_topup_existing_akun'] += (int) $row['deal_topup_existing_akun'];
+            $grouped[$area]['top_up_new_akun_rp'] += (float) $row['top_up_new_akun_rp'];
+            $grouped[$area]['top_up_existing_akun_rp'] += (float) $row['top_up_existing_akun_rp'];
+            $grouped[$area]['total_topup'] += (float) $row['total_topup'];
+        }
+
+        $result = array_values($grouped);
+        usort($result, function ($left, $right) {
+            return strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+        });
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
+            })
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
             })
             ->make(true);
     }
@@ -3689,8 +3785,6 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
-
 
 
 
