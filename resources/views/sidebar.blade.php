@@ -23,6 +23,7 @@
                 $isMaxim = $user->role === 'Maxim';
                 $isAutomatech = $user->role === 'Automatech';
                 $isCdsi = $user->role === 'CDSI';
+                $isKss = $user->role === 'KSS' || $user->role === 'kss';
                 $isMpcc = $user->role === 'MPCC';
                 @endphp
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
@@ -41,6 +42,8 @@
                 <span class="badge badge-primary">B2B</span>
                 @elseif($isCdsi)
                 <span class="badge badge-danger">CDSI</span>
+                @elseif($isKss)
+                <span class="badge badge-danger">KSS</span>
                 @elseif($isMaxim)
                 <span class="badge badge-warning">MAXIM</span>
                 @elseif($isMpcc)
@@ -334,35 +337,35 @@
                         <p>Logout</p>
                     </a>
                 </li>
-                @elseif($isCdsi)
+                @elseif($isCdsi || $isKss)
                 <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
-                        <p>
-                            CDSI
-                            <i class="right fas fa-angle-left"></i>
-                        </p>
-                    </a>
+                          <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
+                          <p>
+                            {{ $isKss ? 'KSS' : 'CDSI' }}
+                              <i class="right fas fa-angle-left"></i>
+                          </p>
+                      </a>
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
                             <a href="{{ route('cdsi.referral-topup-channel') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-table" style="color:#fb7185;"></i>
-                                <p>TopUp Referral CDSI</p>
+                                <p>TopUp Referral {{ $isKss ? 'KSS' : 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('report-cdsi') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('report-cdsi') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-chart-column" style="color:#f59e0b;"></i>
-                                <p>Report CDSI</p>
+                                <p>Report {{ $isKss ? 'KSS' : 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('cdsi.referrals') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
-                                <p>Referral CDSI</p>
+                                <p>Referral {{ $isKss ? 'KSS' : 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
