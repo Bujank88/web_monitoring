@@ -2706,6 +2706,14 @@ class BackController extends Controller
             ->get()
             ->keyBy('user_id');
 
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
         $topUpStatsByCode = DB::table('report_balance_top_up as rp')
             ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
             ->select(
@@ -2766,6 +2774,7 @@ class BackController extends Controller
             $newAkunCount = (int) ($topUpNewAkunByCode[$mpccUser->id]->top_up_count ?? 0);
             $newAkunRp = (float) ($topUpNewAkunByCode[$mpccUser->id]->top_up_new_akun_rp ?? 0);
             $totalTopup = (float) ($topUpStatsByCode[$mpccUser->id]->total_top_up_rp ?? 0);
+            $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
             $existingAkunCount = max($topUpCount - $newAkunCount, 0);
             $existingAkunRp = max($totalTopup - $newAkunRp, 0);
             $momPrevPartial = (float) ($momByCode[$mpccUser->id]->mom_prev_partial ?? 0);
@@ -2778,6 +2787,7 @@ class BackController extends Controller
                 'area' => $mpccUser->area ?: '-',
                 'branch' => $mpccUser->branch ?: '-',
                 'team_powerhouse' => $mpccUser->name,
+                'jumlah_leads' => $jumlahLeads,
                 'target' => $target,
                 'deal_topup_new_akun' => $newAkunCount,
                 'deal_topup_existing_akun' => $existingAkunCount,
@@ -2879,6 +2889,7 @@ class BackController extends Controller
             if (!isset($grouped[$area])) {
                 $grouped[$area] = [
                     'area' => $area,
+                    'jumlah_leads' => 0,
                     'target' => 0,
                     'deal_topup_new_akun' => 0,
                     'deal_topup_existing_akun' => 0,
@@ -2888,6 +2899,7 @@ class BackController extends Controller
                 ];
             }
 
+            $grouped[$area]['jumlah_leads'] += (int) $row['jumlah_leads'];
             $grouped[$area]['target'] += (float) $row['target'];
             $grouped[$area]['deal_topup_new_akun'] += (int) $row['deal_topup_new_akun'];
             $grouped[$area]['deal_topup_existing_akun'] += (int) $row['deal_topup_existing_akun'];
@@ -3785,6 +3797,5 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
 
 
