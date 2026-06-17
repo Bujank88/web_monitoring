@@ -781,9 +781,13 @@
                                 <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Summary Topup MPCC Per Area | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
-                                <th style="text-align: center; width: 5%;">No</th>
-                                <th style="text-align: center;">Area</th>
-                                <th style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
+                                <th rowspan="2" style="text-align: center; width: 5%;">No</th>
+                                <th rowspan="2" style="text-align: center;">Area</th>
+                                <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
+                                <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun &amp; Eksisting Akun)</th>
+                                <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
+                            </tr>
+                            <tr>
                                 <th style="text-align: center; background-color: #d1e7dd;">New Akun</th>
                                 <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>

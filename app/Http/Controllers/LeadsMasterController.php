@@ -32,6 +32,14 @@ class LeadsMasterController extends Controller
                     ->orderBy('regional')
                     ->pluck('regional')
             ),
+            'flagEvents' => Cache::remember('flag_events_list_leads', 3600, fn() =>
+                DB::table('detail_leads_summary')
+                    ->whereNotNull('flag_event')
+                    ->where('flag_event', '!=', '')
+                    ->distinct()
+                    ->orderBy('flag_event')
+                    ->pluck('flag_event')
+            ),
         ]);
     }
 
@@ -68,6 +76,11 @@ class LeadsMasterController extends Controller
             $query->where('dls.user_id', $request->canvasser);
         }
 
+        // Filter Flag Event
+        if ($request->flag_event) {
+            $query->where('dls.flag_event', $request->flag_event);
+        }
+
         // Filter Tanggal
         if ($request->start_date && $request->end_date) {
             $query->whereBetween('dls.created_at', [
@@ -83,7 +96,8 @@ class LeadsMasterController extends Controller
                 ->orWhere('dls.regional', 'like', "%$search%")
                 ->orWhere('dls.company_name', 'like', "%$search%")
                 ->orWhere('dls.email', 'like', "%$search%")
-                ->orWhere('dls.mobile_phone', 'like', "%$search%");
+                ->orWhere('dls.mobile_phone', 'like', "%$search%")
+                ->orWhere('dls.flag_event', 'like', "%$search%");
             });
         }
 
@@ -111,6 +125,9 @@ class LeadsMasterController extends Controller
                     return '<span class="badge badge-primary">' . $type . '</span>';
                 }
                 return '<span class="badge badge-secondary">' . $type . '</span>';
+            })
+            ->addColumn('flag_event', function ($row) {
+                return $row->flag_event ?? '-';
             })
             ->editColumn('created_at', function ($row) {
                 return \Carbon\Carbon::parse($row->created_at)->translatedFormat('d M Y');
@@ -169,6 +186,7 @@ class LeadsMasterController extends Controller
                 'dls.email',
                 'dls.mobile_phone',
                 'dls.data_type',
+                'dls.flag_event',
                 'dls.created_at',
                 'dls.total_settlement_klien',
                 'dls.saldo_utama'
@@ -190,6 +208,11 @@ class LeadsMasterController extends Controller
         // Filter Regional
         if ($request->regional) {
             $query->where('dls.regional', $request->regional);
+        }
+
+        // Filter Flag Event
+        if ($request->flag_event) {
+            $query->where('dls.flag_event', $request->flag_event);
         }
 
         // Filter Tanggal
@@ -214,6 +237,7 @@ class LeadsMasterController extends Controller
             'Email',
             'No HP',
             'Tipe Data',
+            'Flag Event',
             'Tanggal',
             'Total Settlement',
             'Saldo Utama',
@@ -240,6 +264,7 @@ class LeadsMasterController extends Controller
                     $row->email ?? '-',
                     $row->mobile_phone ?? '-',
                     $row->data_type ?? '-',
+                    $row->flag_event ?? '-',
                     \Carbon\Carbon::parse($row->created_at)->format('Y-m-d'),
                     'Rp ' . number_format($totalSettlement, 0, ',', '.'),
                     'Rp ' . number_format($saldoUtama, 0, ',', '.'),
@@ -785,6 +810,7 @@ class LeadsMasterController extends Controller
                 'leads_master.komitmen',
                 'leads_master.plan_min_topup',
                 'leads_master.remarks',
+                'leads_master.flag_event',
                 'leads_master.created_at',
                 'leads_master.updated_at',
                 DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
@@ -812,6 +838,7 @@ class LeadsMasterController extends Controller
                 'komitmen' => $lead->komitmen,
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
+                'flag_event' => $lead->flag_event,
                 'total_settlement_klien' => $lead->total_settlement_klien,
                 'saldo_utama' => $lead->saldo_utama,
                 'created_at' => $lead->created_at,
@@ -881,6 +908,7 @@ class LeadsMasterController extends Controller
                 'komitmen' => $lead->komitmen,
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
+                'flag_event' => $lead->flag_event,
                 'total_settlement_klien' => $settlement ?? 0,
                 'saldo_utama' => $saldoUtama ?? 0,
                 'created_at' => $lead->created_at,

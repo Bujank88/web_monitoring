@@ -180,6 +180,17 @@
         @endif
 
         <div class="filter-group">
+            <label for="filter_flag_event">Flag Event</label>
+            <select id="filter_flag_event" class="form-control select2">
+                <option value="">Semua Flag Event</option>
+                @foreach($flagEvents as $flagEvent)
+                    <option value="{{ $flagEvent }}">{{ $flagEvent }}</option>
+                @endforeach
+            </select>
+            <small>Pilih flag event untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
             <label for="start_date">Tanggal Mulai</label>
             <input type="date" id="start_date" class="form-control">
             <small>Pilih tanggal awal periode</small>
@@ -217,6 +228,7 @@
                         <th>Email</th>
                         <th>No HP</th>
                         <th>Tipe Data</th>
+                        <th>Flag Event</th>
                         <th>Tanggal</th>
                         <th>Total Settlement ({{now()->translatedFormat('F Y')}})</th>
                         <th>Saldo Utama</th>
@@ -341,6 +353,7 @@ $(function () {
                 d.start_date = $('#start_date').val();
                 d.end_date   = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
+                d.flag_event = $('#filter_flag_event').val();
             },
             beforeSend: function() {
                 showLoading();
@@ -356,6 +369,7 @@ $(function () {
             { data: 'email', searchable: true },
             { data: 'mobile_phone', searchable: true },
             { data: 'data_type', searchable: false },
+            { data: 'flag_event', searchable: true },
             { data: 'created_at', searchable: false },
             { data: 'total_settlement_klien', searchable: false },
             { data: 'saldo_utama', searchable: false },
@@ -370,6 +384,10 @@ $(function () {
     });
 
     $('#filter_regional').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_flag_event').on('change', function () {
         table.ajax.reload();
     });
 
@@ -407,7 +425,8 @@ $(function () {
             start_date: $('#start_date').val(),
             end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val(),
-            regional: $('#filter_regional').val()
+            regional: $('#filter_regional').val(),
+            flag_event: $('#filter_flag_event').val()
         };
 
         let query = $.param(params);
