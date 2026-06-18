@@ -114,6 +114,9 @@
                         <th>Email</th>
                         <th>Amount</th>
                         <th>Status Transfer Saldo</th>
+                        @if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+                        <th>Action</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -121,11 +124,45 @@
         </div>
     </div>
 </div>
+
+@if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+<div class="modal fade" id="myadsInvoiceModal" tabindex="-1" role="dialog" aria-labelledby="myadsInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="myadsInvoiceForm">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="myadsInvoiceModalLabel">Input No Invoice MyAds</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="modalTransactionId" name="transaction_id">
+                    <div class="form-group">
+                        <label for="modalTransactionIdDisplay">ID Transaksi</label>
+                        <input type="text" id="modalTransactionIdDisplay" class="form-control" readonly>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="modalMyadsInvoice">No Invoice MyAds</label>
+                        <input type="text" id="modalMyadsInvoice" name="id_transaksi_myads" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitMyadsInvoice">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('js')
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
         const channels = @json($channels);
@@ -209,6 +246,9 @@
                 { data: 'customer_email', name: 'customer_email' },
                 { data: 'amount', name: 'amount', className: 'text-right' },
                 { data: 'transfer_status', name: 'transfer_status', className: 'text-center' }
+                @if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+                ,{ data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center' }
+                @endif
             ],
             order: [[1, 'desc'], [2, 'desc']]
         });
@@ -218,6 +258,52 @@
             table.ajax.reload();
             detailTable.ajax.reload();
         });
+
+        @if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+        $(document).on('click', '.btnUpdateMyadsInvoice', function() {
+            $('#modalTransactionId').val($(this).data('transaction-id'));
+            $('#modalTransactionIdDisplay').val($(this).data('display-transaction-id'));
+            $('#modalMyadsInvoice').val($(this).data('myads-invoice') || '');
+            $('#myadsInvoiceModal').modal('show');
+        });
+
+        $('#myadsInvoiceForm').on('submit', function(e) {
+            e.preventDefault();
+
+            const $submitButton = $('#btnSubmitMyadsInvoice');
+            $submitButton.prop('disabled', true).text('Menyimpan...');
+
+            $.ajax({
+                url: "{{ route('cdsi.referral-topup-channel.update-myads-invoice') }}",
+                type: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    $('#myadsInvoiceModal').modal('hide');
+                    detailTable.ajax.reload(null, false);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil',
+                        text: response.message || 'No Invoice MyAds berhasil disimpan.',
+                        timer: 1800,
+                        showConfirmButton: false
+                    });
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message
+                        || xhr.responseJSON?.errors?.id_transaksi_myads?.[0]
+                        || 'Gagal menyimpan No Invoice MyAds.';
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: message
+                    });
+                },
+                complete: function() {
+                    $submitButton.prop('disabled', false).text('Simpan');
+                }
+            });
+        });
+        @endif
     });
 </script>
 @endsection
