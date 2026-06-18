@@ -377,7 +377,7 @@ class CdsiReportController extends Controller
                     'customer_email' => $transaction->customer_email ?: '-',
                     'amount' => number_format((float) $transaction->transaction_amount, 0, ',', '.'),
                     'id_transaksi_myads' => $transaction->id_transaksi_myads,
-                    'transfer_status' => empty($transaction->id_transaksi_myads) ? 'Pending' : 'Receive',
+                    'transfer_status' => ($transaction->is_received || !empty($transaction->id_transaksi_myads)) ? 'Receive' : 'Pending',
                 ];
             })
             ->values()
@@ -392,7 +392,14 @@ class CdsiReportController extends Controller
                 'pt.customer_email',
                 DB::raw('CAST(pt.transaction_amount AS DECIMAL(15,2)) as transaction_amount'),
                 'pt.id_transaksi_myads',
-                DB::raw('COALESCE(pt.payment_date, pt.transaction_date) as payment_datetime')
+                DB::raw('COALESCE(pt.payment_date, pt.transaction_date) as payment_datetime'),
+                DB::raw("EXISTS(
+                    SELECT 1
+                    FROM transaksi_balance_transfer as tbt
+                    WHERE LOWER(tbt.status) = 'paid'
+                      AND LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email))
+                      AND CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))
+                ) as is_received")
             )
             ->whereRaw('LOWER(pt.status) = ?', ['success'])
             ->whereBetween(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'), [$startDate, $endDate])
@@ -412,16 +419,19 @@ class CdsiReportController extends Controller
                 'pt.referral_code',
                 DB::raw('CAST(pt.transaction_amount AS DECIMAL(15,2)) as transaction_amount'),
                 DB::raw('COALESCE(pt.payment_date, pt.transaction_date) as payment_datetime'),
-                DB::raw('(SELECT MIN(tbt.status) FROM transaksi_balance_transfer as tbt WHERE LOWER(tbt.status) = \'paid\' AND LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email)) AND CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))) as transfer_status')
+                DB::raw('(SELECT MIN(tbt.status) FROM transaksi_balance_transfer as tbt WHERE LOWER(tbt.status) = \'paid\' AND LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email)) AND CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))) as transfer_status'),
+                'pt.id_transaksi_myads'
             )
             ->whereRaw('LOWER(pt.status) = ?', ['success'])
             ->whereBetween(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'), [$startDate, $endDate])
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('transaksi_balance_transfer as tbt')
-                    ->whereRaw('LOWER(tbt.status) = ?', ['paid'])
-                    ->whereRaw('LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email))')
-                    ->whereRaw('CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))');
+            ->where(function ($query) {
+                $query->whereExists(function ($subQuery) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('transaksi_balance_transfer as tbt')
+                        ->whereRaw('LOWER(tbt.status) = ?', ['paid'])
+                        ->whereRaw('LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email))')
+                        ->whereRaw('CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))');
+                })->orWhereNotNull('pt.id_transaksi_myads');
             })
             ->orderByDesc(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'))
             ->get();
@@ -600,6 +610,88 @@ class CdsiReportController extends Controller
             ->orderColumn('last_tgl_transaksi', 'cd.last_tgl_transaksi $1')
             ->orderColumn('total_settlement', 'cd.total_settlement $1')
             ->make(true);
+    }
+
+    public function exportCdsiDormant(Request $request)
+    {
+        try {
+            $data = $this->cdsiDormantBaseQuery()
+                ->select(
+                    'cd.email',
+                    'cd.nomor',
+                    'cd.nama_instansi',
+                    'cd.last_tgl_transaksi',
+                    DB::raw('COALESCE(cd.total_settlement, 0) as total_settlement')
+                )
+                ->orderByDesc('cd.last_tgl_transaksi')
+                ->orderBy('cd.email')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data dormant untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'DATA DORMANT CDSI');
+            $sheet->mergeCells('A1:E1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Email',
+                'Nomor',
+                'Nama Instansi',
+                'Tanggal Terakhir Transaksi',
+                'Total Settlement',
+            ];
+
+            $sheet->fromArray($headers, null, 'A3');
+            $sheet->getStyle('A3:E3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '6F42C1'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->email,
+                    $row->nomor,
+                    $row->nama_instansi,
+                    !empty($row->last_tgl_transaksi) ? Carbon::parse($row->last_tgl_transaksi)->format('d-m-Y') : '-',
+                    (float) $row->total_settlement,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            $sheet->getStyle('E4:E' . max($rowNum - 1, 4))
+                ->getNumberFormat()
+                ->setFormatCode('"Rp" #,##0');
+
+            foreach (range('A', 'E') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Data_Dormant_CDSI_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export CDSI Dormant Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data dormant');
+        }
     }
 
     public function exportCdsi(Request $request)

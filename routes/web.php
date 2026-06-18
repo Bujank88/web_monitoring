@@ -343,6 +343,7 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
     Route::get('report-cdsi/export', [CdsiReportController::class, 'exportCdsi'])->name('report-cdsi.export');
     Route::get('report-cdsi-dormant', [CdsiReportController::class, 'reportCdsiDormant'])->name('report-cdsi-dormant');
     Route::get('report-cdsi-dormant/data', [CdsiReportController::class, 'reportCdsiDormantData'])->name('report-cdsi-dormant.data');
+    Route::get('report-cdsi-dormant/export', [CdsiReportController::class, 'exportCdsiDormant'])->name('report-cdsi-dormant.export');
     Route::get('report-cdsi-province', [CdsiReportController::class, 'reportCdsiProvince'])->name('report-cdsi-province');
     Route::get('report-cdsi-province/data', [CdsiReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
     Route::get('report-cdsi-province/export', [CdsiReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');

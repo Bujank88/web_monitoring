@@ -77,10 +77,13 @@
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header" style="background:#6f42c1; color:#fff;">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:#6f42c1; color:#fff;">
                 <h3 class="card-title mb-0">
                     <i class="fas fa-bed mr-2"></i>{{ $pageTitle ?? 'Data Dormant CDSI' }}
                 </h3>
+                <a href="{{ route('report-cdsi-dormant.export') }}" class="btn btn-success btn-sm">
+                    <i class="fas fa-file-excel mr-1"></i> Download Excel
+                </a>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
