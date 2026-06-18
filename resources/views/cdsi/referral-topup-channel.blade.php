@@ -115,6 +115,7 @@
                         <th>Amount</th>
                         <th>Status Transfer Saldo</th>
                         @if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+                        <th>Invoice Number</th>
                         <th>Action</th>
                         @endif
                     </tr>
@@ -247,6 +248,11 @@
                 { data: 'amount', name: 'amount', className: 'text-right' },
                 { data: 'transfer_status', name: 'transfer_status', className: 'text-center' }
                 @if(in_array(auth()->user()->role, ['Admin', 'KSS', 'kss'], true))
+                ,{ data: 'id_transaksi_myads', name: 'id_transaksi_myads', className: 'text-center',
+                    render: function(data) {
+                        return data ? data : '-';
+                    }
+                }
                 ,{ data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center' }
                 @endif
             ],
