@@ -3444,6 +3444,7 @@ class BackController extends Controller
 
         $voucherData = collect();
         $leadAggByUser = collect();
+        $customerAggByUser = collect();
         $visitAggByName = collect();
 
         if (!empty($voucherCodes)) {
@@ -3469,6 +3470,27 @@ class BackController extends Controller
                 ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
                 ->groupBy('user_id')
                 ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+                ->get()
+                ->keyBy('user_id');
+
+            $customerAggByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('report_balance_top_up as rp', function ($join) use ($startDate, $endDate) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')")
+                        ->whereBetween(
+                            DB::raw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi))"),
+                            [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]
+                        );
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $userIds)
+                ->where('dt.status', 'APPROVE')
+                ->whereBetween(
+                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                    [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]
+                )
+                ->groupBy('lm.user_id')
+                ->select('lm.user_id', DB::raw('COUNT(DISTINCT LOWER(dt.email)) as jumlah_customers'))
                 ->get()
                 ->keyBy('user_id');
 
@@ -3509,7 +3531,7 @@ class BackController extends Controller
             $stats[$cityKey]['mpcc']++;
             $stats[$cityKey]['visits'] += (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
             $stats[$cityKey]['leads'] += (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
-            $stats[$cityKey]['customers'] += (int) ($voucherInfo->jumlah_akun ?? 0);
+            $stats[$cityKey]['customers'] += (int) ($customerAggByUser[$mpccUser->id]->jumlah_customers ?? 0);
             $stats[$cityKey]['total_topup'] += (float) ($voucherInfo->total_topup ?? 0);
         }
 
@@ -3567,7 +3589,7 @@ class BackController extends Controller
             'source_notes' => [
                 'MPCC diambil dari `users.role = MPCC` dan dikelompokkan berdasarkan branch/kota pilot.',
                 'Revenue commitment hanya diambil dari `mpcc_branch_targets.target_revenue_branch_billion` pada bulan yang dipilih dan ditampilkan dengan nilai aslinya.',
-                'Visits diambil dari `bookings`, leads dari `leads_master`, customers dari transaksi voucher unik di `report_balance_top_up + data_voucher`, dan total top-up dari penjumlahan `report_balance_top_up.amount`.',
+                'Visits diambil dari `bookings`, leads dari `leads_master`, customers dari registrasi approved pada bulan filter yang digabung dengan data top-up lalu di-join ke `leads_master`, dan total top-up dari penjumlahan `report_balance_top_up.amount`.',
             ],
         ];
     }
@@ -3797,5 +3819,3 @@ class BackController extends Controller
         return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }
-
-
