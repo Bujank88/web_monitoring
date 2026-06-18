@@ -67,9 +67,26 @@ class CdsiReportController extends Controller
         try {
             $month = $request->get('month', now()->format('Y-m'));
             $rows = $this->getCdsiReferralTopupDetailRows($month);
+            $canManageInvoice = in_array(Auth::user()->role, ['Admin', 'KSS', 'kss'], true);
 
             return datatables()->of(collect($rows))
                 ->addIndexColumn()
+                ->addColumn('action', function ($row) use ($canManageInvoice) {
+                    if (!$canManageInvoice) {
+                        return '';
+                    }
+
+                    $buttonLabel = !empty($row['id_transaksi_myads']) ? 'Edit Invoice' : 'Input Invoice';
+                    $buttonClass = !empty($row['id_transaksi_myads']) ? 'btn-warning' : 'btn-primary';
+
+                    return '<button type="button" class="btn btn-sm ' . $buttonClass . ' btnUpdateMyadsInvoice" '
+                        . 'data-transaction-id="' . e($row['transaction_id_raw']) . '" '
+                        . 'data-myads-invoice="' . e($row['id_transaksi_myads'] ?? '') . '" '
+                        . 'data-display-transaction-id="' . e($row['transaction_id']) . '">'
+                        . $buttonLabel
+                        . '</button>';
+                })
+                ->rawColumns(['action'])
                 ->make(true);
         } catch (\Exception $e) {
             \Log::error('Error in referralTopupChannelDetailData: ' . $e->getMessage());
@@ -101,6 +118,40 @@ class CdsiReportController extends Controller
 
         return response()->json([
             'referral_code' => $this->generateUniqueCdsiReferralCode($name),
+        ]);
+    }
+
+    public function updateReferralTopupMyadsInvoice(Request $request)
+    {
+        if (!in_array(Auth::user()->role, ['Admin', 'KSS', 'kss'], true)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'transaction_id' => 'required|string',
+            'id_transaksi_myads' => 'required|string|max:255',
+        ], [
+            'transaction_id.required' => 'ID transaksi wajib dipilih.',
+            'id_transaksi_myads.required' => 'No Invoice MyAds wajib diisi.',
+        ]);
+
+        $updated = DB::table('payment_transactions_cdsi')
+            ->where('transaction_id', $validated['transaction_id'])
+            ->update([
+                'id_transaksi_myads' => trim($validated['id_transaksi_myads']),
+                'updated_at' => now(),
+            ]);
+
+        if (!$updated) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data transaksi tidak ditemukan atau tidak ada perubahan.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'No Invoice MyAds berhasil disimpan.',
         ]);
     }
 
@@ -318,12 +369,14 @@ class CdsiReportController extends Controller
         return $this->getCdsiPaymentTransactions($startDate, $endDate)
             ->map(function ($transaction) {
                 return [
+                    'transaction_id_raw' => $transaction->transaction_id,
                     'paid_date' => $transaction->payment_datetime
                         ? Carbon::parse($transaction->payment_datetime)->format('d-m-Y')
                         : '-',
                     'transaction_id' => $transaction->transaction_id ?: '-',
                     'customer_email' => $transaction->customer_email ?: '-',
                     'amount' => number_format((float) $transaction->transaction_amount, 0, ',', '.'),
+                    'id_transaksi_myads' => $transaction->id_transaksi_myads,
                     'transfer_status' => empty($transaction->id_transaksi_myads) ? 'Pending' : 'Receive',
                 ];
             })
