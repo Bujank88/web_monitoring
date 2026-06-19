@@ -99,16 +99,37 @@ class CdsiReportController extends Controller
     public function referralData(Request $request)
     {
         $query = DB::table('cdsi_referrals')
-            ->select('id', 'name', 'referral_code', 'created_at')
+            ->select('id', 'name', 'referral_code', 'status', 'created_at')
             ->orderByDesc('id');
 
         return datatables()->of($query)
             ->addIndexColumn()
+            ->editColumn('status', function ($row) {
+                $isActive = strtolower((string) $row->status) === 'active';
+
+                return $isActive
+                    ? '<span class="badge badge-success">Active</span>'
+                    : '<span class="badge badge-secondary">Non Active</span>';
+            })
             ->editColumn('created_at', function ($row) {
                 return $row->created_at
                     ? Carbon::parse($row->created_at)->format('d-m-Y H:i')
                     : '-';
             })
+            ->addColumn('action', function ($row) {
+                $isActive = strtolower((string) $row->status) === 'active';
+                $targetStatus = $isActive ? 'non_active' : 'active';
+                $buttonLabel = $isActive ? 'Non Active' : 'Active';
+                $buttonClass = $isActive ? 'btn-danger' : 'btn-success';
+
+                return '<button type="button" class="btn btn-sm ' . $buttonClass . ' btnToggleReferralStatus" '
+                    . 'data-id="' . e($row->id) . '" '
+                    . 'data-name="' . e($row->name) . '" '
+                    . 'data-status="' . e($targetStatus) . '">'
+                    . $buttonLabel
+                    . '</button>';
+            })
+            ->rawColumns(['status', 'action'])
             ->make(true);
     }
 
@@ -169,6 +190,7 @@ class CdsiReportController extends Controller
         DB::table('cdsi_referrals')->insert([
             'name' => trim($validated['name']),
             'referral_code' => strtoupper(trim($validated['referral_code'])),
+            'status' => 'active',
             'created_by' => Auth::id(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -177,6 +199,37 @@ class CdsiReportController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Referral CDSI berhasil ditambahkan.',
+        ]);
+    }
+
+    public function updateReferralStatus(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,non_active',
+        ], [
+            'status.required' => 'Status referral wajib dipilih.',
+            'status.in' => 'Status referral tidak valid.',
+        ]);
+
+        $updated = DB::table('cdsi_referrals')
+            ->where('id', $id)
+            ->update([
+                'status' => $validated['status'],
+                'updated_at' => now(),
+            ]);
+
+        if (!$updated) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Referral CDSI tidak ditemukan atau tidak ada perubahan status.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['status'] === 'active'
+                ? 'Referral CDSI berhasil diaktifkan.'
+                : 'Referral CDSI berhasil dinonaktifkan dan tidak akan dihitung di TopUp Referral CDSI.',
         ]);
     }
 
@@ -223,7 +276,8 @@ class CdsiReportController extends Controller
         ]];
 
         $referrals = DB::table('cdsi_referrals')
-            ->select('id', 'name', 'referral_code')
+            ->select('id', 'name', 'referral_code', 'status')
+            ->where('status', 'active')
             ->orderBy('name')
             ->get();
 
@@ -387,12 +441,14 @@ class CdsiReportController extends Controller
     protected function getCdsiPaymentTransactions(string $startDate, string $endDate)
     {
         return DB::table('payment_transactions_cdsi as pt')
+            ->leftJoin('cdsi_referrals as cr', DB::raw('UPPER(TRIM(pt.referral_code))'), '=', DB::raw('UPPER(TRIM(cr.referral_code))'))
             ->select(
                 'pt.transaction_id',
                 'pt.customer_email',
                 DB::raw('CAST(pt.transaction_amount AS DECIMAL(15,2)) as transaction_amount'),
                 'pt.id_transaksi_myads',
                 DB::raw('COALESCE(pt.payment_date, pt.transaction_date) as payment_datetime'),
+                'cr.status as referral_status',
                 DB::raw("EXISTS(
                     SELECT 1
                     FROM transaksi_balance_transfer as tbt
@@ -403,6 +459,10 @@ class CdsiReportController extends Controller
             )
             ->whereRaw('LOWER(pt.status) = ?', ['success'])
             ->whereBetween(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'), [$startDate, $endDate])
+            ->where(function ($query) {
+                $query->whereNull('cr.id')
+                    ->orWhere('cr.status', 'active');
+            })
             ->orderByDesc(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'))
             ->get();
     }
@@ -410,6 +470,7 @@ class CdsiReportController extends Controller
     protected function getMatchedCdsiTransactions(string $startDate, string $endDate)
     {
         return DB::table('payment_transactions_cdsi as pt')
+            ->leftJoin('cdsi_referrals as cr', DB::raw('UPPER(TRIM(pt.referral_code))'), '=', DB::raw('UPPER(TRIM(cr.referral_code))'))
             ->select(
                 DB::raw("DATE(COALESCE(pt.payment_date, pt.transaction_date)) as trx_date"),
                 'pt.transaction_id',
@@ -417,6 +478,8 @@ class CdsiReportController extends Controller
                 'pt.customer_name',
                 'pt.customer_email',
                 'pt.referral_code',
+                'cr.id as referral_id',
+                'cr.status as referral_status',
                 DB::raw('CAST(pt.transaction_amount AS DECIMAL(15,2)) as transaction_amount'),
                 DB::raw('COALESCE(pt.payment_date, pt.transaction_date) as payment_datetime'),
                 DB::raw('(SELECT MIN(tbt.status) FROM transaksi_balance_transfer as tbt WHERE LOWER(tbt.status) = \'paid\' AND LOWER(TRIM(tbt.email_penerima)) = LOWER(TRIM(pt.customer_email)) AND CAST(tbt.jumlah AS DECIMAL(15,2)) = CAST(pt.transaction_amount AS DECIMAL(15,2))) as transfer_status'),
@@ -424,6 +487,10 @@ class CdsiReportController extends Controller
             )
             ->whereRaw('LOWER(pt.status) = ?', ['success'])
             ->whereBetween(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'), [$startDate, $endDate])
+            ->where(function ($query) {
+                $query->whereNull('cr.id')
+                    ->orWhere('cr.status', 'active');
+            })
             ->where(function ($query) {
                 $query->whereExists(function ($subQuery) {
                     $subQuery->select(DB::raw(1))

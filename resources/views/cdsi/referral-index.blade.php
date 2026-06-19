@@ -87,7 +87,9 @@
                                 <th>No</th>
                                 <th>Nama</th>
                                 <th>Code Referral</th>
+                                <th>Status</th>
                                 <th>Dibuat</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -103,6 +105,7 @@
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
         const form = $('#cdsiReferralForm');
@@ -116,13 +119,33 @@
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'name', name: 'name' },
                 { data: 'referral_code', name: 'referral_code', className: 'text-center font-weight-bold' },
-                { data: 'created_at', name: 'created_at', className: 'text-center' }
+                { data: 'status', name: 'status', className: 'text-center', orderable: false, searchable: false },
+                { data: 'created_at', name: 'created_at', className: 'text-center' },
+                { data: 'action', name: 'action', className: 'text-center', orderable: false, searchable: false }
             ],
-            order: [[3, 'desc']]
+            order: [[4, 'desc']]
         });
 
         function clearErrors() {
             $('[data-error-for]').addClass('d-none').text('');
+        }
+
+        function showSuccess(message) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: message,
+                confirmButtonColor: '#dc3545'
+            });
+        }
+
+        function showError(message) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Terjadi Kesalahan',
+                text: message,
+                confirmButtonColor: '#dc3545'
+            });
         }
 
         function loadGeneratedCode() {
@@ -132,6 +155,7 @@
                 clearErrors();
                 $('[data-error-for="name"]').removeClass('d-none').text('Isi nama dulu sebelum generate code referral.');
                 $('#name').focus();
+                showError('Isi nama dulu sebelum generate code referral.');
                 return;
             }
 
@@ -155,9 +179,8 @@
                 success: function(response) {
                     if (response.success) {
                         form[0].reset();
-                        loadGeneratedCode();
                         table.ajax.reload(null, false);
-                        alert(response.message);
+                        showSuccess(response.message);
                     }
                 },
                 error: function(xhr) {
@@ -166,11 +189,56 @@
                             const el = $('[data-error-for="' + field + '"]');
                             el.removeClass('d-none').text(xhr.responseJSON.errors[field][0]);
                         });
+                        showError('Mohon cek kembali form referral CDSI.');
                         return;
                     }
 
-                    alert('Terjadi kesalahan saat menyimpan referral.');
+                    showError('Terjadi kesalahan saat menyimpan referral.');
                 }
+            });
+        });
+
+        $(document).on('click', '.btnToggleReferralStatus', function() {
+            const button = $(this);
+            const referralId = button.data('id');
+            const referralName = button.data('name');
+            const nextStatus = button.data('status');
+
+            Swal.fire({
+                icon: 'question',
+                title: 'Ubah Status Referral',
+                text: 'Yakin ingin mengubah status referral ' + referralName + ' menjadi ' + (nextStatus === 'active' ? 'Active' : 'Non Active') + '?',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, ubah',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: nextStatus === 'active' ? '#28a745' : '#dc3545',
+                cancelButtonColor: '#6c757d'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ url('cdsi/referrals') }}/" + referralId + "/status",
+                    method: 'POST',
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        status: nextStatus
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            table.ajax.reload(null, false);
+                            showSuccess(response.message);
+                        }
+                    },
+                    error: function(xhr) {
+                        const message = xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : 'Terjadi kesalahan saat mengubah status referral ' + referralName + '.';
+
+                        showError(message);
+                    }
+                });
             });
         });
     });
