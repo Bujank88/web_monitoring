@@ -334,6 +334,7 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
     Route::get('cdsi/referrals/data', [CdsiReportController::class, 'referralData'])->name('cdsi.referrals.data');
     Route::get('cdsi/referrals/generate', [CdsiReportController::class, 'generateReferralCode'])->name('cdsi.referrals.generate');
     Route::post('cdsi/referrals', [CdsiReportController::class, 'storeReferral'])->name('cdsi.referrals.store');
+    Route::post('cdsi/referrals/{id}/status', [CdsiReportController::class, 'updateReferralStatus'])->name('cdsi.referrals.status');
     Route::get('cdsi/referral-topup-channel', [CdsiReportController::class, 'referralTopupChannel'])->name('cdsi.referral-topup-channel');
     Route::get('cdsi/referral-topup-channel/data', [CdsiReportController::class, 'referralTopupChannelData'])->name('cdsi.referral-topup-channel.data');
     Route::get('cdsi/referral-topup-channel/detail-data', [CdsiReportController::class, 'referralTopupChannelDetailData'])->name('cdsi.referral-topup-channel.detail-data');

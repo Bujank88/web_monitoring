@@ -342,7 +342,7 @@
                     <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}">
                           <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
                           <p>
-                            {{ $isKss ? 'KSS' : 'CDSI' }}
+                            {{ 'CDSI' }}
                               <i class="right fas fa-angle-left"></i>
                           </p>
                       </a>
@@ -351,21 +351,21 @@
                             <a href="{{ route('cdsi.referral-topup-channel') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-table" style="color:#fb7185;"></i>
-                                <p>TopUp Referral {{ $isKss ? 'KSS' : 'CDSI' }}</p>
+                                <p>TopUp Referral {{ 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('report-cdsi') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('report-cdsi') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-chart-column" style="color:#f59e0b;"></i>
-                                <p>Report {{ $isKss ? 'KSS' : 'CDSI' }}</p>
+                                <p>Report {{ 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('cdsi.referrals') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
-                                <p>Referral {{ $isKss ? 'KSS' : 'CDSI' }}</p>
+                                <p>Referral {{ 'CDSI' }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
