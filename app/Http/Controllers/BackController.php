@@ -2714,6 +2714,14 @@ class BackController extends Controller
             ->get()
             ->keyBy('user_id');
 
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
         $topUpStatsByCode = DB::table('report_balance_top_up as rp')
             ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
             ->select(
@@ -2775,6 +2783,7 @@ class BackController extends Controller
             $newAkunRp = (float) ($topUpNewAkunByCode[$mpccUser->id]->top_up_new_akun_rp ?? 0);
             $totalTopup = (float) ($topUpStatsByCode[$mpccUser->id]->total_top_up_rp ?? 0);
             $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
             $existingAkunCount = max($topUpCount - $newAkunCount, 0);
             $existingAkunRp = max($totalTopup - $newAkunRp, 0);
             $momPrevPartial = (float) ($momByCode[$mpccUser->id]->mom_prev_partial ?? 0);
@@ -2788,6 +2797,7 @@ class BackController extends Controller
                 'branch' => $mpccUser->branch ?: '-',
                 'team_powerhouse' => $mpccUser->name,
                 'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => $jumlahVisit,
                 'target' => $target,
                 'deal_topup_new_akun' => $newAkunCount,
                 'deal_topup_existing_akun' => $existingAkunCount,
