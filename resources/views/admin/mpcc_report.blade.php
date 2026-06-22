@@ -561,23 +561,24 @@
     }
 
     #powerHousePerformanceTable tbody td:nth-child(8),
-    #powerHousePerformanceTable tbody td:nth-child(9) {
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10) {
         background-color: #d1e7dd;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(10),
     #powerHousePerformanceTable tbody td:nth-child(11),
     #powerHousePerformanceTable tbody td:nth-child(12),
-    #powerHousePerformanceTable tbody td:nth-child(13) {
+    #powerHousePerformanceTable tbody td:nth-child(13),
+    #powerHousePerformanceTable tbody td:nth-child(14) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(14),
     #powerHousePerformanceTable tbody td:nth-child(15),
     #powerHousePerformanceTable tbody td:nth-child(16),
-    #powerHousePerformanceTable tbody td:nth-child(17) {
+    #powerHousePerformanceTable tbody td:nth-child(17),
+    #powerHousePerformanceTable tbody td:nth-child(18) {
         background-color: #d3ffcd;
         font-weight: 600;
     }
@@ -767,7 +768,7 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="17" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM MPCC | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="18" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM MPCC | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
@@ -777,13 +778,14 @@
                                 <th rowspan="2" class="target-col" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th rowspan="2" style="text-align: center; background-color: #d6ecff;">Jumlah Leads</th>
                                 <th rowspan="2" class="visit-col" style="text-align: center; background-color: #e3f2fd;">Jumlah Visit</th>
-                                <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
+                                <th colspan="3" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
                                 <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                                 <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; background-color: #d1e7dd;">New Akun</th>
                                 <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
+                                <th style="text-align: center; background-color: #d1e7dd;">Total Akun</th>
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
@@ -803,6 +805,7 @@
                                 <td id="totalVisitPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupNewAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalDealTopupAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpPerformance" style="text-align: center; padding: 12px;">0</td>
@@ -963,6 +966,7 @@
                 { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
                 { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
+                { data: 'deal_topup_total_akun', name: 'deal_topup_total_akun', className: 'text-center' },
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
                 { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
@@ -990,7 +994,7 @@
                 });
             },
             rowCallback: function(row, data) {
-                applyPercentageCellStyle($('td', row).eq(12), data.acv);
+                applyPercentageCellStyle($('td', row).eq(13), data.acv);
             },
             drawCallback: function() {
                 calculatePerformanceTotals();
@@ -1157,6 +1161,7 @@
         function calculatePerformanceTotals() {
             let totalDealTopupNewAkun = 0;
             let totalDealTopupExistingAkun = 0;
+            let totalDealTopupAkun = 0;
             let totalTopUpNewAkunRp = 0;
             let totalTopUpExistingAkunRp = 0;
             let totalTopup = 0;
@@ -1183,19 +1188,21 @@
                 totalVisit += parseInt(cells.eq(6).text().trim()) || 0;
                 totalDealTopupNewAkun += parseInt(cells.eq(7).text().trim()) || 0;
                 totalDealTopupExistingAkun += parseInt(cells.eq(8).text().trim()) || 0;
+                totalDealTopupAkun += parseInt(cells.eq(9).text().trim()) || 0;
 
-                totalTopUpNewAkunRp += parseNumber(cells.eq(9).text().trim());
-                totalTopUpExistingAkunRp += parseNumber(cells.eq(10).text().trim());
-                totalTopup += parseNumber(cells.eq(11).text().trim());
+                totalTopUpNewAkunRp += parseNumber(cells.eq(10).text().trim());
+                totalTopUpExistingAkunRp += parseNumber(cells.eq(11).text().trim());
+                totalTopup += parseNumber(cells.eq(12).text().trim());
 
-                totalMomPrevPartial += parseNumber(cells.eq(13).text().trim());
-                totalMomCurrentPartial += parseNumber(cells.eq(14).text().trim());
-                totalMomPrevRemaining += parseNumber(cells.eq(15).text().trim());
-                totalMomGap += parseNumber(cells.eq(16).text().trim());
+                totalMomPrevPartial += parseNumber(cells.eq(14).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(15).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(16).text().trim());
+                totalMomGap += parseNumber(cells.eq(17).text().trim());
             });
 
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
             $('#totalDealTopupExistingAkun').text(totalDealTopupExistingAkun);
+            $('#totalDealTopupAkun').text(totalDealTopupAkun);
             $('#totalTargetPerformance').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
             $('#totalLeadPerformance').text(totalLeads.toLocaleString('id-ID'));
             $('#totalVisitPerformance').text(totalVisit.toLocaleString('id-ID'));
