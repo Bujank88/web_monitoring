@@ -582,8 +582,9 @@
 @php
     use Carbon\Carbon;
 
-    $startDate = request('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-    $endDate   = request('end_date', Carbon::now()->format('Y-m-d'));
+    $defaultReferenceDate = Carbon::yesterday();
+    $startDate = request('start_date', $defaultReferenceDate->copy()->startOfMonth()->format('Y-m-d'));
+    $endDate   = request('end_date', $defaultReferenceDate->copy()->format('Y-m-d'));
     $momRefDate = Carbon::today();
     $prevSameDay = $momRefDate->copy()->subMonthNoOverflow();
     $prevMonthEndDay = $momRefDate->copy()->subMonthNoOverflow()->endOfMonth()->day;

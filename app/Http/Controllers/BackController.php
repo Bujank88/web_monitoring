@@ -1649,13 +1649,13 @@ class BackController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
-        \Log::info($startDate);
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -1865,13 +1865,14 @@ class BackController extends Controller
      */
     public function getPowerHouseVoucher(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -2006,13 +2007,14 @@ class BackController extends Controller
 
     public function getPowerHouseDealTopupMom(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
 
         $targetMonth = $request->get('month')
             ? Carbon::parse($request->get('month'))->format('Y-m')
