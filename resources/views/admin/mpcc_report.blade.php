@@ -940,7 +940,7 @@
         var performanceTable = $('#powerHousePerformanceTable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
+            responsive: false,
             paging: false,
             searching: false,
             info: false,
