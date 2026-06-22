@@ -2801,6 +2801,7 @@ class BackController extends Controller
                 'target' => $target,
                 'deal_topup_new_akun' => $newAkunCount,
                 'deal_topup_existing_akun' => $existingAkunCount,
+                'deal_topup_total_akun' => $topUpCount,
                 'top_up_new_akun_rp' => $newAkunRp,
                 'top_up_existing_akun_rp' => $existingAkunRp,
                 'total_topup' => $totalTopup,
