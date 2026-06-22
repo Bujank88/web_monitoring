@@ -20,6 +20,7 @@ use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\LocationPresensiController;
 use App\Http\Controllers\MitraSbpController;
 use App\Http\Controllers\CdsiReportController;
+use App\Http\Controllers\GotoController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -308,7 +309,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
         ->name('amlevelup.clients');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech,GOTO'])->group(function () {
     Route::get('report-agency-advertising', [ReportController::class, 'reportAgencyAdvertising'])->name('report-agency-advertising');
     Route::get('report-agency-advertising/data', [ReportController::class, 'reportAgencyAdvertisingData'])->name('report-agency-advertising.data');
     Route::get('report-agency-advertising/export', [ReportController::class, 'exportAgencyAdvertising'])->name('report-agency-advertising.export');
@@ -322,6 +323,11 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech'])->group(fu
     Route::get('report-automatech/export', [ReportController::class, 'exportAutomatech'])->name('report-automatech.export');
     Route::get('report-saldo-automatech', [ReportController::class, 'reportSaldoAutomatech'])->name('report-saldo-automatech');
     Route::get('report-saldo-automatech/data', [ReportController::class, 'reportSaldoAutomatechData'])->name('report-saldo-automatech.data');
+    Route::get('report-goto', [GotoController::class, 'report'])->name('report-goto');
+    Route::get('report-goto/data', [GotoController::class, 'reportData'])->name('report-goto.data');
+    Route::get('report-goto/export', [GotoController::class, 'export'])->name('report-goto.export');
+    Route::get('report-saldo-goto', [GotoController::class, 'reportSaldo'])->name('report-saldo-goto');
+    Route::get('report-saldo-goto/data', [GotoController::class, 'reportSaldoData'])->name('report-saldo-goto.data');
     Route::get('report-avalon-kemang-bogor', [ReportController::class, 'reportAvalonKemangBogor'])->name('report-avalon-kemang-bogor');
     Route::get('report-avalon-kemang-bogor/data', [ReportController::class, 'reportAvalonKemangBogorData'])->name('report-avalon-kemang-bogor.data');
     Route::get('report-avalon-kemang-bogor/export', [ReportController::class, 'exportAvalonKemangBogor'])->name('report-avalon-kemang-bogor.export');
@@ -374,6 +380,9 @@ Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
     Route::get('/upload-report-automatech', [FrontController::class, 'uploadAutomatechReport'])->name('admin.upload.automatech-report');
     Route::get('/upload-report-automatech/template', [FrontController::class, 'downloadAutomatechReportTemplate'])->name('admin.upload.automatech-report.template');
     Route::post('/upload-report-automatech', [BackController::class, 'storeUploadAutomatechReport'])->name('admin.upload.automatech-report.store');
+    Route::get('/upload-report-goto', [GotoController::class, 'uploadReport'])->name('admin.upload.goto-report');
+    Route::get('/upload-report-goto/template', [GotoController::class, 'downloadTemplate'])->name('admin.upload.goto-report.template');
+    Route::post('/upload-report-goto', [GotoController::class, 'storeUploadReport'])->name('admin.upload.goto-report.store');
     Route::get('/upload-report-avalon-kemang-bogor', [FrontController::class, 'uploadAvalonKemangBogorReport'])->name('admin.upload.avalon-kemang-bogor-report');
     Route::get('/upload-report-avalon-kemang-bogor/template', [FrontController::class, 'downloadAvalonKemangBogorReportTemplate'])->name('admin.upload.avalon-kemang-bogor-report.template');
     Route::post('/upload-report-avalon-kemang-bogor', [BackController::class, 'storeUploadAvalonKemangBogorReport'])->name('admin.upload.avalon-kemang-bogor-report.store');
