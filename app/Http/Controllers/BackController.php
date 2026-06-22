@@ -434,6 +434,8 @@ class BackController extends Controller
                     return redirect()->route('report-maxim');
                 case 'Automatech':
                     return redirect()->route('report-automatech');
+                case 'GOTO':
+                    return redirect()->route('report-goto');
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
                 case 'CDSI':
@@ -543,6 +545,98 @@ class BackController extends Controller
         return redirect()
             ->route('admin.upload.automatech-report')
             ->with('success', count($payload) . ' baris report Automatech berhasil diimport dari ' . $storedPath . '.');
+    }
+
+    public function storeUploadGotoReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-goto';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('goto-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.goto-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.goto-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('goto_reports')->delete();
+            DB::table('goto_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.goto-report')
+            ->with('success', count($payload) . ' baris report GOTO berhasil diimport dari ' . $storedPath . '.');
     }
 
     public function storeUploadAvalonKemangBogorReport(Request $request)
@@ -2574,13 +2668,14 @@ class BackController extends Controller
 
     public function getMpccVoucherReport(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
 
         $mpccUsers = $this->getMpccUsersWithVoucherCodes();
         if ($mpccUsers->isEmpty()) {
@@ -2831,13 +2926,14 @@ class BackController extends Controller
 
     public function getMpccDealTopupMom(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
 
         $result = $this->buildMpccPerformanceRows($startDate, $endDate);
         if (empty($result)) {
@@ -2881,13 +2977,14 @@ class BackController extends Controller
 
     public function getMpccDealTopupAreaSummary(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
 
         $rows = $this->buildMpccPerformanceRows($startDate, $endDate);
         if (empty($rows)) {
@@ -2900,20 +2997,24 @@ class BackController extends Controller
             if (!isset($grouped[$area])) {
                 $grouped[$area] = [
                     'area' => $area,
+                    'jumlah_visit' => 0,
                     'jumlah_leads' => 0,
                     'target' => 0,
                     'deal_topup_new_akun' => 0,
                     'deal_topup_existing_akun' => 0,
+                    'deal_topup_total_akun' => 0,
                     'top_up_new_akun_rp' => 0,
                     'top_up_existing_akun_rp' => 0,
                     'total_topup' => 0,
                 ];
             }
 
+            $grouped[$area]['jumlah_visit'] += (int) $row['jumlah_visit'];
             $grouped[$area]['jumlah_leads'] += (int) $row['jumlah_leads'];
             $grouped[$area]['target'] += (float) $row['target'];
             $grouped[$area]['deal_topup_new_akun'] += (int) $row['deal_topup_new_akun'];
             $grouped[$area]['deal_topup_existing_akun'] += (int) $row['deal_topup_existing_akun'];
+            $grouped[$area]['deal_topup_total_akun'] += (int) $row['deal_topup_total_akun'];
             $grouped[$area]['top_up_new_akun_rp'] += (float) $row['top_up_new_akun_rp'];
             $grouped[$area]['top_up_existing_akun_rp'] += (float) $row['top_up_existing_akun_rp'];
             $grouped[$area]['total_topup'] += (float) $row['total_topup'];
@@ -2954,12 +3055,13 @@ class BackController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
 
         $mpccUsers = $this->getMpccUsersWithVoucherCodes();
         $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
@@ -3445,74 +3547,7 @@ class BackController extends Controller
         $targetMonth = (int) $monthDate->month;
         $targetYear = (int) $monthDate->year;
 
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
-        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
-            return strtoupper($code);
-        })->values()->all();
-        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
-            return (int) $id;
-        })->values()->all();
-
-        $voucherData = collect();
-        $leadAggByUser = collect();
-        $customerAggByUser = collect();
-        $visitAggByName = collect();
-
-        if (!empty($voucherCodes)) {
-            $transactionDateExpr = "DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))";
-
-            $voucherData = DB::table('report_balance_top_up as rb')
-                ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
-                ->select(
-                    DB::raw('UPPER(dv.voucher_code) as voucher_code'),
-                    DB::raw('COUNT(DISTINCT LOWER(rb.email_client)) as jumlah_akun'),
-                    DB::raw('SUM(CAST(rb.amount AS DECIMAL(15,2))) as total_topup')
-                )
-                ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
-                ->whereBetween(DB::raw($transactionDateExpr), [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
-                ->get()
-                ->keyBy('voucher_code');
-        }
-
-        if (!empty($userIds)) {
-            $leadAggByUser = DB::table('leads_master')
-                ->whereIn('user_id', $userIds)
-                ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
-                ->groupBy('user_id')
-                ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
-                ->get()
-                ->keyBy('user_id');
-
-            $customerAggByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('report_balance_top_up as rp', function ($join) use ($startDate, $endDate) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')")
-                        ->whereBetween(
-                            DB::raw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi))"),
-                            [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]
-                        );
-                })
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $userIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereBetween(
-                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                    [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]
-                )
-                ->groupBy('lm.user_id')
-                ->select('lm.user_id', DB::raw('COUNT(DISTINCT LOWER(dt.email)) as jumlah_customers'))
-                ->get()
-                ->keyBy('user_id');
-
-            $visitAggByName = DB::table('bookings')
-                ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
-                ->whereBetween('tanggal', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                ->groupBy('nama')
-                ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
-                ->get()
-                ->keyBy('nama');
-        }
+        $performanceRows = $this->buildMpccPerformanceRows($startDate, $endDate);
 
         $targetRows = DB::table('mpcc_branch_targets')
             ->where('year', $targetYear)
@@ -3530,20 +3565,17 @@ class BackController extends Controller
             $stats[$cityKey]['revenue_commitment'] += $branchTargetRevenue;
         }
 
-        foreach ($mpccUsers as $mpccUser) {
-            $cityKey = $this->resolveMpccPilotCityKey($mpccUser->branch);
+        foreach ($performanceRows as $row) {
+            $cityKey = $this->resolveMpccPilotCityKey($row['branch'] ?? null);
             if (!$cityKey || !isset($stats[$cityKey])) {
                 continue;
             }
 
-            $voucherCode = strtoupper($mpccUser->voucher_code);
-            $voucherInfo = $voucherData->get($voucherCode);
-
             $stats[$cityKey]['mpcc']++;
-            $stats[$cityKey]['visits'] += (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
-            $stats[$cityKey]['leads'] += (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
-            $stats[$cityKey]['customers'] += (int) ($customerAggByUser[$mpccUser->id]->jumlah_customers ?? 0);
-            $stats[$cityKey]['total_topup'] += (float) ($voucherInfo->total_topup ?? 0);
+            $stats[$cityKey]['visits'] += (int) ($row['jumlah_visit'] ?? 0);
+            $stats[$cityKey]['leads'] += (int) ($row['jumlah_leads'] ?? 0);
+            $stats[$cityKey]['customers'] += (int) ($row['deal_topup_total_akun'] ?? 0);
+            $stats[$cityKey]['total_topup'] += (float) ($row['total_topup'] ?? 0);
         }
 
         $rows = [
@@ -3600,7 +3632,7 @@ class BackController extends Controller
             'source_notes' => [
                 'MPCC diambil dari `users.role = MPCC` dan dikelompokkan berdasarkan branch/kota pilot.',
                 'Revenue commitment hanya diambil dari `mpcc_branch_targets.target_revenue_branch_billion` pada bulan yang dipilih dan ditampilkan dengan nilai aslinya.',
-                'Visits diambil dari `bookings`, leads dari `leads_master`, customers dari registrasi approved pada bulan filter yang digabung dengan data top-up lalu di-join ke `leads_master`, dan total top-up dari penjumlahan `report_balance_top_up.amount`.',
+                'Visits, leads, total akun (# of customers), dan total top-up mengikuti agregasi yang sama dengan tabel `Report MPCC Deal Top Up & MOM` melalui `buildMpccPerformanceRows()`.',
             ],
         ];
     }
@@ -3654,8 +3686,22 @@ class BackController extends Controller
             'medan' => 'medan',
             'pekanbaru' => 'pekanbaru',
             'bandung' => 'bandung',
+            'kota bandung' => 'bandung',
+            'cluster kota bandung' => 'bandung',
             'northern jakarta' => 'jakarta',
+            'jakarta northern' => 'jakarta',
             'southern jakarta' => 'jakarta',
+            'jakarta southern' => 'jakarta',
+            'western jakarta' => 'jakarta',
+            'jakarta western' => 'jakarta',
+            'eastern jakarta' => 'jakarta',
+            'jakarta eastern' => 'jakarta',
+            'central jakarta' => 'jakarta',
+            'jakarta central' => 'jakarta',
+            'cluster jakarta barat' => 'jakarta',
+            'cluster jakarta utara' => 'jakarta',
+            'cluster jakarta pusat selatan' => 'jakarta',
+            'cluster jakarta timur' => 'jakarta',
             'jakarta barat' => 'jakarta',
             'jakarta utara' => 'jakarta',
             'jakarta pusat' => 'jakarta',

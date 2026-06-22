@@ -207,6 +207,7 @@
                             <option value="b2b">B2B</option>
                             <option value="Maxim">Maxim</option>
                             <option value="Automatech">Automatech</option>
+                            <option value="GOTO">GOTO</option>
                             <option value="CDSI">CDSI</option>
                             <option value="KSS">KSS</option>
                             <option value="MPCC">MPCC</option>
@@ -325,6 +326,8 @@
                             badgeClass = 'badge-warning';
                         } else if (data === 'Automatech') {
                             badgeClass = 'badge-warning';
+                        } else if (data === 'GOTO') {
+                            badgeClass = 'badge-primary';
                         } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
                             badgeClass = 'badge-danger';
                         }

@@ -22,6 +22,7 @@
                 $isB2b = $user->role === 'b2b';
                 $isMaxim = $user->role === 'Maxim';
                 $isAutomatech = $user->role === 'Automatech';
+                $isGoto = $user->role === 'GOTO';
                 $isCdsi = $user->role === 'CDSI';
                 $isKss = $user->role === 'KSS' || $user->role === 'kss';
                 $isMpcc = $user->role === 'MPCC';
@@ -46,6 +47,8 @@
                 <span class="badge badge-danger">KSS</span>
                 @elseif($isMaxim)
                 <span class="badge badge-warning">MAXIM</span>
+                @elseif($isGoto)
+                <span class="badge badge-primary">GOTO</span>
                 @elseif($isMpcc)
                 <span class="badge badge-info">MPCC</span>
                 @elseif($isCanv)
@@ -316,6 +319,49 @@
                                 class="nav-link waves-effect {{ request()->routeIs('report-saldo-automatech') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                                 <p>Report Saldo Automatech</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isGoto)
+                <li class="nav-item {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-store" style="color:#16a34a;"></i>
+                        <p>
+                            GOTO
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('report-goto') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-goto') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                                <p>Report GOTO</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-goto') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-saldo-goto') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo GOTO</p>
                             </a>
                         </li>
                     </ul>
@@ -709,6 +755,42 @@
                             class="nav-link waves-effect {{ request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}" style="padding-left: 45px;">
                             <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
                             <p>Upload Report Automatech</p>
+                        </a>
+                    </li>
+                    @endif
+                    </ul>
+                </li>
+                @endif
+                @if($isAdmin || $isGoto)
+                <li class="nav-item {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') || request()->routeIs('admin.upload.goto-report') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') || request()->routeIs('admin.upload.goto-report') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-store" style="color:#16a34a;"></i>
+                                <p>
+                                    GOTO
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                    <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{{ route('report-goto') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-goto') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#f59e0b;"></i>
+                            <p>Report GOTO</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('report-saldo-goto') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-goto') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                            <p>Report Saldo GOTO</p>
+                        </a>
+                    </li>
+                    @if($isAdmin)
+                    <li class="nav-item">
+                        <a href="{{ route('admin.upload.goto-report') }}"
+                            class="nav-link waves-effect {{ request()->routeIs('admin.upload.goto-report') ? 'active' : '' }}" style="padding-left: 45px;">
+                            <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                            <p>Upload Report GOTO</p>
                         </a>
                     </li>
                     @endif

@@ -608,22 +608,31 @@
     }
 
     #powerHouseAreaSummaryTable tbody td:nth-child(4) {
-        background-color: #e3f2fd;
-        /* color: #1976d2; */
+        background: linear-gradient(135deg, #d6ecff 0%, #b8ddff 100%);
+        color: #0b5394;
         font-weight: 600;
     }
 
-    #powerHouseAreaSummaryTable tbody td:nth-child(5),
-    #powerHouseAreaSummaryTable tbody td:nth-child(6) {
-        background-color: #d1e7dd;
+    #powerHouseAreaSummaryTable tbody td:nth-child(5) {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        color: #0d47a1;
         font-weight: 600;
     }
 
+    #powerHouseAreaSummaryTable tbody td:nth-child(6),
     #powerHouseAreaSummaryTable tbody td:nth-child(7),
-    #powerHouseAreaSummaryTable tbody td:nth-child(8),
+    #powerHouseAreaSummaryTable tbody td:nth-child(8) {
+        background-color: #d1e7dd;
+        color: #1b4332;
+        font-weight: 600;
+    }
+
     #powerHouseAreaSummaryTable tbody td:nth-child(9),
-    #powerHouseAreaSummaryTable tbody td:nth-child(10) {
+    #powerHouseAreaSummaryTable tbody td:nth-child(10),
+    #powerHouseAreaSummaryTable tbody td:nth-child(11),
+    #powerHouseAreaSummaryTable tbody td:nth-child(12) {
         background-color: #f8d7da;
+        color: #842029;
         font-weight: 600;
     }
 </style>
@@ -664,8 +673,9 @@
 @php
     use Carbon\Carbon;
 
-    $startDate = request('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-    $endDate   = request('end_date', Carbon::now()->format('Y-m-d'));
+    $defaultReferenceDate = Carbon::yesterday();
+    $startDate = request('start_date', $defaultReferenceDate->copy()->startOfMonth()->format('Y-m-d'));
+    $endDate   = request('end_date', $defaultReferenceDate->copy()->format('Y-m-d'));
     $momRefDate = Carbon::today();
     $prevSameDay = $momRefDate->copy()->subMonthNoOverflow();
     $prevMonthEndDay = $momRefDate->copy()->subMonthNoOverflow()->endOfMonth()->day;
@@ -834,19 +844,21 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseAreaSummaryTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="10" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Summary Topup MPCC Per Area | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="12" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Summary Topup MPCC Per Area | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
                                 <th rowspan="2" style="text-align: center;">Area</th>
                                 <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th rowspan="2" style="text-align: center; background-color: #e3f2fd; ">Jumlah Leads</th>
-                                <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun &amp; Eksisting Akun)</th>
+                                <th rowspan="2" style="text-align: center; background-color: #d6ecff;">Jumlah Visit</th>
+                                <th colspan="3" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun &amp; Eksisting Akun)</th>
                                 <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; background-color: #d1e7dd;">New Akun</th>
                                 <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
+                                <th style="text-align: center; background-color: #d1e7dd;">Total Akun</th>
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
@@ -859,8 +871,10 @@
                                 <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
                                 <td id="totalAreaSummaryTarget" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryLeads" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryVisits" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryNewAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryExistingAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAreaSummaryTotalAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryNewAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAreaSummaryTopup" style="text-align: center; padding: 12px;">0</td>
@@ -1022,15 +1036,17 @@
                 { data: 'area', name: 'area', className: 'text-center' },
                 { data: 'target', name: 'target', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
+                { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
                 { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
+                { data: 'deal_topup_total_akun', name: 'deal_topup_total_akun', className: 'text-center' },
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
                 { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
                 { data: 'acv', name: 'acv', className: 'text-center' }
             ],
             rowCallback: function(row, data) {
-                applyPercentageCellStyle($('td', row).eq(9), data.acv);
+                applyPercentageCellStyle($('td', row).eq(11), data.acv);
             },
             drawCallback: function() {
                 calculateAreaSummaryTotals();
@@ -1219,10 +1235,12 @@
         }
 
         function calculateAreaSummaryTotals() {
+            let totalVisits = 0;
             let totalLeads = 0;
             let totalTarget = 0;
             let totalNewAkun = 0;
             let totalExistingAkun = 0;
+            let totalAkun = 0;
             let totalNewAkunRp = 0;
             let totalExistingAkunRp = 0;
             let totalTopup = 0;
@@ -1238,19 +1256,23 @@
 
                 totalTarget += parseNumber(cells.eq(2).text().trim());
                 totalLeads += parseInt(cells.eq(3).text().trim()) || 0;
-                totalNewAkun += parseInt(cells.eq(4).text().trim()) || 0;
-                totalExistingAkun += parseInt(cells.eq(5).text().trim()) || 0;
-                totalNewAkunRp += parseNumber(cells.eq(6).text().trim());
-                totalExistingAkunRp += parseNumber(cells.eq(7).text().trim());
-                totalTopup += parseNumber(cells.eq(8).text().trim());
+                totalVisits += parseInt(cells.eq(4).text().trim()) || 0;
+                totalNewAkun += parseInt(cells.eq(5).text().trim()) || 0;
+                totalExistingAkun += parseInt(cells.eq(6).text().trim()) || 0;
+                totalAkun += parseInt(cells.eq(7).text().trim()) || 0;
+                totalNewAkunRp += parseNumber(cells.eq(8).text().trim());
+                totalExistingAkunRp += parseNumber(cells.eq(9).text().trim());
+                totalTopup += parseNumber(cells.eq(10).text().trim());
             });
 
             const totalAcv = totalTarget > 0 ? (totalTopup / totalTarget) * 100 : 0;
 
             $('#totalAreaSummaryTarget').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
             $('#totalAreaSummaryLeads').text(totalLeads);
+            $('#totalAreaSummaryVisits').text(totalVisits);
             $('#totalAreaSummaryNewAkun').text(totalNewAkun);
             $('#totalAreaSummaryExistingAkun').text(totalExistingAkun);
+            $('#totalAreaSummaryTotalAkun').text(totalAkun);
             $('#totalAreaSummaryNewAkunRp').text(Math.floor(totalNewAkunRp).toLocaleString('id-ID'));
             $('#totalAreaSummaryExistingAkunRp').text(Math.floor(totalExistingAkunRp).toLocaleString('id-ID'));
             $('#totalAreaSummaryTopup').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));

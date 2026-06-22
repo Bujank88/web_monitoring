@@ -177,6 +177,8 @@
             $('#btnExportCampaign').attr('href', url);
         }
 
+        var tableAlias = @json($tableAlias ?? 'ar');
+
         var table = $('#campaignTable').DataTable({
             processing: true,
             serverSide: true,
@@ -188,19 +190,19 @@
                 }
             },
             columns: [
-                { data: 'tanggal_iklan', name: 'ar.tgl_tayang' },
-                { data: 'id_iklan', name: 'ar.id_iklan' },
-                { data: 'judul_pesan_iklan', name: 'ar.judul_pesan_iklan' },
-                { data: 'operator_seluler', name: 'ar.operator_seluler' },
-                { data: 'kategori_iklan', name: 'ar.kategori_iklan' },
-                { data: 'tipe_kanal', name: 'ar.tipe_kanal' },
-                { data: 'success', name: 'ar.sukses' },
-                { data: 'failed', name: 'ar.gagal' },
-                { data: 'read', name: 'ar.read' },
-                { data: 'click', name: 'ar.click' },
+                { data: 'tanggal_iklan', name: tableAlias + '.tgl_tayang' },
+                { data: 'id_iklan', name: tableAlias + '.id_iklan' },
+                { data: 'judul_pesan_iklan', name: tableAlias + '.judul_pesan_iklan' },
+                { data: 'operator_seluler', name: tableAlias + '.operator_seluler' },
+                { data: 'kategori_iklan', name: tableAlias + '.kategori_iklan' },
+                { data: 'tipe_kanal', name: tableAlias + '.tipe_kanal' },
+                { data: 'success', name: tableAlias + '.sukses' },
+                { data: 'failed', name: tableAlias + '.gagal' },
+                { data: 'read', name: tableAlias + '.read' },
+                { data: 'click', name: tableAlias + '.click' },
                 { data: 'percentage_read', name: 'percentage_read', searchable: false },
                 { data: 'percentage_click', name: 'percentage_click', searchable: false },
-                { data: 'total_harga', name: 'ar.total_harga' }
+                { data: 'total_harga', name: tableAlias + '.total_harga' }
             ],
             order: [[0, 'desc']],
             pageLength: 25,
