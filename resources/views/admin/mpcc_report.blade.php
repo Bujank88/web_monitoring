@@ -775,8 +775,8 @@
                                 <th rowspan="2" style="text-align: center;">Cluster</th>
                                 <th rowspan="2" style="text-align: center;">Nama MPCC</th>
                                 <th rowspan="2" class="target-col" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
-                                <th rowspan="2" class="visit-col" style="text-align: center; background-color: #e3f2fd;">Jumlah Visit</th>
                                 <th rowspan="2" style="text-align: center; background-color: #d6ecff;">Jumlah Leads</th>
+                                <th rowspan="2" class="visit-col" style="text-align: center; background-color: #e3f2fd;">Jumlah Visit</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
                                 <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                                 <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
@@ -799,8 +799,8 @@
                             <tr style="background: #fff200; color: #1f2937; font-weight: 700;">
                                 <td colspan="4" style="text-align: right; padding: 12px;">TOTAL</td>
                                 <td id="totalTargetPerformance" style="text-align: center; padding: 12px;">0</td>
-                                <td id="totalVisitPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalLeadPerformance" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalVisitPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupNewAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
@@ -959,8 +959,8 @@
                 { data: 'branch', name: 'branch', className: 'text-center' },
                 { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
                 { data: 'target', name: 'target', className: 'text-center' },
-                { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
+                { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
                 { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
@@ -979,13 +979,13 @@
                     'font-weight': '600'
                 });
                 $('td', row).eq(5).css({
-                    'background': 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                    'color': '#0d47a1',
+                    'background': 'linear-gradient(135deg, #d6ecff 0%, #b8ddff 100%)',
+                    'color': '#0b5394',
                     'font-weight': '600'
                 });
                 $('td', row).eq(6).css({
-                    'background': 'linear-gradient(135deg, #d6ecff 0%, #b8ddff 100%)',
-                    'color': '#0b5394',
+                    'background': 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                    'color': '#0d47a1',
                     'font-weight': '600'
                 });
             },
@@ -1179,8 +1179,8 @@
                 const cells = $(this).find('td');
 
                 totalTarget += parseNumber(cells.eq(4).text().trim());
-                totalVisit += parseInt(cells.eq(5).text().trim()) || 0;
-                totalLeads += parseInt(cells.eq(6).text().trim()) || 0;
+                totalLeads += parseInt(cells.eq(5).text().trim()) || 0;
+                totalVisit += parseInt(cells.eq(6).text().trim()) || 0;
                 totalDealTopupNewAkun += parseInt(cells.eq(7).text().trim()) || 0;
                 totalDealTopupExistingAkun += parseInt(cells.eq(8).text().trim()) || 0;
 
@@ -1197,8 +1197,8 @@
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
             $('#totalDealTopupExistingAkun').text(totalDealTopupExistingAkun);
             $('#totalTargetPerformance').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
-            $('#totalVisitPerformance').text(totalVisit.toLocaleString('id-ID'));
             $('#totalLeadPerformance').text(totalLeads.toLocaleString('id-ID'));
+            $('#totalVisitPerformance').text(totalVisit.toLocaleString('id-ID'));
             $('#totalTopUpNewAkunRp').text(Math.floor(totalTopUpNewAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpExistingAkunRp').text(Math.floor(totalTopUpExistingAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpPerformance').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
