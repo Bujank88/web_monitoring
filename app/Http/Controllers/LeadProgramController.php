@@ -60,11 +60,23 @@ class LeadProgramController extends Controller
                 $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             }
 
-            // Query dengan LEFT JOIN ke leads_master dan mitra_sbp 
+            // Dedup leads_master by email agar satu email hanya menghasilkan satu baris join.
+            // Ini mencegah transaksi topup terduplikasi ketika ada multiple rows dengan email sama.
+            $leadMasterByEmail = DB::table('leads_master')
+                ->select(
+                    DB::raw('LOWER(TRIM(email)) as normalized_email'),
+                    DB::raw('MIN(user_id) as user_id')
+                )
+                ->whereNotNull('email')
+                ->groupBy(DB::raw('LOWER(TRIM(email))'));
+
+            // Query dengan LEFT JOIN ke leads_master dan mitra_sbp
             // untuk capture SEMUA transaksi, termasuk yang tidak ada di leads_master
             $topupData = DB::table('report_balance_top_up as rp')
                 ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
-                ->leftJoin('leads_master as lm', 'lm.email', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
                 ->leftJoin('b2b_clients as bc', DB::raw('LOWER(bc.myads_account)'), '=', DB::raw('LOWER(rp.email_client)'))
                 ->select(
                     DB::raw("DATE(rp.tgl_transaksi) as tanggal"),
