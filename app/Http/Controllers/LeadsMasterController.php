@@ -777,8 +777,7 @@ class LeadsMasterController extends Controller
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             );
 
-        // Query untuk mendapatkan data yang akan dimasukkan
-        $leadsData = LeadsMaster::with(['user'])
+        $baseQuery = LeadsMaster::with(['user'])
             ->leftJoinSub(
                 $settlementSubquery,
                 'rbt',
@@ -816,53 +815,56 @@ class LeadsMasterController extends Controller
                 DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             )
-            ->get();
+            ->orderBy('leads_master.id');
 
-        // Build array untuk batch insert
-        $summaryData = $leadsData->map(function ($lead) {
-            return [
-                'leads_master_id' => $lead->leads_master_id,
-                'user_id' => $lead->user_id,
-                'user_name' => $lead->user->name ?? null,
-                'source_id' => $lead->source_id,
-                'sector_id' => $lead->sector_id,
-                'regional' => $lead->regional,
-                'company_name' => $lead->company_name,
-                'mobile_phone' => $lead->mobile_phone,
-                'email' => $lead->email,
-                'status' => $lead->status,
-                'nama' => $lead->nama,
-                'address' => $lead->address,
-                'myads_account' => $lead->myads_account,
-                'data_type' => $lead->data_type,
-                'komitmen' => $lead->komitmen,
-                'plan_min_topup' => $lead->plan_min_topup,
-                'remarks' => $lead->remarks,
-                'flag_event' => $lead->flag_event,
-                'total_settlement_klien' => $lead->total_settlement_klien,
-                'saldo_utama' => $lead->saldo_utama,
-                'created_at' => $lead->created_at,
-                'updated_at' => $lead->updated_at,
-            ];
-        })->toArray();
+        $totalInserted = 0;
 
-        // Truncate dan insert ulang
-        DB::table('detail_leads_summary')->truncate();
-        
-        if (!empty($summaryData)) {
-            // Batch insert untuk performa
-            $chunks = array_chunk($summaryData, 500);
-            foreach ($chunks as $chunk) {
-                DB::table('detail_leads_summary')->insert($chunk);
-            }
-        }
+        DB::transaction(function () use ($baseQuery, &$totalInserted) {
+            // Gunakan delete dalam transaction supaya tabel tidak tertinggal setengah jadi
+            // saat job gagal atau koneksi DB sempat putus di tengah proses refresh.
+            DB::table('detail_leads_summary')->delete();
 
-        \Log::info('Detail Leads Summary - Refreshed: ' . count($summaryData) . ' records');
+            $baseQuery->chunkById(500, function ($leadsData) use (&$totalInserted) {
+                $summaryData = $leadsData->map(function ($lead) {
+                    return [
+                        'leads_master_id' => $lead->leads_master_id,
+                        'user_id' => $lead->user_id,
+                        'user_name' => $lead->user->name ?? null,
+                        'source_id' => $lead->source_id,
+                        'sector_id' => $lead->sector_id,
+                        'regional' => $lead->regional,
+                        'company_name' => $lead->company_name,
+                        'mobile_phone' => $lead->mobile_phone,
+                        'email' => $lead->email,
+                        'status' => $lead->status,
+                        'nama' => $lead->nama,
+                        'address' => $lead->address,
+                        'myads_account' => $lead->myads_account,
+                        'data_type' => $lead->data_type,
+                        'komitmen' => $lead->komitmen,
+                        'plan_min_topup' => $lead->plan_min_topup,
+                        'remarks' => $lead->remarks,
+                        'flag_event' => $lead->flag_event,
+                        'total_settlement_klien' => $lead->total_settlement_klien,
+                        'saldo_utama' => $lead->saldo_utama,
+                        'created_at' => $lead->created_at,
+                        'updated_at' => $lead->updated_at,
+                    ];
+                })->toArray();
+
+                if (!empty($summaryData)) {
+                    DB::table('detail_leads_summary')->insert($summaryData);
+                    $totalInserted += count($summaryData);
+                }
+            }, 'leads_master.id', 'leads_master_id');
+        });
+
+        \Log::info('Detail Leads Summary - Refreshed: ' . $totalInserted . ' records');
 
         return response()->json([
             'success' => true,
-            'message' => "Summary direfresh. Total: " . count($summaryData) . " records",
-            'total_records' => count($summaryData),
+            'message' => "Summary direfresh. Total: " . $totalInserted . " records",
+            'total_records' => $totalInserted,
         ]);
     }
 
