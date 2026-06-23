@@ -2705,6 +2705,7 @@ class BackController extends Controller
                 DB::raw('MAX(COALESCE(rb.paid_date, rb.tgl_transaksi)) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
             ->get()
@@ -2827,6 +2828,7 @@ class BackController extends Controller
                 DB::raw('SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp')
             )
             ->whereIn('lm.user_id', $userIds)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy('lm.user_id')
             ->get()
@@ -2840,6 +2842,7 @@ class BackController extends Controller
             ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
             ->where('dt.status', 'APPROVE')
             ->whereIn('lm.user_id', $userIds)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startDateFormatted, $endDateFormatted])
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy('lm.user_id')
@@ -2863,6 +2866,7 @@ class BackController extends Controller
         $momByCode = DB::table('report_balance_top_up as rp')
             ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
             ->whereIn('lm.user_id', $userIds)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
             ->groupBy('lm.user_id')
             ->select(
                 'lm.user_id',
@@ -3088,6 +3092,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw("DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))"), [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.paid_date')
