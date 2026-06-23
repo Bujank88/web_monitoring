@@ -235,6 +235,12 @@
                 </li>
                 @elseif($isMpcc)
                 <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item">
+                    <a href="{{ route('daily.topup.channel') }}" class="nav-link waves-effect {{ request()->routeIs('daily.topup.channel') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(255, 159, 64);"></i>
+                        <p>Daily Top Up Channel</p>
+                    </a>
+                </li>
                 <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
