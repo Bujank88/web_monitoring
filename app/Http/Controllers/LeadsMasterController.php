@@ -925,6 +925,8 @@ class LeadsMasterController extends Controller
             'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
             'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
             'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
+            'HEBAT1','HEBAT2','HEBAT3','HEBAT4','HEBAT5','HEBAT6','HEBAT7',
+            'HEBAT8','HEBAT9','HEBAT10','HEBAT11','HEBAT12','HEBAT13',
         ];
 
         // 2️⃣ Ambil data top up + referral_code user
