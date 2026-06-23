@@ -452,7 +452,7 @@
                 @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
-                @if($isAdmin || $isTsel || $isCanv || $isPH)
+                @if($isAdmin || $isTsel || $isCanv || $isPH || $isMpcc)
                 <li class="nav-header">ALL DASHBOARD</li>
                 <li class="nav-item">
                     <a href="{{ route('daily.topup.channel') }}"
