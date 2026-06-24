@@ -190,7 +190,7 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
-})->name('refreshDetailLeadsSummary')->withoutOverlapping()->everyFiveMinutes();
+})->name('refreshDetailLeadsSummary')->withoutOverlapping()->everyThirtyMinutes();
 
 // Refresh Regional Canvasser Summary setiap 5 menit
 Schedule::command('summary:refresh-regional-canvasser')->everyFiveMinutes()->name('refreshRegionalCanvasserSummary');
