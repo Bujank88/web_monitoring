@@ -143,6 +143,7 @@
                             <th class="text-center">Email</th>
                             <th class="text-center">No HP</th>
                             <th class="text-center">Role</th>
+                            <th class="text-center">Referral Code</th>
                             {{-- <th class="text-center">Treg</th> --}}
                             <th class="text-center">Status</th>
                             <th class="text-center">Tanggal<br>Dibuat</th>
@@ -223,6 +224,11 @@
                         <div class="form-group">
                             <label for="branch">Branch <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="branch" name="branch">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="referral_code">Referral Code</label>
+                            <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Contoh: HEBAT14">
                         </div>
                     </div>
                     
@@ -335,6 +341,12 @@
                     }
                 },
                 {
+                    data: 'referral_code',
+                    name: 'referral_code',
+                    orderable: true,
+                    render: data => `<div style="text-align: center; font-weight: 600;">${data || '-'}</div>`
+                },
+                {
                     data: 'status',
                     name: 'status',
                     orderable: true,
@@ -402,7 +414,7 @@
             $('#area, #branch').prop('required', isMpcc);
 
             if (!isMpcc) {
-                $('#area, #branch').val('');
+                $('#area, #branch, #referral_code').val('');
             }
 
             if (role === 'Treg') {
@@ -483,6 +495,7 @@
                     $('#role').val(user.role);
                     $('#area').val(user.area || '');
                     $('#branch').val(user.branch || '');
+                    $('#referral_code').val(user.referral_code || '');
                     toggleRoleFields();
                     
                     if (user.role === 'Treg') {
@@ -538,7 +551,6 @@
 </script>
 
 @endsection
-
 
 
 
