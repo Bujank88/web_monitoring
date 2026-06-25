@@ -2646,20 +2646,16 @@ class BackController extends Controller
 
     private function getMpccUsersWithVoucherCodes()
     {
-        $voucherCodes = collect(range(1, 13))
-            ->map(function ($index) {
-                return 'HEBAT' . $index;
-            })
-            ->values();
-
         return DB::table('users')
             ->where('role', 'MPCC')
-            ->select('id', 'name', 'area', 'branch')
+            ->whereNotNull('referral_code')
+            ->where('referral_code', '!=', '')
+            ->select('id', 'name', 'area', 'branch', 'referral_code')
             ->orderBy('id')
             ->get()
             ->values()
-            ->map(function ($user, $index) use ($voucherCodes) {
-                $user->voucher_code = $voucherCodes->get($index);
+            ->map(function ($user) {
+                $user->voucher_code = strtoupper(trim((string) $user->referral_code));
                 return $user;
             })
             ->filter(function ($user) {
