@@ -52,10 +52,11 @@ class ReportController extends Controller
     }
 
     /* ================= TOPUP ================= */
-    $topups = DB::connection('pgsql')
-        ->table('em_myads_topup')
-        ->whereBetween('tgl_transaksi', [$start, $end])
-        ->select('tgl_transaksi', 'email_client', 'total_settlement_klien')
+    $topups = DB::connection('mysql')
+        ->table('report_balance_top_up as rb')
+        ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+        ->whereBetween('rb.tgl_transaksi', [$start, $end])
+        ->select('rb.tgl_transaksi', 'rb.email_client', 'rb.total_settlement_klien')
         ->get()
         ->map(fn($t) => [
             'date'   => Carbon::parse($t->tgl_transaksi)->format('Y-m-d'),
@@ -69,20 +70,11 @@ class ReportController extends Controller
 
     $emails = $topups->pluck('email')->unique()->values();
 
-    /* ================= FIX DUPLICATE EMAIL ================= */
-    $sub = DB::connection('mysql')
-        ->table('leads_master')
-        ->selectRaw('LOWER(TRIM(email)) as email, MAX(id) as last_id')
-        ->whereIn(DB::raw('LOWER(TRIM(email))'), $emails)
-        ->groupBy(DB::raw('LOWER(TRIM(email))'));
-
     $master = DB::connection('mysql')
         ->table('leads_master as lm')
-        ->joinSub($sub, 'x', function ($j) {
-            $j->on('lm.id', '=', 'x.last_id');
-        })
         ->join('users', 'users.id', '=', 'lm.user_id')
-        ->where('users.role', 'cvsr');
+        ->where('users.role', 'cvsr')
+        ->whereIn(DB::raw('LOWER(TRIM(lm.email))'), $emails);
 
     if ($request->canvassers) {
         $master->whereIn('users.name', $request->canvassers);
@@ -90,6 +82,7 @@ class ReportController extends Controller
 
     $master = $master
         ->selectRaw('LOWER(TRIM(lm.email)) as email, users.name as canvasser')
+        ->distinct()
         ->get();
 
     if ($master->isEmpty()) {
@@ -135,18 +128,20 @@ class ReportController extends Controller
         $end2   = $now->copy()->subMonth()->endOfMonth()->endOfDay();
 
         // Query topup bulan ini
-        $topupThisMonth = DB::connection('pgsql')->table('em_myads_topup')
+        $topupThisMonth = DB::connection('mysql')->table('report_balance_top_up as rb')
             ->whereBetween('tgl_transaksi', [$start1, $end1])
-            ->select('email_client', DB::raw('SUM(total_settlement_klien) as total'))
-            ->groupBy('email_client')
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->select('rb.email_client', DB::raw('SUM(rb.total_settlement_klien) as total'))
+            ->groupBy('rb.email_client')
             ->get()
             ->mapWithKeys(fn($row) => [strtolower(trim($row->email_client)) => (float) $row->total]);
 
         // Query topup bulan lalu
-        $topupLastMonth = DB::connection('pgsql')->table('em_myads_topup')
+        $topupLastMonth = DB::connection('mysql')->table('report_balance_top_up as rb')
             ->whereBetween('tgl_transaksi', [$start2, $end2])
-            ->select('email_client', DB::raw('SUM(total_settlement_klien) as total'))
-            ->groupBy('email_client')
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->select('rb.email_client', DB::raw('SUM(rb.total_settlement_klien) as total'))
+            ->groupBy('rb.email_client')
             ->get()
             ->mapWithKeys(fn($row) => [strtolower(trim($row->email_client)) => (float) $row->total]);
 

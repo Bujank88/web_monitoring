@@ -62,13 +62,15 @@ class LeadProgramController extends Controller
 
             // Dedup leads_master by email agar satu email hanya menghasilkan satu baris join.
             // Ini mencegah transaksi topup terduplikasi ketika ada multiple rows dengan email sama.
-            $leadMasterByEmail = DB::table('leads_master')
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
                 ->select(
-                    DB::raw('LOWER(TRIM(email)) as normalized_email'),
-                    DB::raw('MIN(user_id) as user_id')
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
                 )
-                ->whereNotNull('email')
-                ->groupBy(DB::raw('LOWER(TRIM(email))'));
+                ->whereNotNull('lm.email')
+                ->where('u.role', '!=', 'MPCC')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
 
             // Query dengan LEFT JOIN ke leads_master dan mitra_sbp
             // untuk capture SEMUA transaksi, termasuk yang tidak ada di leads_master
