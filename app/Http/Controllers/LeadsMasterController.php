@@ -951,6 +951,15 @@ class LeadsMasterController extends Controller
                 continue;
             }
 
+            if (!str_starts_with($topUp->referral_code, 'HEBAT')) {
+                $existsInMitraSbp = DB::table('mitra_sbp')
+                    ->where('email_myads', $topUp->email_client)
+                    ->exists();
+                if ($existsInMitraSbp) {
+                    continue;
+                }
+            }
+
             // 4️⃣ Insert ke leads_master
             LeadsMaster::create([
                 'user_id'        => $topUp->user_id,

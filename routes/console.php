@@ -182,7 +182,7 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsFromTopUp();
-})->everyTenMinutes()->name('syncLeadsFromTopUp');
+})->twiceDaily()->name('syncLeadsFromTopUp');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegional();
