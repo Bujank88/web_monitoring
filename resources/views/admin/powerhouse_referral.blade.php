@@ -531,18 +531,60 @@
 
     #powerHousePerformanceTable tbody td:nth-child(6),
     #powerHousePerformanceTable tbody td:nth-child(7),
-    #powerHousePerformanceTable tbody td:nth-child(8),
-    #powerHousePerformanceTable tbody td:nth-child(9) {
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(10),
+    #powerHousePerformanceTable tbody td:nth-child(8) {
+        background: linear-gradient(135deg, #d6f5ff 0%, #a8e6ff 100%);
+        color: #055160;
+        font-weight: 700;
+    }
+
     #powerHousePerformanceTable tbody td:nth-child(11),
     #powerHousePerformanceTable tbody td:nth-child(12),
-    #powerHousePerformanceTable tbody td:nth-child(13) {
+    #powerHousePerformanceTable tbody td:nth-child(13),
+    #powerHousePerformanceTable tbody td:nth-child(14) {
         background-color: #d3ffcd;
         font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable {
+        border: 0.5px solid #ccc;
+        box-shadow: none;
+    }
+
+    #powerHouseSaldoTransferTable th,
+    #powerHouseSaldoTransferTable td {
+        border: 0.5px solid #ccc !important;
+    }
+
+    #powerHouseSaldoTransferTable tbody tr:nth-child(odd) {
+        background-color: #f2f2f2;
+    }
+
+    #powerHouseSaldoTransferTable tbody tr:nth-child(even) {
+        background-color: #ffffff;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(2) {
+        background-color: #e8f5e9;
+        color: #1b5e20;
+        font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(5) {
+        background-color: #fff3cd;
+        color: #7a5d00;
+        font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(6) {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        font-weight: 700;
     }
 </style>
 @endsection
@@ -688,14 +730,14 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="13" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="14" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
                                 <th rowspan="2" style="text-align: center;">Team PowerHouse</th>
                                 <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
-                                <th colspan="4" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
+                                <th colspan="5" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                                 <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
                             </tr>
                             <tr>
@@ -703,6 +745,7 @@
                                 <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Transfer Saldo(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Acv (%)</th>
                                 <th id="momHeaderPrevPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $prevSameDay->day }} {{ $prevSameDay->translatedFormat('M') }}</th>
@@ -720,12 +763,51 @@
                                 <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalTransferSaldoRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalAcvPerformance" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalMomPrevPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomCurrentPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomPrevRemaining" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomGap" style="text-align: center; padding: 12px;">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card" id="powerHouseSaldoTransferCard">
+            <div class="card-header bg-gradient-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> Detail Transfer Saldo</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseSaldoTransferTable" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr style="background-color: #e8eaf6; font-weight: bold;">
+                                <th colspan="7" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Detail Transfer Saldo PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                            </tr>
+                            <tr>
+                                <th style="text-align: center; width: 5%;">No</th>
+                                <th style="text-align: center;">Team PowerHouse</th>
+                                <th style="text-align: center;">Company Name</th>
+                                <th style="text-align: center;">Email Client</th>
+                                <th style="text-align: center;">Parent Email</th>
+                                <th style="text-align: center;">Amount</th>
+                                <th style="text-align: center;">Tgl Transaksi</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
+                                <td colspan="5" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td id="totalSaldoTransferAmount" style="text-align: center; padding: 12px;">Rp 0</td>
+                                <td id="totalSaldoTransferCount" style="text-align: center; padding: 12px;">0 Transfer</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -844,6 +926,7 @@
                 { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
                 { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
+                { data: 'total_transfer_saldo_rp', name: 'total_transfer_saldo_rp', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
                 { data: 'acv', name: 'acv', className: 'text-center' },
                 { data: 'mom_prev_partial', name: 'mom_prev_partial', className: 'text-center' },
@@ -859,10 +942,40 @@
                 });
             },
             rowCallback: function(row, data) {
-                applyPercentageCellStyle($('td', row).eq(8), data.acv);
+                applyPercentageCellStyle($('td', row).eq(9), data.acv);
             },
             drawCallback: function() {
                 calculatePerformanceTotals();
+            }
+        });
+
+        var saldoTransferTable = $('#powerHouseSaldoTransferTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: false,
+            ajax: {
+                url: "{{ route('powerhouse_saldo_transfer_detail_data') }}",
+                type: 'GET',
+                data: function(d) {
+                    d.start_date = $('#startDatePH').val();
+                    d.end_date = $('#endDatePH').val();
+                }
+            },
+            columns: [
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
+                { data: 'company_name', name: 'company_name', className: 'text-center' },
+                { data: 'email_client', name: 'email_client', className: 'text-center' },
+                { data: 'parent_email', name: 'parent_email', className: 'text-center' },
+                { data: 'amount', name: 'amount', className: 'text-center' },
+                { data: 'tgl_transaksi', name: 'tgl_transaksi', className: 'text-center' }
+            ],
+            drawCallback: function() {
+                calculateSaldoTransferTotals();
             }
         });
 
@@ -887,6 +1000,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            saldoTransferTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -904,6 +1018,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            saldoTransferTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -1015,6 +1130,7 @@
             let totalDealTopupExistingAkun = 0;
             let totalTopUpNewAkunRp = 0;
             let totalTopUpExistingAkunRp = 0;
+            let totalTransferSaldoRp = 0;
             let totalTopup = 0;
             let totalTarget = 0;
             let totalAcv = 0;
@@ -1038,12 +1154,13 @@
 
                 totalTopUpNewAkunRp += parseNumber(cells.eq(5).text().trim());
                 totalTopUpExistingAkunRp += parseNumber(cells.eq(6).text().trim());
-                totalTopup += parseNumber(cells.eq(7).text().trim());
+                totalTransferSaldoRp += parseNumber(cells.eq(7).text().trim());
+                totalTopup += parseNumber(cells.eq(8).text().trim());
 
-                totalMomPrevPartial += parseNumber(cells.eq(9).text().trim());
-                totalMomCurrentPartial += parseNumber(cells.eq(10).text().trim());
-                totalMomPrevRemaining += parseNumber(cells.eq(11).text().trim());
-                totalMomGap += parseNumber(cells.eq(12).text().trim());
+                totalMomPrevPartial += parseNumber(cells.eq(10).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(11).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(12).text().trim());
+                totalMomGap += parseNumber(cells.eq(13).text().trim());
             });
 
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
@@ -1051,6 +1168,7 @@
             $('#totalTargetPerformance').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
             $('#totalTopUpNewAkunRp').text(Math.floor(totalTopUpNewAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpExistingAkunRp').text(Math.floor(totalTopUpExistingAkunRp).toLocaleString('id-ID'));
+            $('#totalTransferSaldoRp').text(Math.floor(totalTransferSaldoRp).toLocaleString('id-ID'));
             $('#totalTopUpPerformance').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
             totalAcv = totalTarget > 0 ? (totalTopup / totalTarget) * 100 : 0;
             $('#totalAcvPerformance').text(totalAcv.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%');
@@ -1059,6 +1177,26 @@
             $('#totalMomCurrentPartial').text(Math.floor(totalMomCurrentPartial).toLocaleString('id-ID'));
             $('#totalMomPrevRemaining').text(Math.floor(totalMomPrevRemaining).toLocaleString('id-ID'));
             $('#totalMomGap').text(Math.floor(totalMomGap).toLocaleString('id-ID'));
+        }
+
+        function calculateSaldoTransferTotals() {
+            let totalAmount = 0;
+            let totalCount = 0;
+
+            const parseNumber = (text) => {
+                if (!text) return 0;
+                const normalized = text.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.-]/g, '');
+                return parseFloat(normalized) || 0;
+            };
+
+            $('#powerHouseSaldoTransferTable tbody tr').each(function() {
+                const cells = $(this).find('td');
+                totalAmount += parseNumber(cells.eq(5).text().trim());
+                totalCount += 1;
+            });
+
+            $('#totalSaldoTransferAmount').text('Rp ' + Math.floor(totalAmount).toLocaleString('id-ID'));
+            $('#totalSaldoTransferCount').text(totalCount.toLocaleString('id-ID') + ' Transfer');
         }
 
         function getSubMonthNoOverflow(dateObj) {

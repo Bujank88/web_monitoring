@@ -295,10 +295,10 @@ class BackController extends Controller
                 + (int) ($saldoTransferNewAkunByUser[$userId]->top_up_count ?? 0);
             $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0)
                 + (int) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
-            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0)
-                + (float) ($saldoTransferNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
-            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0)
-                + (float) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTransferSaldoRp = (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $reportTopUpTotalFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
             $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0)
                 + (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
             $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0)
@@ -308,11 +308,13 @@ class BackController extends Controller
             $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0)
                 + (float) ($saldoTransferMomByUser[$userId]->mom_prev_remaining ?? 0);
 
-            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
-            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
-            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
-                $difference = $totalTopUpFromStats - $splitTotal;
+            $splitTopUpOnly = $topUpNewAkunRp + $topUpExistingAkunRp;
+            if ($reportTopUpTotalFromStats > 0 && $splitTopUpOnly < $reportTopUpTotalFromStats) {
+                $difference = $reportTopUpTotalFromStats - $splitTopUpOnly;
                 $topUpExistingAkunRp += $difference;
+            }
+            $totalTopup = $topUpNewAkunRp + $topUpExistingAkunRp + $totalTransferSaldoRp;
+            if ($totalTopUpFromStats > 0 && $totalTopup <= 0) {
                 $totalTopup = $totalTopUpFromStats;
             }
 
@@ -341,6 +343,7 @@ class BackController extends Controller
                 'deal_topup_existing_akun' => $topUpExistingAkunCount,
                 'top_up_new_akun_rp' => $topUpNewAkunRp,
                 'top_up_existing_akun_rp' => $topUpExistingAkunRp,
+                'total_transfer_saldo_rp' => $totalTransferSaldoRp,
                 'total_topup' => $totalTopup,
                 'target' => $target,
                 'mom_prev_partial' => $momPrevPartial,
@@ -2052,6 +2055,9 @@ class BackController extends Controller
             ->editColumn('top_up_existing_akun_rp', function ($row) {
                 return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
             })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
+            })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
             })
@@ -2069,6 +2075,64 @@ class BackController extends Controller
             })
             ->editColumn('mom_gap', function ($row) {
                 return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getPowerHouseSaldoTransferDetail(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        if (!Schema::hasTable('saldo_transfer')) {
+            return DataTables::of(collect())->make(true);
+        }
+
+        $powerHouseLeadByEmail = DB::table('leads_master as lm')
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->where('u.role', 'PH')
+            ->where('u.name', '!=', 'self service')
+            ->whereNotNull('lm.email')
+            ->groupBy(DB::raw('LOWER(TRIM(lm.email))'))
+            ->select(
+                DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                DB::raw('MIN(lm.user_id) as user_id'),
+                DB::raw('MIN(lm.company_name) as company_name'),
+                DB::raw('MIN(lm.email) as email_client')
+            );
+
+        $data = DB::table('saldo_transfer as st')
+            ->joinSub($powerHouseLeadByEmail, 'phl', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(st.email_client))'), '=', 'phl.normalized_email');
+            })
+            ->join('users as u', 'u.id', '=', 'phl.user_id')
+            ->whereBetween('st.tgl_transaksi', [$startDate, $endDate])
+            ->select(
+                'u.name as team_powerhouse',
+                'phl.company_name',
+                'phl.email_client',
+                'st.parent_email',
+                DB::raw('CAST(st.amount AS DECIMAL(18,2)) as amount'),
+                'st.tgl_transaksi'
+            )
+            ->orderBy('st.tgl_transaksi', 'desc')
+            ->get();
+
+        return DataTables::of($data)
+            ->addIndexColumn()
+            ->editColumn('amount', function ($row) {
+                return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
+            })
+            ->editColumn('tgl_transaksi', function ($row) {
+                return $row->tgl_transaksi
+                    ? Carbon::parse($row->tgl_transaksi)->format('d M Y H:i')
+                    : '-';
             })
             ->make(true);
     }
@@ -2118,6 +2182,9 @@ class BackController extends Controller
             })
             ->editColumn('top_up_existing_akun_rp', function ($row) {
                 return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
             })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
