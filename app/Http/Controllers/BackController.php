@@ -1888,9 +1888,10 @@ class BackController extends Controller
             'SUPER7' => 'Naqsyabandi',
             'SUPER8' => 'Ikrar Dharmawan',
         ];
+        $powerHouseMapping = $this->getPowerHouseOwnerMapForMonth($powerHouseMapping, $startDate->copy()->startOfMonth());
 
         // Get users associated with PowerHouse teams
-        $powerHouseUserMap = [
+        $powerHouseUserAliases = [
             'Angga Satria Gusti' => ['Angga Satria Gusti', 'Angga S. Gusti'],
             'Abdul Halim' => ['Abdul Halim'],
             'Raden Agie S. Akbar' => ['Raden Agie Satria Akbar', 'Raden Agie S. Akbar'],
@@ -1922,7 +1923,8 @@ class BackController extends Controller
             $voucherInfo = $voucherData->get($voucherCode);
             
             // Count leads for this PowerHouse team (from leads_master table)
-            $userNames = $powerHouseUserMap[$powerHouseName] ?? [];
+            $userNames = $powerHouseUserAliases[$powerHouseName] ?? [$powerHouseName];
+            $userNames = array_values(array_filter($userNames));
             
             // Get user IDs for this PowerHouse
             $userIds = DB::table('users')
@@ -2644,9 +2646,9 @@ class BackController extends Controller
         }
     }
 
-    private function getMpccUsersWithVoucherCodes()
+    private function getMpccUsersWithVoucherCodes(?Carbon $monthStart = null)
     {
-        return DB::table('users')
+        $mpccUsers = DB::table('users')
             ->where('role', 'MPCC')
             ->whereNotNull('referral_code')
             ->where('referral_code', '!=', '')
@@ -2662,6 +2664,50 @@ class BackController extends Controller
                 return !empty($user->voucher_code);
             })
             ->values();
+
+        if (!$monthStart || $mpccUsers->isEmpty()) {
+            return $mpccUsers;
+        }
+
+        $ownerMapping = $this->getMpccOwnerMapForMonth($mpccUsers, $monthStart);
+        if (empty($ownerMapping)) {
+            return $mpccUsers;
+        }
+
+        $ownerNames = collect($ownerMapping)->filter()->unique()->values()->all();
+        $ownerUsersByName = DB::table('users')
+            ->whereIn('name', $ownerNames)
+            ->select('id', 'name', 'area', 'branch')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtolower(trim((string) $user->name));
+            });
+
+        return $mpccUsers->map(function ($user) use ($ownerMapping, $ownerUsersByName) {
+            $voucherCode = strtoupper(trim((string) $user->voucher_code));
+            if (!array_key_exists($voucherCode, $ownerMapping)) {
+                return $user;
+            }
+
+            $ownerName = trim((string) ($ownerMapping[$voucherCode] ?? ''));
+            if ($ownerName === '') {
+                $user->id = 0;
+                $user->name = '-';
+                $user->area = '-';
+                $user->branch = '-';
+                return $user;
+            }
+
+            $ownerUser = $ownerUsersByName->get(strtolower(trim((string) $ownerName)));
+            if ($ownerUser) {
+                $user->id = $ownerUser->id;
+                $user->area = $ownerUser->area;
+                $user->branch = $ownerUser->branch;
+            }
+
+            $user->name = $ownerName;
+            return $user;
+        })->values();
     }
 
     public function getMpccVoucherReport(Request $request)
@@ -2675,7 +2721,7 @@ class BackController extends Controller
             ? Carbon::parse($request->end_date)->endOfDay()
             : $defaultReferenceDate->copy()->endOfDay();
 
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return DataTables::of([])->addIndexColumn()->make(true);
         }
@@ -3823,6 +3869,95 @@ class BackController extends Controller
     {
         return strtolower(trim((string) $branch));
     }
+
+    private function getMpccOwnerMapForMonth($mpccUsers, Carbon $monthStart): array
+    {
+        $voucherCodes = collect($mpccUsers)
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($voucherCodes)) {
+            return [];
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $mapping = [];
+        foreach ($historyCodes as $code) {
+            $mapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        foreach ($historyRows as $row) {
+            $mapping[$row->voucher_code] = $row->owner_name;
+        }
+
+        return $mapping;
+    }
+
+    private function getPowerHouseOwnerMapForMonth(array $defaultMapping, Carbon $monthStart): array
+    {
+        $voucherCodes = array_keys($defaultMapping);
+        if (empty($voucherCodes)) {
+            return $defaultMapping;
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $baseMapping = $defaultMapping;
+        foreach ($historyCodes as $code) {
+            $baseMapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $override = [];
+        foreach ($historyRows as $row) {
+            $override[$row->voucher_code] = $row->owner_name;
+        }
+
+        return array_merge($baseMapping, $override);
+    }
+
     private function getCanvasserOwnerMapForMonth(Carbon $monthStart): array
     {
         $defaultMapping = [
