@@ -102,6 +102,7 @@ class BackController extends Controller
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
                 ->select(
@@ -115,6 +116,7 @@ class BackController extends Controller
             $topUpAggByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
                 ->select(
@@ -133,6 +135,7 @@ class BackController extends Controller
                 ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(
                     DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                     [$startDateFormatted, $endDateFormatted]
@@ -155,6 +158,7 @@ class BackController extends Controller
                 })
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
@@ -178,6 +182,7 @@ class BackController extends Controller
             $momByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -295,10 +300,10 @@ class BackController extends Controller
                 + (int) ($saldoTransferNewAkunByUser[$userId]->top_up_count ?? 0);
             $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0)
                 + (int) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
-            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0)
-                + (float) ($saldoTransferNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
-            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0)
-                + (float) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTransferSaldoRp = (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $reportTopUpTotalFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
             $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0)
                 + (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
             $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0)
@@ -308,11 +313,13 @@ class BackController extends Controller
             $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0)
                 + (float) ($saldoTransferMomByUser[$userId]->mom_prev_remaining ?? 0);
 
-            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
-            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
-            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
-                $difference = $totalTopUpFromStats - $splitTotal;
+            $splitTopUpOnly = $topUpNewAkunRp + $topUpExistingAkunRp;
+            if ($reportTopUpTotalFromStats > 0 && $splitTopUpOnly < $reportTopUpTotalFromStats) {
+                $difference = $reportTopUpTotalFromStats - $splitTopUpOnly;
                 $topUpExistingAkunRp += $difference;
+            }
+            $totalTopup = $topUpNewAkunRp + $topUpExistingAkunRp + $totalTransferSaldoRp;
+            if ($totalTopUpFromStats > 0 && $totalTopup <= 0) {
                 $totalTopup = $totalTopUpFromStats;
             }
 
@@ -341,6 +348,7 @@ class BackController extends Controller
                 'deal_topup_existing_akun' => $topUpExistingAkunCount,
                 'top_up_new_akun_rp' => $topUpNewAkunRp,
                 'top_up_existing_akun_rp' => $topUpExistingAkunRp,
+                'total_transfer_saldo_rp' => $totalTransferSaldoRp,
                 'total_topup' => $totalTopup,
                 'target' => $target,
                 'mom_prev_partial' => $momPrevPartial,
@@ -1888,9 +1896,10 @@ class BackController extends Controller
             'SUPER7' => 'Naqsyabandi',
             'SUPER8' => 'Ikrar Dharmawan',
         ];
+        $powerHouseMapping = $this->getPowerHouseOwnerMapForMonth($powerHouseMapping, $startDate->copy()->startOfMonth());
 
         // Get users associated with PowerHouse teams
-        $powerHouseUserMap = [
+        $powerHouseUserAliases = [
             'Angga Satria Gusti' => ['Angga Satria Gusti', 'Angga S. Gusti'],
             'Abdul Halim' => ['Abdul Halim'],
             'Raden Agie S. Akbar' => ['Raden Agie Satria Akbar', 'Raden Agie S. Akbar'],
@@ -1911,6 +1920,7 @@ class BackController extends Controller
                 DB::raw('MAX(rb.tgl_transaksi) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween('rb.paid_date', [$startDate, $endDate])
             ->groupBy('dv.voucher_code')
             ->get()
@@ -1922,7 +1932,8 @@ class BackController extends Controller
             $voucherInfo = $voucherData->get($voucherCode);
             
             // Count leads for this PowerHouse team (from leads_master table)
-            $userNames = $powerHouseUserMap[$powerHouseName] ?? [];
+            $userNames = $powerHouseUserAliases[$powerHouseName] ?? [$powerHouseName];
+            $userNames = array_values(array_filter($userNames));
             
             // Get user IDs for this PowerHouse
             $userIds = DB::table('users')
@@ -2052,6 +2063,9 @@ class BackController extends Controller
             ->editColumn('top_up_existing_akun_rp', function ($row) {
                 return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
             })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
+            })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
             })
@@ -2069,6 +2083,64 @@ class BackController extends Controller
             })
             ->editColumn('mom_gap', function ($row) {
                 return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getPowerHouseSaldoTransferDetail(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        if (!Schema::hasTable('saldo_transfer')) {
+            return DataTables::of(collect())->make(true);
+        }
+
+        $powerHouseLeadByEmail = DB::table('leads_master as lm')
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->where('u.role', 'PH')
+            ->where('u.name', '!=', 'self service')
+            ->whereNotNull('lm.email')
+            ->groupBy(DB::raw('LOWER(TRIM(lm.email))'))
+            ->select(
+                DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                DB::raw('MIN(lm.user_id) as user_id'),
+                DB::raw('MIN(lm.company_name) as company_name'),
+                DB::raw('MIN(lm.email) as email_client')
+            );
+
+        $data = DB::table('saldo_transfer as st')
+            ->joinSub($powerHouseLeadByEmail, 'phl', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(st.email_client))'), '=', 'phl.normalized_email');
+            })
+            ->join('users as u', 'u.id', '=', 'phl.user_id')
+            ->whereBetween('st.tgl_transaksi', [$startDate, $endDate])
+            ->select(
+                'u.name as team_powerhouse',
+                'phl.company_name',
+                'phl.email_client',
+                'st.parent_email',
+                DB::raw('CAST(st.amount AS DECIMAL(18,2)) as amount'),
+                'st.tgl_transaksi'
+            )
+            ->orderBy('st.tgl_transaksi', 'desc')
+            ->get();
+
+        return DataTables::of($data)
+            ->addIndexColumn()
+            ->editColumn('amount', function ($row) {
+                return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
+            })
+            ->editColumn('tgl_transaksi', function ($row) {
+                return $row->tgl_transaksi
+                    ? Carbon::parse($row->tgl_transaksi)->format('d M Y H:i')
+                    : '-';
             })
             ->make(true);
     }
@@ -2118,6 +2190,9 @@ class BackController extends Controller
             })
             ->editColumn('top_up_existing_akun_rp', function ($row) {
                 return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
             })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
@@ -2229,6 +2304,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2296,6 +2372,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2368,6 +2445,7 @@ class BackController extends Controller
                 DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as total_topup')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2644,12 +2722,13 @@ class BackController extends Controller
         }
     }
 
-    private function getMpccUsersWithVoucherCodes()
+    private function getMpccUsersWithVoucherCodes(?Carbon $monthStart = null)
     {
-        return DB::table('users')
+        $mpccUsers = DB::table('users')
             ->where('role', 'MPCC')
             ->whereNotNull('referral_code')
             ->where('referral_code', '!=', '')
+            ->where(DB::raw('UPPER(referral_code)'), 'like', 'HEBAT%')
             ->select('id', 'name', 'area', 'branch', 'referral_code')
             ->orderBy('id')
             ->get()
@@ -2660,6 +2739,104 @@ class BackController extends Controller
             })
             ->filter(function ($user) {
                 return !empty($user->voucher_code);
+            })
+            ->values();
+
+        if (!$monthStart) {
+            return $mpccUsers;
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $allHebatHistoryCodes = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'))
+            ->distinct()
+            ->pluck('voucher_code')
+            ->filter()
+            ->values();
+
+        $historyRows = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $historyByVoucherCode = $historyRows
+            ->keyBy('voucher_code');
+
+        $voucherCodes = $mpccUsers->pluck('voucher_code')
+            ->merge($allHebatHistoryCodes)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $usersByVoucherCode = DB::table('users')
+            ->whereNotNull('referral_code')
+            ->where('referral_code', '!=', '')
+            ->whereIn(DB::raw('UPPER(referral_code)'), $voucherCodes)
+            ->select('id', 'name', 'area', 'branch', 'referral_code')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtoupper(trim((string) $user->referral_code));
+            });
+
+        $ownerNames = $historyRows->pluck('owner_name')->filter()->unique()->values()->all();
+        $ownerUsersByName = DB::table('users')
+            ->whereIn('name', $ownerNames)
+            ->select('id', 'name', 'area', 'branch')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtolower(trim((string) $user->name));
+            });
+
+        return collect($voucherCodes)
+            ->map(function ($voucherCode) use ($mpccUsers, $historyByVoucherCode, $usersByVoucherCode, $ownerUsersByName) {
+                $baseUser = $mpccUsers->first(function ($user) use ($voucherCode) {
+                    return strtoupper(trim((string) $user->voucher_code)) === $voucherCode;
+                });
+
+                $user = $baseUser ?: (object) [
+                    'id' => 0,
+                    'name' => '-',
+                    'area' => '-',
+                    'branch' => '-',
+                    'referral_code' => $voucherCode,
+                    'voucher_code' => $voucherCode,
+                ];
+
+                $historyRow = $historyByVoucherCode->get($voucherCode);
+                $ownerName = trim((string) ($historyRow->owner_name ?? ''));
+                $voucherUser = $usersByVoucherCode->get($voucherCode);
+
+                if ($voucherUser) {
+                    $user->id = $voucherUser->id;
+                    $user->area = $voucherUser->area ?: $user->area;
+                    $user->branch = $voucherUser->branch ?: $user->branch;
+                }
+
+                if ($ownerName !== '') {
+                    $ownerUser = $ownerUsersByName->get(strtolower($ownerName));
+                    if ($ownerUser) {
+                        $user->id = $ownerUser->id;
+                        $user->area = $ownerUser->area ?: $user->area;
+                        $user->branch = $ownerUser->branch ?: $user->branch;
+                    }
+
+                    $user->name = $ownerName;
+                }
+
+                $user->voucher_code = $voucherCode;
+                $user->referral_code = $voucherCode;
+                $user->area = $user->area ?: '-';
+                $user->branch = $user->branch ?: '-';
+                $user->name = trim((string) ($user->name ?: '-'));
+
+                return $user;
             })
             ->values();
     }
@@ -2675,7 +2852,7 @@ class BackController extends Controller
             ? Carbon::parse($request->end_date)->endOfDay()
             : $defaultReferenceDate->copy()->endOfDay();
 
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return DataTables::of([])->addIndexColumn()->make(true);
         }
@@ -2777,7 +2954,7 @@ class BackController extends Controller
 
     private function buildMpccPerformanceRows(Carbon $startDate, Carbon $endDate): array
     {
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return [];
         }
@@ -3065,7 +3242,7 @@ class BackController extends Controller
             ? Carbon::parse($request->end_date)->endOfDay()
             : $defaultReferenceDate->copy()->endOfDay();
 
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
             return strtoupper($code);
         })->values()->all();
@@ -3306,7 +3483,7 @@ class BackController extends Controller
 
     private function buildMpccAreaBranchRows(Carbon $startDate, Carbon $endDate): array
     {
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return [];
         }
@@ -3334,6 +3511,7 @@ class BackController extends Controller
                 DB::raw('MAX(COALESCE(rb.paid_date, rb.tgl_transaksi)) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
             ->get()
@@ -3823,6 +4001,95 @@ class BackController extends Controller
     {
         return strtolower(trim((string) $branch));
     }
+
+    private function getMpccOwnerMapForMonth($mpccUsers, Carbon $monthStart): array
+    {
+        $voucherCodes = collect($mpccUsers)
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($voucherCodes)) {
+            return [];
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $mapping = [];
+        foreach ($historyCodes as $code) {
+            $mapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        foreach ($historyRows as $row) {
+            $mapping[$row->voucher_code] = $row->owner_name;
+        }
+
+        return $mapping;
+    }
+
+    private function getPowerHouseOwnerMapForMonth(array $defaultMapping, Carbon $monthStart): array
+    {
+        $voucherCodes = array_keys($defaultMapping);
+        if (empty($voucherCodes)) {
+            return $defaultMapping;
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $baseMapping = $defaultMapping;
+        foreach ($historyCodes as $code) {
+            $baseMapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $override = [];
+        foreach ($historyRows as $row) {
+            $override[$row->voucher_code] = $row->owner_name;
+        }
+
+        return array_merge($baseMapping, $override);
+    }
+
     private function getCanvasserOwnerMapForMonth(Carbon $monthStart): array
     {
         $defaultMapping = [
