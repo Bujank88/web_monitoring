@@ -27,7 +27,7 @@ class UserController extends Controller
     {
         $data = DB::table('users')
             ->where('status', 'Aktif')
-            ->select('id', 'name', 'email', 'nohp', 'status', 'role', 'area', 'branch', 'created_at')
+            ->select('id', 'name', 'email', 'nohp', 'status', 'role', 'area', 'branch', 'referral_code', 'created_at')
             ->orderByDesc('created_at');
 
         return datatables()->of($data)
@@ -54,6 +54,7 @@ class UserController extends Controller
             'role'  => 'required',
             'area' => 'nullable|required_if:role,MPCC',
             'branch' => 'nullable|required_if:role,MPCC',
+            'referral_code' => 'nullable|string|max:255',
             // 'treg_id' => 'nullable'
         ]);
 
@@ -64,6 +65,7 @@ class UserController extends Controller
             'role' => $request->role,
             'area' => $request->role === 'MPCC' ? $request->area : null,
             'branch' => $request->role === 'MPCC' ? $request->branch : null,
+            'referral_code' => $request->role === 'MPCC' ? strtoupper(trim((string) $request->referral_code)) : null,
             // 'treg_id' => $request->role == 'Treg' ? $request->treg_id : null,
             'password' => bcrypt('123456'), // default
             'status' => 'Aktif',
@@ -93,6 +95,7 @@ class UserController extends Controller
             'role'  => 'required',
             'area' => 'nullable|required_if:role,MPCC',
             'branch' => 'nullable|required_if:role,MPCC',
+            'referral_code' => 'nullable|string|max:255',
             // 'treg_id' => 'nullable'
         ]);
 
@@ -103,6 +106,7 @@ class UserController extends Controller
             'role' => $request->role,
             'area' => $request->role === 'MPCC' ? $request->area : null,
             'branch' => $request->role === 'MPCC' ? $request->branch : null,
+            'referral_code' => $request->role === 'MPCC' ? strtoupper(trim((string) $request->referral_code)) : null,
             // 'treg_id' => $request->role == 'Treg' ? $request->treg_id : null,
             'updated_at' => now()
         ];
@@ -121,5 +125,4 @@ class UserController extends Controller
         return response()->json(['message' => 'User berhasil di-nonaktifkan']);
     }
 }
-
 
