@@ -229,27 +229,29 @@ class ReportController extends Controller
 
         /* ================= TOPUP PER REGION ================= */
         $topupPerRegion = DB::connection('mysql')
-            ->table('report_balance_top_up as emt')
+            ->table('report_balance_top_up as rp')
             ->selectRaw("
                 CASE
-                    WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung', 'Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
-                    WHEN data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
-                    WHEN data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
-                    WHEN data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
-                    WHEN data_province_name = 'Jawa Barat' THEN 'JABAR'
-                    WHEN data_province_name IN ('Jawa Tengah','Yogyakarta', 'DI Yogyakarta') THEN 'JATENG DIY'
-                    WHEN data_province_name = 'Jawa Timur' THEN 'JATIM'
-                    WHEN data_province_name IN ('Bali','NTB','NTT') THEN 'BALI NUSRA'
-                    WHEN data_province_name IN ('Kalimantan Tengah','Kalimantan Barat','Kalimantan Utara','Kalimantan Timur','Kalimantan Selatan') THEN 'KALIMANTAN'
-                    WHEN data_province_name IN ('Sulawesi Utara','Sulawesi Tengah','Gorontalo','Sulawesi Tenggara','Sulawesi Selatan','Maluku Utara') THEN 'SULAWESI'
-                    WHEN data_province_name IN ('Maluku','Papua Barat','Papua') THEN 'PAPUA MALUKU'
+                    WHEN rp.data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung', 'Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
+                    WHEN rp.data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
+                    WHEN rp.data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
+                    WHEN rp.data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
+                    WHEN rp.data_province_name = 'Jawa Barat' THEN 'JABAR'
+                    WHEN rp.data_province_name IN ('Jawa Tengah','Yogyakarta', 'DI Yogyakarta') THEN 'JATENG DIY'
+                    WHEN rp.data_province_name = 'Jawa Timur' THEN 'JATIM'
+                    WHEN rp.data_province_name IN ('Bali','NTB','NTT') THEN 'BALI NUSRA'
+                    WHEN rp.data_province_name IN ('Kalimantan Tengah','Kalimantan Barat','Kalimantan Utara','Kalimantan Timur','Kalimantan Selatan') THEN 'KALIMANTAN'
+                    WHEN rp.data_province_name IN ('Sulawesi Utara','Sulawesi Tengah','Gorontalo','Sulawesi Tenggara','Sulawesi Selatan','Maluku Utara') THEN 'SULAWESI'
+                    WHEN rp.data_province_name IN ('Maluku','Papua Barat','Papua') THEN 'PAPUA MALUKU'
                     ELSE 'UNKNOWN'
                 END AS region,
-                SUM(emt.total_settlement_klien) AS topup
+                SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) AS topup
             ")
-            ->whereBetween('emt.tgl_transaksi', [$start, $end])
-            ->whereNotNull('emt.tgl_transaksi')
-            // ->where('emt.payment_history_status', 'PAID')
+            ->whereDate('rp.tgl_transaksi', '>=', $start->format('Y-m-d'))
+            ->whereDate('rp.tgl_transaksi', '<=', $end->format('Y-m-d'))
+            ->whereNotNull('rp.email_client')
+            ->whereNotNull('rp.total_settlement_klien')
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
             ->groupBy('region')
             ->get()
             ->mapWithKeys(fn ($item) => [strtoupper($item->region) => $item]);
@@ -267,15 +269,40 @@ class ReportController extends Controller
             ->table('report_balance_top_up')
             ->whereBetween('tgl_transaksi', [$start, $end])
             ->whereNotNull('tgl_transaksi')
+            ->where('payment_method_name', '!=', 'Voucher Bonus')
             ->where('payment_history_status', 'PAID')
             ->max('tgl_transaksi');
 
         /* ================= MERGE DATA ================= */
         $data = [];
 
+        $regionOrder = [
+            'SUMBAGUT',
+            'SUMBAGTENG',
+            'SUMBAGSEL',
+            'JABODETABEK',
+            'JABAR',
+            'JATENG',
+            'JATENG DIY',
+            'JATIM',
+            'BALNUS',
+            'BALI NUSRA',
+            'KALIMANTAN',
+            'SULAWESI',
+            'PUMA',
+            'PAPUA MALUKU',
+            'UNKNOWN',
+        ];
+
         $regions = $targets->keys()
             ->merge($topupPerRegion->keys())
-            ->unique();
+            ->unique()
+            ->sortBy(function ($region) use ($regionOrder) {
+                $index = array_search(strtoupper($region), $regionOrder, true);
+
+                return $index === false ? PHP_INT_MAX : $index;
+            })
+            ->values();
             // ->filter(fn ($r) => $r !== 'UNKNOWN');
 
         // Hitung sisa hari di bulan berjalan

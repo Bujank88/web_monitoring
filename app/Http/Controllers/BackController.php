@@ -102,6 +102,7 @@ class BackController extends Controller
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
                 ->select(
@@ -115,6 +116,7 @@ class BackController extends Controller
             $topUpAggByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
                 ->select(
@@ -133,6 +135,7 @@ class BackController extends Controller
                 ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereBetween(
                     DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                     [$startDateFormatted, $endDateFormatted]
@@ -155,6 +158,7 @@ class BackController extends Controller
                 })
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
                 ->groupBy('lm.user_id')
@@ -178,6 +182,7 @@ class BackController extends Controller
             $momByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -1915,6 +1920,7 @@ class BackController extends Controller
                 DB::raw('MAX(rb.tgl_transaksi) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween('rb.paid_date', [$startDate, $endDate])
             ->groupBy('dv.voucher_code')
             ->get()
@@ -2298,6 +2304,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2365,6 +2372,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2437,6 +2445,7 @@ class BackController extends Controller
                 DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as total_topup')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -2719,6 +2728,7 @@ class BackController extends Controller
             ->where('role', 'MPCC')
             ->whereNotNull('referral_code')
             ->where('referral_code', '!=', '')
+            ->where(DB::raw('UPPER(referral_code)'), 'like', 'HEBAT%')
             ->select('id', 'name', 'area', 'branch', 'referral_code')
             ->orderBy('id')
             ->get()
@@ -2732,16 +2742,50 @@ class BackController extends Controller
             })
             ->values();
 
-        if (!$monthStart || $mpccUsers->isEmpty()) {
+        if (!$monthStart) {
             return $mpccUsers;
         }
 
-        $ownerMapping = $this->getMpccOwnerMapForMonth($mpccUsers, $monthStart);
-        if (empty($ownerMapping)) {
-            return $mpccUsers;
-        }
+        $monthDate = $monthStart->toDateString();
+        $allHebatHistoryCodes = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'))
+            ->distinct()
+            ->pluck('voucher_code')
+            ->filter()
+            ->values();
 
-        $ownerNames = collect($ownerMapping)->filter()->unique()->values()->all();
+        $historyRows = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $historyByVoucherCode = $historyRows
+            ->keyBy('voucher_code');
+
+        $voucherCodes = $mpccUsers->pluck('voucher_code')
+            ->merge($allHebatHistoryCodes)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $usersByVoucherCode = DB::table('users')
+            ->whereNotNull('referral_code')
+            ->where('referral_code', '!=', '')
+            ->whereIn(DB::raw('UPPER(referral_code)'), $voucherCodes)
+            ->select('id', 'name', 'area', 'branch', 'referral_code')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtoupper(trim((string) $user->referral_code));
+            });
+
+        $ownerNames = $historyRows->pluck('owner_name')->filter()->unique()->values()->all();
         $ownerUsersByName = DB::table('users')
             ->whereIn('name', $ownerNames)
             ->select('id', 'name', 'area', 'branch')
@@ -2750,31 +2794,51 @@ class BackController extends Controller
                 return strtolower(trim((string) $user->name));
             });
 
-        return $mpccUsers->map(function ($user) use ($ownerMapping, $ownerUsersByName) {
-            $voucherCode = strtoupper(trim((string) $user->voucher_code));
-            if (!array_key_exists($voucherCode, $ownerMapping)) {
+        return collect($voucherCodes)
+            ->map(function ($voucherCode) use ($mpccUsers, $historyByVoucherCode, $usersByVoucherCode, $ownerUsersByName) {
+                $baseUser = $mpccUsers->first(function ($user) use ($voucherCode) {
+                    return strtoupper(trim((string) $user->voucher_code)) === $voucherCode;
+                });
+
+                $user = $baseUser ?: (object) [
+                    'id' => 0,
+                    'name' => '-',
+                    'area' => '-',
+                    'branch' => '-',
+                    'referral_code' => $voucherCode,
+                    'voucher_code' => $voucherCode,
+                ];
+
+                $historyRow = $historyByVoucherCode->get($voucherCode);
+                $ownerName = trim((string) ($historyRow->owner_name ?? ''));
+                $voucherUser = $usersByVoucherCode->get($voucherCode);
+
+                if ($voucherUser) {
+                    $user->id = $voucherUser->id;
+                    $user->area = $voucherUser->area ?: $user->area;
+                    $user->branch = $voucherUser->branch ?: $user->branch;
+                }
+
+                if ($ownerName !== '') {
+                    $ownerUser = $ownerUsersByName->get(strtolower($ownerName));
+                    if ($ownerUser) {
+                        $user->id = $ownerUser->id;
+                        $user->area = $ownerUser->area ?: $user->area;
+                        $user->branch = $ownerUser->branch ?: $user->branch;
+                    }
+
+                    $user->name = $ownerName;
+                }
+
+                $user->voucher_code = $voucherCode;
+                $user->referral_code = $voucherCode;
+                $user->area = $user->area ?: '-';
+                $user->branch = $user->branch ?: '-';
+                $user->name = trim((string) ($user->name ?: '-'));
+
                 return $user;
-            }
-
-            $ownerName = trim((string) ($ownerMapping[$voucherCode] ?? ''));
-            if ($ownerName === '') {
-                $user->id = 0;
-                $user->name = '-';
-                $user->area = '-';
-                $user->branch = '-';
-                return $user;
-            }
-
-            $ownerUser = $ownerUsersByName->get(strtolower(trim((string) $ownerName)));
-            if ($ownerUser) {
-                $user->id = $ownerUser->id;
-                $user->area = $ownerUser->area;
-                $user->branch = $ownerUser->branch;
-            }
-
-            $user->name = $ownerName;
-            return $user;
-        })->values();
+            })
+            ->values();
     }
 
     public function getMpccVoucherReport(Request $request)
@@ -2890,7 +2954,7 @@ class BackController extends Controller
 
     private function buildMpccPerformanceRows(Carbon $startDate, Carbon $endDate): array
     {
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return [];
         }
@@ -3178,7 +3242,7 @@ class BackController extends Controller
             ? Carbon::parse($request->end_date)->endOfDay()
             : $defaultReferenceDate->copy()->endOfDay();
 
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
             return strtoupper($code);
         })->values()->all();
@@ -3419,7 +3483,7 @@ class BackController extends Controller
 
     private function buildMpccAreaBranchRows(Carbon $startDate, Carbon $endDate): array
     {
-        $mpccUsers = $this->getMpccUsersWithVoucherCodes();
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
         if ($mpccUsers->isEmpty()) {
             return [];
         }
@@ -3447,6 +3511,7 @@ class BackController extends Controller
                 DB::raw('MAX(COALESCE(rb.paid_date, rb.tgl_transaksi)) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
             ->get()
