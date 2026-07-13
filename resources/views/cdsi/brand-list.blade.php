@@ -92,7 +92,7 @@
                     <div class="row align-items-start">
                         <div class="col-md-9">
                             <input type="text" id="brandFilter" class="form-control" placeholder="Ketik brand atau beberapa kata lalu tekan Tampilkan">
-                            <small class="helper-text">Masukan Nama Perusahaan. Kalau ada spasi, hasil muncul jika salah satu kata cocok.</small>
+                        <small class="helper-text">Masukkan nama perusahaan. Kalau ada spasi, hasil muncul jika salah satu kata cocok. Gunakan tanpa PT, CV, dan sejenisnya. Contoh: PT. Serasi Auto Raya cukup ketik Serasi Auto Raya.</small>
                         </div>
                         <div class="col-md-3 mt-3 mt-md-0">
                             <button type="button" id="btnFilterBrand" class="btn btn-success btn-block">
