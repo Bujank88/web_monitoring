@@ -390,8 +390,8 @@
                     </a>
                 </li>
                 @elseif($isCdsi || $isKss)
-                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
                           <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
                           <p>
                             {{ 'CDSI' }}
@@ -418,6 +418,13 @@
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
                                 <p>Referral {{ 'CDSI' }}</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('cdsi.brand-list') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-tags" style="color:#14b8a6;"></i>
+                                <p>Brand List</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -803,8 +810,8 @@
                     </ul>
                 </li>
                 @if($isAdmin)
-                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
                         <p>
                             CDSI
@@ -831,6 +838,13 @@
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
                                 <p>Referral CDSI</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('cdsi.brand-list') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-tags" style="color:#14b8a6;"></i>
+                                <p>Brand List</p>
                             </a>
                         </li>
                         <li class="nav-item">

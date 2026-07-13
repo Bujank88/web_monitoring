@@ -23,6 +23,110 @@ class CdsiReportController extends Controller
         return view('cdsi.referral-index', compact('pageTitle'));
     }
 
+    public function brandListIndex()
+    {
+        logUserLogin();
+
+        $pageTitle = 'Brand List';
+
+        return view('cdsi.brand-list', compact('pageTitle'));
+    }
+
+    public function brandListData(Request $request)
+    {
+        try {
+            if (!Schema::hasTable('brand_list_cdsi')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tabel brand_list_cdsi tidak ditemukan.',
+                    'columns' => [],
+                    'rows' => [],
+                ], 404);
+            }
+
+            $brand = trim((string) $request->get('brand', ''));
+
+            if ($brand === '') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Brand masih kosong.',
+                    'columns' => [],
+                    'rows' => [],
+                ]);
+            }
+
+            $columns = Schema::getColumnListing('brand_list_cdsi');
+            $brandColumn = $this->resolveBrandListColumn($columns);
+
+            if (!$brandColumn) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kolom brand tidak ditemukan di brand_list_cdsi.',
+                    'columns' => [],
+                    'rows' => [],
+                ], 422);
+            }
+
+            $visibleColumns = collect($columns)
+                ->filter(function ($column) {
+                    return !in_array(strtolower($column), ['id', 'created_at', 'updated_at', 'deleted_at'], true);
+                })
+                ->values()
+                ->all();
+
+            $brandTerms = preg_split('/\s+/', mb_strtolower($brand), -1, PREG_SPLIT_NO_EMPTY);
+
+            DB::table('brand_list_search_log')->insert([
+                'brand_filter' => $brand,
+                'user_name' => Auth::user()?->name,
+                'searched_at' => now(),
+            ]);
+
+            $query = DB::table('brand_list_cdsi')->select($visibleColumns);
+
+            $query->where(function ($builder) use ($brandTerms, $brandColumn) {
+                foreach ($brandTerms as $index => $term) {
+                    $escapedTerm = preg_quote($term, '/');
+                    $condition = 'LOWER(' . $brandColumn . ') REGEXP ?';
+                    $pattern = ['(^|[[:space:][:punct:]])' . $escapedTerm . '([[:space:][:punct:]]|$)'];
+
+                    if ($index === 0) {
+                        $builder->whereRaw($condition, $pattern);
+                        continue;
+                    }
+
+                    $builder->orWhereRaw($condition, $pattern);
+                }
+            });
+
+            $rows = $query
+                ->orderBy($brandColumn)
+                ->get()
+                ->map(function ($row) {
+                    return (array) $row;
+                })
+                ->values()
+                ->all();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($rows) > 0 ? 'Data brand ditemukan.' : 'Tidak ada data yang cocok.',
+                'columns' => $this->buildBrandListColumns($visibleColumns),
+                'rows' => $rows,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in brandListData: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'columns' => [],
+                'rows' => [],
+            ], 500);
+        }
+    }
+
     public function referralTopupChannel(Request $request)
     {
         logUserLogin();
@@ -45,6 +149,46 @@ class CdsiReportController extends Controller
         $pageTitle = 'Daily Top Up Referral CDSI';
 
         return view('cdsi.referral-topup-channel', compact('months', 'month', 'channels', 'pageTitle'));
+    }
+
+    private function resolveBrandListColumn(array $columns): ?string
+    {
+        $preferredColumns = ['brand', 'brand_name', 'nama_brand', 'nama_brand_list', 'nama_brand_cdsi', 'brand_cdsi'];
+
+        foreach ($preferredColumns as $preferredColumn) {
+            if (in_array($preferredColumn, $columns, true)) {
+                return $preferredColumn;
+            }
+        }
+
+        foreach ($columns as $column) {
+            if (stripos($column, 'brand') !== false) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildBrandListColumns(array $columns): array
+    {
+        return collect($columns)
+            ->reject(function ($column) {
+                return strtolower($column) === 'id';
+            })
+            ->map(function ($column) {
+                return [
+                    'data' => $column,
+                    'title' => $this->humanizeBrandListColumn($column),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function humanizeBrandListColumn(string $column): string
+    {
+        return ucwords(str_replace(['_', '-'], ' ', $column));
     }
 
     public function referralTopupChannelData(Request $request)
