@@ -575,14 +575,21 @@ class LeadProgramController extends Controller
 
             $endOfMonthFormatted = $endOfMonth->format('Y-m-d');
             $newAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $canvaserIds)
+                ->where('dt.status', 'APPROVE')
                 ->whereBetween(
                     DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                     [$startOfMonth, $endOfMonthFormatted]
                 )
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
-                ->select('lm.user_id', DB::raw('COUNT(DISTINCT dt.email) as new_akun'))
+                ->select('lm.user_id', DB::raw('COUNT(DISTINCT LOWER(dt.email)) as new_akun'))
                 ->get()
                 ->keyBy('user_id');
 
@@ -617,27 +624,26 @@ class LeadProgramController extends Controller
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
-                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                    DB::raw("COUNT(DISTINCT LOWER(dt.email)) as top_up_count"),
                     DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_new_akun_rp")
                 )
                 ->get()
                 ->keyBy('user_id');
 
-            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
+            $topUpExistingAkunByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->leftJoin('data_registarsi_status_approveorreject as dt', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                 ->whereIn('lm.user_id', $canvaserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->where(function ($query) use ($startOfMonth) {
+                    $query->whereNull('dt.email')
+                        ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth]);
+                })
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
+                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as top_up_existing_akun_count"),
                     DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_existing_akun_rp")
                 )
                 ->get()
@@ -920,14 +926,21 @@ class LeadProgramController extends Controller
                         ->count('lm.id');
                     // 2. New Akun
                     $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
-                        ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
+                        ->join('report_balance_top_up as rp', function ($join) {
+                            $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                                ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                        })
+                        ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                         ->where('lm.user_id', $userId)
+                        ->where('dt.status', 'APPROVE')
                         ->whereBetween(
                             DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                             [$startOfMonth, $endOfMonth->format('Y-m-d')]
                         )
+                        ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                        ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                         ->distinct()
-                        ->count('dt.email');
+                        ->count(DB::raw('LOWER(dt.email)'));
                 }
 
 
@@ -940,18 +953,18 @@ class LeadProgramController extends Controller
                     ->count('lb.leads_master_id');
 
                 // 4. Top Up Existing Akun Count
-                $topUpExistingAkunCount = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                    ->join('report_balance_top_up as rp', function($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                    })
+                $topUpExistingAkunCount = DB::table('report_balance_top_up as rp')
+                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->leftJoin('data_registarsi_status_approveorreject as dt', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                     ->where('lm.regional', $region)
-                    ->where('dt.status', 'APPROVE')
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
                     ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                    ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                    ->where(function ($query) use ($startOfMonth) {
+                        $query->whereNull('dt.email')
+                            ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth]);
+                    })
                     ->distinct()
-                    ->count(DB::raw('LOWER(dt.email)'));
+                    ->count(DB::raw('LOWER(rp.email_client)'));
 
                 // 5. Target (optional jika masih per user → boleh di-skip)
                 $targetData = DB::table('region_target')
