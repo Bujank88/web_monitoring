@@ -276,6 +276,66 @@
                         </li>
                     </ul>
                 </li>
+                <li class="nav-item has-treeview {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
+                        <p>
+                            Mitra SBP
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('mitra-sbp') }}" class="nav-link waves-effect {{ request()->routeIs('mitra-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-column" style="color:rgb(173, 252, 157);"></i>
+                                <p>Performance Report</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-campaign-sbp') }}" class="nav-link waves-effect {{ request()->routeIs('report-campaign-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
+                                <p>Report Campaign</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-sbp') }}" class="nav-link waves-effect {{ request()->routeIs('report-saldo-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @if($isMpccPowerhouse)
+                <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-house-chimney-user"></i>
+                        <p>
+                            Powerhouse
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('region-target') }}" class="nav-link waves-effect {{ request()->routeIs('region-target') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
+                                <p>Report Powerhouse</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_referral') }}" class="nav-link waves-effect {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
+                                <p>PowerHouse Referral</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_semester') }}" class="nav-link waves-effect {{ request()->routeIs('admin.monitoring.powerhouse_semester') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-calendar-alt" style="color:#17a2b8;"></i>
+                                <p>PowerHouse Semester</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @endif
                 <li class="nav-item">
                     <a href="{{ route('leads-master.index') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
                         <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
@@ -523,49 +583,6 @@
                         </li>
                     </ul>
                 </li>
-                @endif
-                @if($isAdmin || $isTsel || $isPH || $isMpccPowerhouse)
-                <li class="nav-item has-treeview 
-                    {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
-                    
-                    <a href="#" class="nav-link 
-                        {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-house-chimney-user"></i>
-                        <p>
-                            Powerhouse
-                            <i class="right fas fa-angle-left"></i>
-                        </p>
-                    </a>
-
-                    <ul class="nav nav-treeview">
-                        @if($isAdmin)
-                        <li class="nav-item">
-                            <a href="{{ route('region-target') }}"
-                            class="nav-link {{ request()->routeIs('region-target') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
-                                <p>Report Powerhouse</p>
-                            </a>
-                        </li>
-                        @endif
-
-                        <!-- Powerhouse Referral -->
-                        <li class="nav-item">
-                            <a href="{{ route('admin.monitoring.powerhouse_referral') }}"
-                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}"  style="padding-left: 45px;">
-                                <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
-                                <p>PowerHouse Referral</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route('admin.monitoring.powerhouse_semester') }}"
-                            class="nav-link {{ request()->routeIs('admin.monitoring.powerhouse_semester') ? 'active' : '' }}"  style="padding-left: 45px;">
-                                <i class="nav-icon fas fa-calendar-alt" style="color:#17a2b8;"></i>
-                                <p>PowerHouse Semester</p>
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
                 @endif
                 {{--<li class="nav-item {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'active' : '' }}">
@@ -1230,8 +1247,6 @@
         </nav>
     </div>
 </aside>
-
-
 
 
 
