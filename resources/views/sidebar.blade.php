@@ -26,6 +26,12 @@
                 $isCdsi = $user->role === 'CDSI';
                 $isKss = $user->role === 'KSS' || $user->role === 'kss';
                 $isMpcc = $user->role === 'MPCC';
+                $isMpccPowerhouse = $isMpcc && in_array($user->email, [
+                    'mpcc_area1@telkomsel.co.id',
+                    'mpcc_area2@telkomsel.co.id',
+                    'mpcc_area3@telkomsel.co.id',
+                    'mpcc_area4@telkomsel.co.id',
+                ], true);
                 @endphp
                 @if($isAdmin && $user->email === 'admin@telkomsel.co.id')
                 <span class="badge badge-warning">SUPER ADMIN</span>
@@ -37,7 +43,7 @@
                 <span class="badge badge-info">POWERHOUSE</span>
                 @elseif($isTcd)
                 <span class="badge badge-secondary">TCD</span>
-                @elseif($isInternal)
+                @elseif($isInternal || $isMpcc)
                 <span class="badge badge-success">Internal</span>
                 @elseif($isB2b)
                 <span class="badge badge-primary">B2B</span>
@@ -518,7 +524,7 @@
                     </ul>
                 </li>
                 @endif
-                @if($isAdmin || $isTsel || $isPH)
+                @if($isAdmin || $isTsel || $isPH || $isMpccPowerhouse)
                 <li class="nav-item has-treeview 
                     {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
                     
@@ -876,7 +882,7 @@
                 
                 @endif
                 @endif
-                @if($isAdmin || $isPH)
+                @if($isAdmin || $isPH || $isMpcc)
                     <li class="nav-item {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
