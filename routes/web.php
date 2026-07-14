@@ -358,7 +358,7 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
     Route::get('report-cdsi-province/data', [CdsiReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
     Route::get('report-cdsi-province/export', [CdsiReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
 });
-Route::middleware(['auth', 'checkrole:Admin,PH,Internal'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC'])->group(function () {
     
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
     Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
