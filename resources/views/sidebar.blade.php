@@ -305,7 +305,7 @@
                         </li>
                     </ul>
                 </li>
-                @if($isMpccPowerhouse)
+                @if($isAdmin || $isMpccPowerhouse)
                 <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-house-chimney-user"></i>
@@ -583,6 +583,37 @@
                         </li>
                     </ul>
                 </li>
+                @if($isAdmin || $isPH)
+                <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester')) ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-house-chimney-user"></i>
+                        <p>
+                            Powerhouse
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('region-target') }}" class="nav-link waves-effect {{ request()->routeIs('region-target') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(240, 37, 1);"></i>
+                                <p>Report Powerhouse</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_referral') }}" class="nav-link waves-effect {{ request()->routeIs('admin.monitoring.powerhouse_referral') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-star" style="color:#ffc107;"></i>
+                                <p>PowerHouse Referral</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('admin.monitoring.powerhouse_semester') }}" class="nav-link waves-effect {{ request()->routeIs('admin.monitoring.powerhouse_semester') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-calendar-alt" style="color:#17a2b8;"></i>
+                                <p>PowerHouse Semester</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                @endif
                 @endif
                 {{--<li class="nav-item {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('admin.voucher') || request()->routeIs('admin.claim.voucher')) ? 'active' : '' }}">
@@ -1247,8 +1278,6 @@
         </nav>
     </div>
 </aside>
-
-
 
 
 
