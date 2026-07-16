@@ -65,8 +65,14 @@
                             <option value="b2b">B2B</option>
                             <option value="CDSI">CDSI</option>
                             <option value="KSS">KSS</option>
+                            <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
                         </select>
+                    </div>
+
+                    <div class="form-group" id="regional_group" style="display: none;">
+                        <label>Regional</label>
+                        <input type="text" name="regional" id="regional" class="form-control">
                     </div>
 
 
@@ -84,6 +90,22 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $(function() {
+            function toggleRoleFields() {
+                const isRegional = $('#role').val() === 'Regional';
+                $('#regional_group').toggle(isRegional);
+                $('#regional').prop('required', isRegional);
+
+                if (!isRegional) {
+                    $('#regional').val('');
+                }
+            }
+
+            $('#role').on('change', toggleRoleFields);
+            toggleRoleFields();
+        });
+    </script>
 
     @if(session('success'))
         <script>
@@ -99,5 +121,4 @@
 </body>
 
 </html>
-
 
