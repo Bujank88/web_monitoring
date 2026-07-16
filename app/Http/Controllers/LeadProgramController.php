@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use App\Models\RegionalSummary;
 
@@ -385,6 +386,391 @@ class LeadProgramController extends Controller
                 ->make(true);
         } catch (\Exception $e) {
             \Log::error("Error in getDailyTopupDataTable: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getDailyTopupRegionalData($monthFilter = null, $regionalName = null)
+    {
+        try {
+            $regionalName = $regionalName ?: Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return [];
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+            }
+
+            $agencyEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Agency')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $internalEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Internal')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $mitraSbpEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Mitra SBP')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $topupQuery = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    DB::raw("DATE(rp.tgl_transaksi) as tanggal"),
+                    'rp.email_client as email',
+                    'rp.user_id as id_user',
+                    'rp.data_province_name',
+                    DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2)) as total_settlement"),
+                    'm.remark',
+                    'lm.user_id as leads_user_id'
+                )
+                ->whereRaw("rp.tgl_transaksi >= ?", [$startDate])
+                ->whereRaw("rp.tgl_transaksi <= ?", [$endDate . ' 23:59:59'])
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $topupQuery->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $topupQuery->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $topupData = $topupQuery
+                ->orderBy('rp.tgl_transaksi', 'desc')
+                ->get();
+
+            if ($topupData->isEmpty()) {
+                return [];
+            }
+
+            $groupedData = [];
+
+            foreach ($topupData as $row) {
+                $date = $row->tanggal;
+
+                if (!isset($groupedData[$date])) {
+                    $groupedData[$date] = [
+                        'mitra_sbp' => ['settlement' => 0, 'users' => []],
+                        'agency' => ['settlement' => 0, 'users' => []],
+                        'internal' => ['settlement' => 0, 'users' => []],
+                        'powerhouse' => ['settlement' => 0, 'users' => []],
+                        'mpcc' => ['settlement' => 0, 'users' => []],
+                    ];
+                }
+
+                $settlement = (float) $row->total_settlement;
+                $userId = $row->id_user;
+                $leadsUserId = $row->leads_user_id;
+
+                if (!empty($leadsUserId) && in_array($leadsUserId, $mpccUserIds, true)) {
+                    $groupedData[$date]['mpcc']['settlement'] += $settlement;
+                    $groupedData[$date]['mpcc']['users'][] = $userId;
+                } elseif (!empty($leadsUserId) && in_array($leadsUserId, $powerhouseUserIds, true)) {
+                    $groupedData[$date]['powerhouse']['settlement'] += $settlement;
+                    $groupedData[$date]['powerhouse']['users'][] = $userId;
+                } elseif ($row->remark === 'Internal') {
+                    $groupedData[$date]['internal']['settlement'] += $settlement;
+                    $groupedData[$date]['internal']['users'][] = $userId;
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $groupedData[$date]['mitra_sbp']['settlement'] += $settlement;
+                    $groupedData[$date]['mitra_sbp']['users'][] = $userId;
+                } elseif ($row->remark === 'Agency') {
+                    $groupedData[$date]['agency']['settlement'] += $settlement;
+                    $groupedData[$date]['agency']['users'][] = $userId;
+                }
+            }
+
+            $result = [];
+            $totals = [
+                'mitra_sbp_settle' => 0,
+                'mitra_sbp_user' => [],
+                'agency_settle' => 0,
+                'agency_user' => [],
+                'internal_settle' => 0,
+                'internal_user' => [],
+                'powerhouse_settle' => 0,
+                'powerhouse_user' => [],
+                'mpcc_settle' => 0,
+                'mpcc_user' => [],
+            ];
+
+            krsort($groupedData);
+
+            foreach ($groupedData as $date => $data) {
+                $row = [
+                    'date' => Carbon::parse($date)->locale('id')->translatedFormat('d F Y'),
+                    'mitra_sbp_user' => count(array_unique($data['mitra_sbp']['users'])),
+                    'mitra_sbp_settle' => number_format($data['mitra_sbp']['settlement'], 0, ',', '.'),
+                    'agency_user' => count(array_unique($data['agency']['users'])),
+                    'agency_settle' => number_format($data['agency']['settlement'], 0, ',', '.'),
+                    'internal_user' => count(array_unique($data['internal']['users'])),
+                    'internal_settle' => number_format($data['internal']['settlement'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($data['powerhouse']['users'])),
+                    'powerhouse_settle' => number_format($data['powerhouse']['settlement'], 0, ',', '.'),
+                    'mpcc_user' => count(array_unique($data['mpcc']['users'])),
+                    'mpcc_settle' => number_format($data['mpcc']['settlement'], 0, ',', '.'),
+                    'total_user' => count(array_unique(array_merge(
+                        $data['mitra_sbp']['users'],
+                        $data['agency']['users'],
+                        $data['internal']['users'],
+                        $data['powerhouse']['users'],
+                        $data['mpcc']['users']
+                    ))),
+                    'total' => number_format(
+                        $data['mitra_sbp']['settlement'] +
+                        $data['agency']['settlement'] +
+                        $data['internal']['settlement'] +
+                        $data['powerhouse']['settlement'] +
+                        $data['mpcc']['settlement'],
+                        0,
+                        ',',
+                        '.'
+                    ),
+                ];
+
+                $result[] = $row;
+
+                $totals['mitra_sbp_settle'] += $data['mitra_sbp']['settlement'];
+                $totals['mitra_sbp_user'] = array_merge($totals['mitra_sbp_user'], $data['mitra_sbp']['users']);
+                $totals['agency_settle'] += $data['agency']['settlement'];
+                $totals['agency_user'] = array_merge($totals['agency_user'], $data['agency']['users']);
+                $totals['internal_settle'] += $data['internal']['settlement'];
+                $totals['internal_user'] = array_merge($totals['internal_user'], $data['internal']['users']);
+                $totals['powerhouse_settle'] += $data['powerhouse']['settlement'];
+                $totals['powerhouse_user'] = array_merge($totals['powerhouse_user'], $data['powerhouse']['users']);
+                $totals['mpcc_settle'] += $data['mpcc']['settlement'];
+                $totals['mpcc_user'] = array_merge($totals['mpcc_user'], $data['mpcc']['users']);
+            }
+
+            $result[] = [
+                'date' => 'Total Keseluruhan',
+                'mitra_sbp_user' => count(array_unique($totals['mitra_sbp_user'])),
+                'mitra_sbp_settle' => number_format($totals['mitra_sbp_settle'], 0, ',', '.'),
+                'agency_user' => count(array_unique($totals['agency_user'])),
+                'agency_settle' => number_format($totals['agency_settle'], 0, ',', '.'),
+                'internal_user' => count(array_unique($totals['internal_user'])),
+                'internal_settle' => number_format($totals['internal_settle'], 0, ',', '.'),
+                'powerhouse_user' => count(array_unique($totals['powerhouse_user'])),
+                'powerhouse_settle' => number_format($totals['powerhouse_settle'], 0, ',', '.'),
+                'mpcc_user' => count(array_unique($totals['mpcc_user'])),
+                'mpcc_settle' => number_format($totals['mpcc_settle'], 0, ',', '.'),
+                'total_user' => count(array_unique(array_merge(
+                    $totals['mitra_sbp_user'],
+                    $totals['agency_user'],
+                    $totals['internal_user'],
+                    $totals['powerhouse_user'],
+                    $totals['mpcc_user']
+                ))),
+                'total' => number_format(
+                    $totals['mitra_sbp_settle'] +
+                    $totals['agency_settle'] +
+                    $totals['internal_settle'] +
+                    $totals['powerhouse_settle'] +
+                    $totals['mpcc_settle'],
+                    0,
+                    ',',
+                    '.'
+                ),
+            ];
+
+            return $result;
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return [];
+        }
+    }
+
+    public function getDailyTopupRegionalDataTable(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $result = $this->getDailyTopupRegionalData($monthFilter);
+
+            return datatables()->of(collect($result))->make(true);
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalDataTable: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getDailyTopupRegionalByProvinceDataTable(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $regionalName = Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return response()->json([
+                    'data' => [],
+                    'totals' => [
+                        'total_provinces' => 0,
+                        'total_user_ids' => 0,
+                        'total_emails' => 0,
+                        'total_settlement' => 0,
+                    ]
+                ]);
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::createFromFormat('Y-m-d', $monthFilter)->translatedFormat('F Y');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::now()->translatedFormat('F Y');
+            }
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $query = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    'rp.data_province_name',
+                    'rp.user_id',
+                    'rp.email_client',
+                    'm.remark',
+                    'lm.user_id as leads_user_id',
+                    DB::raw("'" . $displayMonth . "' as month_display"),
+                    DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement')
+                )
+                ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+                ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $query->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $query->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $data = $query
+                ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client', 'm.remark', 'lm.user_id')
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderByDesc('total_settlement')
+                ->get();
+
+            $data = $data->map(function ($row) use ($powerhouseUserIds, $mpccUserIds) {
+                $channel = null;
+
+                if (!empty($row->leads_user_id) && in_array($row->leads_user_id, $mpccUserIds, true)) {
+                    $channel = 'MPCC';
+                } elseif (!empty($row->leads_user_id) && in_array($row->leads_user_id, $powerhouseUserIds, true)) {
+                    $channel = 'Powerhouse';
+                } elseif ($row->remark === 'Internal') {
+                    $channel = 'Internal';
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $channel = 'Mitra SBP';
+                } elseif ($row->remark === 'Agency') {
+                    $channel = 'Agency Indihome';
+                }
+
+                $row->channel = $channel;
+                return $row;
+            })->filter(function ($row) {
+                return !empty($row->channel);
+            })->values();
+
+            $uniqueProvinces = $data->unique('data_province_name')->count();
+            $uniqueUserIds = $data->unique('user_id')->count();
+            $uniqueEmails = $data->unique('email_client')->count();
+            $totalSettlement = $data->sum('total_settlement');
+
+            return response()->json([
+                'data' => $data->map(function ($row) {
+                    return [
+                        'province' => $row->data_province_name,
+                        'data_province_name' => $row->data_province_name,
+                        'user_id' => $row->user_id,
+                        'email_client' => $row->email_client,
+                        'channel' => $row->channel,
+                        'month_display' => $row->month_display,
+                        'total_settlement' => number_format($row->total_settlement, 0, ',', '.'),
+                    ];
+                })->values(),
+                'totals' => [
+                    'total_provinces' => $uniqueProvinces,
+                    'total_user_ids' => $uniqueUserIds,
+                    'total_emails' => $uniqueEmails,
+                    'total_settlement' => number_format($totalSettlement, 0, ',', '.'),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalByProvinceDataTable: " . $e->getMessage());
             \Log::error($e->getTraceAsString());
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -1274,6 +1660,157 @@ class LeadProgramController extends Controller
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error("Error in exportDailyTopupByProvince: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
+
+    public function exportDailyTopupRegionalByProvince(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $regionalName = Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return redirect()->back()->with('error', 'Regional user tidak ditemukan');
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::createFromFormat('Y-m-d', $monthFilter)->translatedFormat('F Y');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::now()->translatedFormat('F Y');
+            }
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $query = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    'rp.data_province_name',
+                    'rp.user_id',
+                    'rp.email_client',
+                    'm.remark',
+                    'lm.user_id as leads_user_id',
+                    DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement')
+                )
+                ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+                ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $query->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $query->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $data = $query
+                ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client', 'm.remark', 'lm.user_id')
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderByDesc('total_settlement')
+                ->get();
+
+            $data = $data->map(function ($row) use ($powerhouseUserIds, $mpccUserIds) {
+                $channel = null;
+
+                if (!empty($row->leads_user_id) && in_array($row->leads_user_id, $mpccUserIds, true)) {
+                    $channel = 'MPCC';
+                } elseif (!empty($row->leads_user_id) && in_array($row->leads_user_id, $powerhouseUserIds, true)) {
+                    $channel = 'Powerhouse';
+                } elseif ($row->remark === 'Internal') {
+                    $channel = 'Internal';
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $channel = 'Mitra SBP';
+                } elseif ($row->remark === 'Agency') {
+                    $channel = 'Agency Indihome';
+                }
+
+                $row->channel = $channel;
+                return $row;
+            })->filter(function ($row) {
+                return !empty($row->channel);
+            })->values();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $safeRegionalName = preg_replace('/[^A-Za-z0-9_-]/', '_', $regionalName);
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Channel' => $row->channel,
+                    'Province' => $row->data_province_name,
+                    'User ID' => $row->user_id,
+                    'Email' => $row->email_client,
+                    'Bulan' => $displayMonth,
+                    'Total Settlement' => ' ' . number_format((float) $row->total_settlement, 0, ',', '.'),
+                ];
+            }
+
+            $fileName = 'Daily_TopUp_Regional_Per_Province_' . $safeRegionalName . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = ['Channel', 'Province', 'User ID', 'Email', 'Bulan', 'Total Settlement'];
+                $sheet->fromArray($headers, null, 'A1');
+
+                $headerStyle = [
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E74A3B']],
+                    'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+                ];
+                $sheet->getStyle('A1:F1')->applyFromArray($headerStyle);
+
+                $row = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray((array) $item, null, 'A' . $row);
+                    $row++;
+                }
+
+                foreach (range('A', 'F') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error("Error in exportDailyTopupRegionalByProvince: " . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
         }
     }

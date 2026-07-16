@@ -85,6 +85,28 @@ class FrontController extends Controller
         }
         return view('dailytopup.daily_topup', compact('months'));
     }
+
+    public function dailyTopupRegional()
+    {
+        logUserLogin();
+        $months = [];
+
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        $regionalName = Auth::user()->regional ?? '-';
+
+        return view('dailytopup.daily_topup_regional', compact('months', 'regionalName'));
+    }
     public function logout()
     {
         // Menghapus sesi dan logout

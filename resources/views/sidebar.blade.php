@@ -25,6 +25,7 @@
                 $isGoto = $user->role === 'GOTO';
                 $isCdsi = $user->role === 'CDSI';
                 $isKss = $user->role === 'KSS' || $user->role === 'kss';
+                $isRegional = $user->role === 'Regional';
                 $isMpcc = $user->role === 'MPCC';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
@@ -55,6 +56,8 @@
                 <span class="badge badge-warning">MAXIM</span>
                 @elseif($isGoto)
                 <span class="badge badge-primary">GOTO</span>
+                @elseif($isRegional)
+                <span class="badge badge-info">REGIONAL</span>
                 @elseif($isMpcc)
                 <span class="badge badge-info">MPCC</span>
                 @elseif($isCanv)
@@ -235,6 +238,35 @@
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isRegional)
+                <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item">
+                    <a href="{{ route('daily.topup.channel') }}" class="nav-link waves-effect {{ request()->routeIs('daily.topup.channel') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(255, 159, 64);"></i>
+                        <p>Daily Top Up Channel</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('daily.topup.regional') }}" class="nav-link waves-effect {{ request()->routeIs('daily.topup.regional') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-area" style="color:rgb(23, 162, 184);"></i>
+                        <p>Daily Topup Regional</p>
+                    </a>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}" class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
                         <p>Logout</p>
                     </a>
@@ -1278,8 +1310,6 @@
         </nav>
     </div>
 </aside>
-
-
 
 
 

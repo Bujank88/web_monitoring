@@ -58,13 +58,24 @@ Route::middleware(['auth', 'checkrole:Admin,Treg'])->group(function (){
     ->name('download.format.voucher.treg');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function () {
-    Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Regional'])->group(function () {
     Route::get('/daily-topup-channel', [FrontController::class, 'dailyTopupChannel'])->name('daily.topup.channel');
     Route::get('/get-daily-topup-data', [LeadProgramController::class, 'getDailyTopupDataTable'])->name('daily_topup_data');
     Route::get('/get-daily-topup-by-province-data', [LeadProgramController::class, 'getDailyTopupByProvinceDataTable'])->name('daily_topup_by_province_data');
     Route::get('/export-daily-topup', [BackController::class, 'exportDailyTopup'])->name('export.daily_topup');
     Route::get('/export-daily-topup-by-province', [LeadProgramController::class, 'exportDailyTopupByProvince'])->name('export.daily_topup_by_province');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,Regional'])->group(function () {
+    Route::get('/daily-topup-regional', [FrontController::class, 'dailyTopupRegional'])->name('daily.topup.regional');
+    Route::get('/get-daily-topup-regional-data', [LeadProgramController::class, 'getDailyTopupRegionalDataTable'])->name('daily_topup_regional_data');
+    Route::get('/export-daily-topup-regional', [BackController::class, 'exportDailyTopupRegional'])->name('export.daily_topup_regional');
+    Route::get('/get-daily-topup-regional-by-province-data', [LeadProgramController::class, 'getDailyTopupRegionalByProvinceDataTable'])->name('daily_topup_regional_by_province_data');
+    Route::get('/export-daily-topup-regional-by-province', [LeadProgramController::class, 'exportDailyTopupRegionalByProvince'])->name('export.daily_topup_regional_by_province');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function () {
+    Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
     Route::get('/export-regional', [BackController::class, 'exportRegional'])->name('export.regional');
     Route::get('/get-leads-data-api', [LeadProgramController::class, 'getLeadsDataApi'])->name('leads_data_api');
     Route::get('/get-regional-data', [LeadProgramController::class, 'getRegionalDataTable'])->name('regional_data');
@@ -427,10 +438,6 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
-
-
-
-
 
 
 

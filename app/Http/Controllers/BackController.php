@@ -377,13 +377,15 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional',
+            'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
             'name' => $request->name,
             'nohp' => $request->nope,
             'email' => $request->email,
             'role' => $request->role,
+            'regional' => $request->role === 'Regional' ? $request->regional : null,
             'password' => Hash::make('123456'),
             'status' => 'Aktif'
         ];
@@ -436,6 +438,8 @@ class BackController extends Controller
                     return redirect()->route('presensi.index');
                 case 'MPCC':
                     return redirect()->route('mpcc.report');
+                case 'Regional':
+                    return redirect()->route('daily.topup.channel');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
                 case 'Maxim':
@@ -2619,6 +2623,92 @@ class BackController extends Controller
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error("Error in exportDailyTopup: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
+
+    public function exportDailyTopupRegional()
+    {
+        try {
+            $monthFilter = request()->get('month');
+            $leadProgramController = new LeadProgramController();
+            $data = $leadProgramController->getDailyTopupRegionalData($monthFilter);
+
+            if (empty($data)) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $regionalName = auth()->user()->regional ?? 'Regional';
+            $safeRegionalName = preg_replace('/[^A-Za-z0-9_-]/', '_', $regionalName);
+
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Tanggal' => $row['date'],
+                    'Mitra SBP (User)' => $row['mitra_sbp_user'],
+                    'Mitra SBP (Settlement)' => $row['mitra_sbp_settle'],
+                    'Agency Indihome (User)' => $row['agency_user'],
+                    'Agency Indihome (Settlement)' => $row['agency_settle'],
+                    'Internal (User)' => $row['internal_user'],
+                    'Internal (Settlement)' => $row['internal_settle'],
+                    'Powerhouse (User)' => $row['powerhouse_user'],
+                    'Powerhouse (Settlement)' => $row['powerhouse_settle'],
+                    'Self Service (User)' => $row['self_service_user'],
+                    'Self Service (Settlement)' => $row['self_service_settle'],
+                    'MPCC (User)' => $row['mpcc_user'],
+                    'MPCC (Settlement)' => $row['mpcc_settle'],
+                    'Total (User)' => $row['total_user'],
+                    'Total (Settlement)' => $row['total'],
+                ];
+            }
+
+            $fileName = 'Daily_TopUp_Regional_' . $safeRegionalName . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = [
+                    'Tanggal',
+                    'Mitra SBP (User)',
+                    'Mitra SBP (Settlement)',
+                    'Agency Indihome (User)',
+                    'Agency Indihome (Settlement)',
+                    'Internal (User)',
+                    'Internal (Settlement)',
+                    'Powerhouse (User)',
+                    'Powerhouse (Settlement)',
+                    'Self Service (User)',
+                    'Self Service (Settlement)',
+                    'MPCC (User)',
+                    'MPCC (Settlement)',
+                    'Total (User)',
+                    'Total (Settlement)',
+                ];
+                $sheet->fromArray($headers, null, 'A1');
+
+                $headerStyle = [
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
+                    'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+                ];
+                $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
+
+                $row = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray((array) $item, null, 'A' . $row);
+                    $row++;
+                }
+
+                foreach (range('A', 'O') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error("Error in exportDailyTopupRegional: " . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
         }
     }

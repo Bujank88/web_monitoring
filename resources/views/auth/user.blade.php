@@ -211,8 +211,14 @@
                             <option value="GOTO">GOTO</option>
                             <option value="CDSI">CDSI</option>
                             <option value="KSS">KSS</option>
+                            <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
                         </select>
+                    </div>
+
+                    <div class="form-group" id="regional_group" style="display: none;">
+                        <label for="regional">Regional <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="regional" name="regional">
                     </div>
 
                     <div id="mpcc_fields" style="display: none;">
@@ -334,6 +340,10 @@
                             badgeClass = 'badge-warning';
                         } else if (data === 'GOTO') {
                             badgeClass = 'badge-primary';
+                        } else if (data === 'Regional') {
+                            badgeClass = 'badge-info';
+                        } else if (data === 'MPCC') {
+                            badgeClass = 'badge-info';
                         } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
                             badgeClass = 'badge-danger';
                         }
@@ -409,12 +419,19 @@
         function toggleRoleFields() {
             const role = $('#role').val();
             const isMpcc = role === 'MPCC';
+            const isRegional = role === 'Regional';
 
             $('#mpcc_fields').toggle(isMpcc);
             $('#area, #branch').prop('required', isMpcc);
+            $('#regional_group').toggle(isRegional);
+            $('#regional').prop('required', isRegional);
 
             if (!isMpcc) {
                 $('#area, #branch, #referral_code').val('');
+            }
+
+            if (!isRegional) {
+                $('#regional').val('');
             }
 
             if (role === 'Treg') {
@@ -495,6 +512,7 @@
                     $('#role').val(user.role);
                     $('#area').val(user.area || '');
                     $('#branch').val(user.branch || '');
+                    $('#regional').val(user.regional || '');
                     $('#referral_code').val(user.referral_code || '');
                     toggleRoleFields();
                     
@@ -551,7 +569,6 @@
 </script>
 
 @endsection
-
 
 
 
