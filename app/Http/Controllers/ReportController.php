@@ -559,6 +559,267 @@ class ReportController extends Controller
         ));
     }
 
+    public function reportCampaignRegional(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Regional';
+
+        return view('mitra-sbp.report-campaign-regional', compact(
+            'months',
+            'month',
+            'pageTitle'
+        ));
+    }
+
+    protected function campaignRegionalRegistrationSubQuery()
+    {
+        return DB::table('data_registarsi_status_approveorreject as dt')
+            ->selectRaw('LOWER(TRIM(dt.email)) as email_key')
+            ->selectRaw('MAX(dt.provinsi) as provinsi')
+            ->whereNotNull('dt.email')
+            ->where('dt.email', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(dt.email))'));
+    }
+
+    protected function reportCampaignRegionalBaseQuery(string $month)
+    {
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $mitraQuery = DB::table('mitra_sbp as a')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+            ->whereBetween('b.created_at', [$startDate, $endDate])
+            ->whereRaw('UPPER(TRIM(a.regional)) = ?', ['KALIMANTAN'])
+            ->select(
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
+                'a.email_myads as email',
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_brand as nama_instansi',
+                'b.area_provinsi',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
+                'b.total',
+                'b.sukses as success',
+                'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                'b.pesan as pesan',
+                'b.status as campaign_status',
+                DB::raw("'Mitra SBP' as source_label")
+            );
+
+        $registrationSubQuery = $this->campaignRegionalRegistrationSubQuery();
+
+        $leadsQuery = DB::table('leads_master as lm')
+            ->joinSub($registrationSubQuery, 'dt', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(lm.email))'),
+                    '=',
+                    'dt.email_key'
+                );
+            })
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->join('myads_request_soadb as b', 'lm.reg_id', '=', 'b.user_id')
+            ->whereBetween('b.created_at', [$startDate, $endDate])
+            ->whereNotNull('lm.reg_id')
+            ->where('lm.reg_id', '!=', '')
+            ->whereRaw('LOWER(TRIM(dt.provinsi)) LIKE ?', ['kalimantan%'])
+            ->whereIn('u.role', ['PH', 'MPCC'])
+            ->select(
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
+                DB::raw('COALESCE(NULLIF(lm.myads_account, \'\'), lm.email) as email'),
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_brand as nama_instansi',
+                'b.area_provinsi',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
+                'b.total',
+                'b.sukses as success',
+                'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                'b.pesan as pesan',
+                'b.status as campaign_status',
+                DB::raw("CASE WHEN u.role = 'PH' THEN 'Powerhouse' ELSE 'MPCC' END as source_label")
+            );
+
+        return $mitraQuery->unionAll($leadsQuery);
+    }
+
+    public function reportCampaignRegionalData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        $source = $request->get('source');
+
+        $unionQuery = $this->reportCampaignRegionalBaseQuery($month);
+
+        $baseQuery = DB::query()->fromSub($unionQuery, 'campaign_regional');
+
+        if (!empty($source)) {
+            $baseQuery->where('campaign_regional.source_label', $source);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('campaign_regional.source_label', DB::raw('COUNT(*) as total'))
+            ->groupBy('campaign_regional.source_label')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Powerhouse' => 0,
+            'MPCC' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->source_label] = (int) $row->total;
+        }
+
+        return datatables()->of(
+            (clone $baseQuery)->select('campaign_regional.*')
+        )
+            ->with('summary', $summary)
+            ->editColumn('balance_terpakai', function ($row) {
+                return 'Rp ' . number_format((float) $row->balance_terpakai, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function exportCampaignRegional(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $source = $request->get('source');
+
+            $query = DB::query()
+                ->fromSub($this->reportCampaignRegionalBaseQuery($month), 'campaign_regional')
+                ->select('campaign_regional.*');
+
+            if (!empty($source)) {
+                $query->where('campaign_regional.source_label', $source);
+            }
+
+            $data = $query
+                ->orderByRaw('COALESCE(campaign_regional.broadcast_date, campaign_regional.tanggal_iklan) DESC')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleSource = $source ?: 'Semua Source';
+            $sheet->setCellValue(
+                'A1',
+                'REPORT CAMPAIGN REGIONAL KALIMANTAN - ' . strtoupper($titleSource) . ' - ' . $month
+            );
+
+            $sheet->mergeCells('A1:S1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Iklan',
+                'Broadcast Date',
+                'Email',
+                'ID Iklan',
+                'Nama Iklan',
+                'Nama Instansi',
+                'Area Provinsi',
+                'Campaign Type',
+                'Inventory Type',
+                'Total',
+                'Success',
+                'Failed',
+                'Delivered',
+                'Read',
+                'Click',
+                'Balance Terpakai',
+                'Pesan',
+                'Campaign Status',
+                'Source',
+            ];
+
+            $headerRow = 3;
+            foreach ($headers as $index => $header) {
+                $cell = chr(65 + $index) . $headerRow;
+                $sheet->setCellValue($cell, $header);
+            }
+
+            $sheet->getStyle('A3:S3')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A3:S3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('DC3545');
+            $sheet->getStyle('A3:S3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $rowNumber = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->broadcast_date,
+                    $row->email,
+                    $row->id_iklan,
+                    $row->nama_iklan,
+                    $row->nama_instansi,
+                    $row->area_provinsi,
+                    $row->campaign_type,
+                    $row->inventory_type,
+                    $row->total,
+                    $row->success,
+                    $row->failed,
+                    $row->delivered,
+                    $row->read,
+                    $row->click,
+                    $row->balance_terpakai,
+                    $row->pesan,
+                    $row->campaign_status,
+                    $row->source_label,
+                ], null, 'A' . $rowNumber++);
+            }
+
+            foreach (range('A', 'S') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Campaign_Regional_Kalimantan_' . ($source ?: 'Semua') . '_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Export Campaign Regional Error: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal export data campaign regional.');
+        }
+    }
+
 
     public function reportSaldoSbp(Request $request)
     {
