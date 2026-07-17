@@ -72,6 +72,9 @@ Route::middleware(['auth', 'checkrole:Admin,Regional'])->group(function () {
     Route::get('/export-daily-topup-regional', [BackController::class, 'exportDailyTopupRegional'])->name('export.daily_topup_regional');
     Route::get('/get-daily-topup-regional-by-province-data', [LeadProgramController::class, 'getDailyTopupRegionalByProvinceDataTable'])->name('daily_topup_regional_by_province_data');
     Route::get('/export-daily-topup-regional-by-province', [LeadProgramController::class, 'exportDailyTopupRegionalByProvince'])->name('export.daily_topup_regional_by_province');
+    Route::get('/report-campaign-regional', [ReportController::class, 'reportCampaignRegional'])->name('report-campaign-regional');
+    Route::get('/report-campaign-regional/data', [ReportController::class, 'reportCampaignRegionalData'])->name('report-campaign-regional.data');
+    Route::get('/report-campaign-regional/export', [ReportController::class, 'exportCampaignRegional'])->name('report-campaign-regional.export');
 });
 
 Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function () {
@@ -438,7 +441,6 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
-
 
 
 

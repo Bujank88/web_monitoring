@@ -256,6 +256,12 @@
                         <p>Daily Topup Regional</p>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="{{ route('report-campaign-regional') }}" class="nav-link waves-effect {{ request()->routeIs('report-campaign-regional*') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-bullhorn" style="color:#ffc107;"></i>
+                        <p>Report Campaign Regional</p>
+                    </a>
+                </li>
 
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
@@ -1310,7 +1316,6 @@
         </nav>
     </div>
 </aside>
-
 
 
 
