@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Report Panen Poin V2 @endsection
+@section('title') Report {{ $programLabel ?? 'Panen Poin V2' }} @endsection
 
 @section('css')
 <!-- DataTables CSS -->
@@ -352,7 +352,7 @@
             <label for="source">Source</label>
             <select id="source" name="source" class="form-control">
                 <option value="">Semua Source</option>
-                <option value="user_panen_poin_v2">User Panen Poin V2</option>
+                <option value="{{ ($routePrefix ?? 'panenpoinv2') === 'panenpoinv3' ? 'user_panen_poin_v3' : 'user_panen_poin_v2' }}">User {{ $programLabel ?? 'Panen Poin V2' }}</option>
                 <option value="leads_master">Leads Master</option>
             </select>
             <small>Pilih sumber data untuk memfilter tipe akun</small>
@@ -455,7 +455,7 @@
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('panenpoinv2.report-data') }}",
+                url: "{{ route(($routePrefix ?? 'panenpoinv2') . '.report-data') }}",
                 data: function(d) {
                     d.tanggal = $('#tanggal').val();
                     d.source = $('#source').val();
@@ -488,8 +488,8 @@
                 {
                     data: 'source',
                     render: function(data) {
-                        if (data === 'user_panen_poin_v2') {
-                            return '<span class="badge badge-primary"><i class="fas fa-user-edit"></i> Panen Poin V2</span>';
+                        if (data === 'user_panen_poin_v2' || data === 'user_panen_poin_v3') {
+                            return '<span class="badge badge-primary"><i class="fas fa-user-edit"></i> {{ $programLabel ?? 'Panen Poin V2' }}</span>';
                         } else {
                             return '<span class="badge badge-secondary"><i class="fas fa-database"></i> Leads Master</span>';
                         }
@@ -590,7 +590,7 @@
             var tanggal = $('#tanggal').val();
             var source = $('#source').val();
             var remark = $('#remark').val();
-            var exportUrl = "{{ route('panenpoinv2.export') }}" + "?tanggal=" + tanggal + "&source=" + source + "&remark=" + remark;
+            var exportUrl = "{{ route(($routePrefix ?? 'panenpoinv2') . '.export') }}" + "?tanggal=" + tanggal + "&source=" + source + "&remark=" + remark;
             window.location.href = exportUrl;
         });
     });

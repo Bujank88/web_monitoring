@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') List Akun Panen Poin V2 @endsection
+@section('title') List Akun {{ $programLabel ?? 'Panen Poin V2' }} @endsection
 
 @section('css')
 <!-- DataTables CSS -->
@@ -87,7 +87,7 @@
     <div class="col-12">
         <h4 class="mb-0">
             <i class="fas fa-user-check mr-2 text-primary"></i>
-            <strong>List Akun Panen Poin V2 yang Sudah Terdaftar</strong>
+            <strong>List Akun {{ $programLabel ?? 'Panen Poin V2' }} yang Sudah Terdaftar</strong>
         </h4>
     </div>
 </div>
@@ -152,7 +152,7 @@
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('panenpoinv2.akun-data') }}",
+                url: "{{ route(($routePrefix ?? 'panenpoinv2') . '.akun-data') }}",
                 type: 'GET'
             },
             columns: [
@@ -223,5 +223,4 @@
     });
 </script>
 @endsection
-
 

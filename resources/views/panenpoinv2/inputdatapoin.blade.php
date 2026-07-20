@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Input Data Panen Poin V2 @endsection
+@section('title') Input Data {{ $programLabel ?? 'Panen Poin V2' }} @endsection
 
 @section('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
@@ -31,10 +31,10 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-header bg-gradient-info text-white">
-                <h5 class="mb-0"><i class="fas fa-user-plus mr-2"></i>Form Input Data Pelanggan Panen Poin V2</h5>
+                <h5 class="mb-0"><i class="fas fa-user-plus mr-2"></i>Form Input Data Pelanggan {{ $programLabel ?? 'Panen Poin V2' }}</h5>
             </div>
 
-            <form action="{{ route('panenpoinv2.store') }}" method="POST">
+            <form action="{{ route(($routePrefix ?? 'panenpoinv2') . '.store') }}" method="POST">
                 @csrf
                 <div class="card-body">
                     <div class="form-group">
@@ -95,7 +95,7 @@
                     <button type="submit" class="btn btn-primary btn-submit">
                         <i class="fas fa-save mr-2"></i>Simpan Data
                     </button>
-                    <a href="{{ route('panenpoinv2.report') }}" class="btn btn-secondary">
+                    <a href="{{ route(($routePrefix ?? 'panenpoinv2') . '.report') }}" class="btn btn-secondary">
                         <i class="fas fa-chart-bar mr-2"></i>Lihat Report
                     </a>
                 </div>
@@ -150,4 +150,3 @@
     });
 </script>
 @endsection
-

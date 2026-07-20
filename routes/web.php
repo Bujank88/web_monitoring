@@ -13,6 +13,7 @@ use App\Http\Controllers\LogbookDailyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
+use App\Http\Controllers\PanenPoinV3Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
@@ -266,6 +267,20 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('panen-poin-v2/list-akun', [PanenPoinV2Controller::class, 'listAkun'])->name('panenpoinv2.list-akun');
     Route::get('panen-poin-v2/akun-data', [PanenPoinV2Controller::class, 'getAkunData'])->name('panenpoinv2.akun-data');
 
+    // Panen Poin V3 Routes
+    Route::get('panen-poin-v3/input', [PanenPoinV3Controller::class, 'index'])->name('panenpoinv3.index');
+    Route::post('panen-poin-v3/store', [PanenPoinV3Controller::class, 'store'])->name('panenpoinv3.store');
+    Route::get('panen-poin-v3/report', [PanenPoinV3Controller::class, 'report'])->name('panenpoinv3.report');
+    Route::get('panen-poin-v3/report-data', [PanenPoinV3Controller::class, 'getReportData'])->name('panenpoinv3.report-data');
+    Route::get('panen-poin-v3/report-canvasser', [PanenPoinV3Controller::class, 'reportCanvasser'])->name('panenpoinv3.report-canvasser');
+    Route::get('panen-poin-v3/report-canvasser-data', [PanenPoinV3Controller::class, 'getReportCanvasserData'])->name('panenpoinv3.report-canvasser-data');
+    Route::get('panen-poin-v3/report-ph', [PanenPoinV3Controller::class, 'reportPowerhouse'])->name('panenpoinv3.report-ph');
+    Route::get('panen-poin-v3/report-ph-data', [PanenPoinV3Controller::class, 'getReportPowerhouseData'])->name('panenpoinv3.report-ph-data');
+    Route::get('panen-poin-v3/export', [PanenPoinV3Controller::class, 'export'])->name('panenpoinv3.export');
+    Route::get('panen-poin-v3/refresh-summary', [PanenPoinV3Controller::class, 'refreshSummaryPanenPoinV3'])->name('panenpoinv3.refresh');
+    Route::get('panen-poin-v3/list-akun', [PanenPoinV3Controller::class, 'listAkun'])->name('panenpoinv3.list-akun');
+    Route::get('panen-poin-v3/akun-data', [PanenPoinV3Controller::class, 'getAkunData'])->name('panenpoinv3.akun-data');
+
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
@@ -444,7 +459,6 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
-
 
 
 
