@@ -446,7 +446,7 @@
                     <button type="button" id="btnSaveDailyTopupImage" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap;">
                         <i class="fas fa-image mr-2"></i> Save Image
                     </button>
-                    <a href="{{ route('export.daily_topup') }}" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap;">
+                    <a href="{{ route('export.daily_topup') }}?month={{ $months[array_search(true, array_column($months, 'selected'))]['value'] ?? now()->format('Y-m-d') }}" id="btnExportDailyTopupExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap;">
                         <i class="fas fa-file-excel mr-2"></i> Download Excel
                     </a>
                 </div>
@@ -869,8 +869,14 @@
             ]
         });
 
+        function updateDailyTopupExportLink() {
+            let monthValue = $('#filterMonthPH').val();
+            $('#btnExportDailyTopupExcel').attr('href', "{{ route('export.daily_topup') }}?month=" + monthValue);
+        }
+
         // Event listener untuk filter bulan - reload datatable per province juga
         $('#filterMonthPH').on('change', function() {
+            updateDailyTopupExportLink();
             tableByProvince.ajax.reload();
         });
 
@@ -902,6 +908,8 @@
             let monthValue = $('#filterMonthPH').val();
             window.location = "{{ route('export.daily_topup_by_province') }}?month=" + monthValue;
         });
+
+        updateDailyTopupExportLink();
 
     });
 </script>
