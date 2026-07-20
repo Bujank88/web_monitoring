@@ -32,6 +32,8 @@ class FrontController extends Controller
                 return redirect()->route('report-agency-advertising');
             } else if ('Internal' == Auth::user()->role) {
                 return redirect()->route('mitra-sbp');
+            } else if ('Dormant' == Auth::user()->role) {
+                return redirect()->route('data-dormant');
             } else if ('GOTO' == Auth::user()->role) {
                 return redirect()->route('report-goto');
             } else if ('b2b' == Auth::user()->role) {

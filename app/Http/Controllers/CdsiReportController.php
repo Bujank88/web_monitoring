@@ -756,8 +756,21 @@ class CdsiReportController extends Controller
         logUserLogin();
 
         $pageTitle = 'Data Dormant CDSI';
+        $dataUrl = route('report-cdsi-dormant.data');
+        $exportUrl = route('report-cdsi-dormant.export');
 
-        return view('cdsi.report-cdsi-dormant', compact('pageTitle'));
+        return view('cdsi.report-cdsi-dormant', compact('pageTitle', 'dataUrl', 'exportUrl'));
+    }
+
+    public function dormantIndex(Request $request)
+    {
+        logUserLogin();
+
+        $pageTitle = 'Data Dormant';
+        $dataUrl = route('data-dormant.data');
+        $exportUrl = route('data-dormant.export');
+
+        return view('cdsi.report-cdsi-dormant', compact('pageTitle', 'dataUrl', 'exportUrl'));
     }
 
     protected function cdsiDormantBaseQuery()
@@ -821,6 +834,11 @@ class CdsiReportController extends Controller
             ->orderColumn('last_tgl_transaksi', 'cd.last_tgl_transaksi $1')
             ->orderColumn('total_settlement', 'cd.total_settlement $1')
             ->make(true);
+    }
+
+    public function dormantData(Request $request)
+    {
+        return $this->reportCdsiDormantData($request);
     }
 
     public function exportCdsiDormant(Request $request)
@@ -901,6 +919,88 @@ class CdsiReportController extends Controller
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error('Export CDSI Dormant Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data dormant');
+        }
+    }
+
+    public function exportDormant(Request $request)
+    {
+        try {
+            $data = $this->cdsiDormantBaseQuery()
+                ->select(
+                    'cd.email',
+                    'cd.nomor',
+                    'cd.nama_instansi',
+                    'cd.last_tgl_transaksi',
+                    DB::raw('COALESCE(cd.total_settlement, 0) as total_settlement')
+                )
+                ->orderByDesc('cd.last_tgl_transaksi')
+                ->orderBy('cd.email')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data dormant untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'DATA DORMANT');
+            $sheet->mergeCells('A1:E1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Email',
+                'Nomor',
+                'Nama Instansi',
+                'Tanggal Terakhir Transaksi',
+                'Total Settlement',
+            ];
+
+            $sheet->fromArray($headers, null, 'A3');
+            $sheet->getStyle('A3:E3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '6F42C1'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->email,
+                    $row->nomor,
+                    $row->nama_instansi,
+                    !empty($row->last_tgl_transaksi) ? Carbon::parse($row->last_tgl_transaksi)->format('d-m-Y') : '-',
+                    (float) $row->total_settlement,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            $sheet->getStyle('E4:E' . max($rowNum - 1, 4))
+                ->getNumberFormat()
+                ->setFormatCode('"Rp" #,##0');
+
+            foreach (range('A', 'E') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Data_Dormant_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Dormant Error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal export data dormant');
         }
     }

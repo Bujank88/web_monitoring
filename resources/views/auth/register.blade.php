@@ -67,6 +67,7 @@
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
+                            <option value="Dormant">Dormant</option>
                         </select>
                     </div>
 
@@ -121,4 +122,3 @@
 </body>
 
 </html>
-

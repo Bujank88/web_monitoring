@@ -213,6 +213,7 @@
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
+                            <option value="Dormant">Dormant</option>
                         </select>
                     </div>
 
@@ -344,6 +345,8 @@
                             badgeClass = 'badge-info';
                         } else if (data === 'MPCC') {
                             badgeClass = 'badge-info';
+                        } else if (data === 'Dormant') {
+                            badgeClass = 'badge-secondary';
                         } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
                             badgeClass = 'badge-danger';
                         }
@@ -569,6 +572,5 @@
 </script>
 
 @endsection
-
 
 
