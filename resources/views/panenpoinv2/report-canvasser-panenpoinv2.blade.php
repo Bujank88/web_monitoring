@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Panen Poin V2 Report @endsection
+@section('title') Report Canvasser {{ $programLabel ?? 'Panen Poin V2' }} @endsection
 @section('css')
 <!-- Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -604,7 +604,7 @@
             searching: false,
             info: false,
             ajax: {
-                url: "{{ route('panenpoinv2.report-canvasser-data') }}",
+                url: "{{ route(($routePrefix ?? 'panenpoinv2') . '.report-canvasser-data') }}",
                 type: 'GET',
                 data: function(d) {
                     d.tanggal = $('#filterMonthCanvasser').val();
@@ -682,5 +682,3 @@
     });
 </script>
 @endsection
-
-

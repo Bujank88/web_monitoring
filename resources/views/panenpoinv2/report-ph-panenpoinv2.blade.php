@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Panen Poin V2 Report Powerhouse @endsection
+@section('title') Report Powerhouse {{ $programLabel ?? 'Panen Poin V2' }} @endsection
 @section('css')
 <!-- Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -565,7 +565,7 @@
             searching: false,
             info: false,
             ajax: {
-                url: "{{ route('panenpoinv2.report-ph-data') }}",
+                url: "{{ route(($routePrefix ?? 'panenpoinv2') . '.report-ph-data') }}",
                 type: 'GET',
                 data: function(d) {
                     d.tanggal = $('#filterMonthPH').val();
@@ -641,5 +641,3 @@
     });
 </script>
 @endsection
-
-

@@ -7,6 +7,7 @@ use App\Http\Controllers\FrontController;
 use App\Http\Controllers\GetDataController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
+use App\Http\Controllers\PanenPoinV3Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
@@ -27,6 +28,12 @@ Artisan::command('logbook:refresh-today', function () {
 Artisan::command('logbook:refresh-past', function () {
     app(LogbookDailyController::class)->refreshLogbookDailyPast();
 })->purpose('Refresh logbook daily topup for past days (report_balance_top_up)');
+
+Artisan::command('panenpoinv3:refresh-summary', function () {
+    $result = app(PanenPoinV3Controller::class)->refreshSummaryPanenPoinV3();
+    $payload = method_exists($result, 'getData') ? $result->getData(true) : ['message' => 'Refresh selesai'];
+    $this->info($payload['message'] ?? 'Summary Panen Poin V3 berhasil direfresh.');
+})->purpose('Refresh summary Panen Poin V3 untuk periode aktif');
 
 // // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
@@ -159,6 +166,10 @@ Schedule::call(function () {
 Schedule::call(function () {
     app(PanenPoinV2Controller::class)->refreshSummaryPanenPoinV2();
 })->everyFiveMinutes()->name('refreshSummaryPanenPoinV2');
+
+Schedule::call(function () {
+    app(PanenPoinV3Controller::class)->refreshSummaryPanenPoinV3();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoinV3');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();
