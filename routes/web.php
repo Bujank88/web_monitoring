@@ -350,7 +350,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,TCD,Maxim,Automatech,GOTO'])->gro
     Route::get('report-saldo-avalon-kemang-bogor/data', [ReportController::class, 'reportSaldoAvalonKemangBogorData'])->name('report-saldo-avalon-kemang-bogor.data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss,Dormant'])->group(function () {
     Route::get('cdsi/referrals', [CdsiReportController::class, 'referralIndex'])->name('cdsi.referrals');
     Route::get('cdsi/referrals/data', [CdsiReportController::class, 'referralData'])->name('cdsi.referrals.data');
     Route::get('cdsi/referrals/generate', [CdsiReportController::class, 'generateReferralCode'])->name('cdsi.referrals.generate');
@@ -368,6 +368,9 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss'])->group(function () {
     Route::get('report-cdsi-dormant', [CdsiReportController::class, 'reportCdsiDormant'])->name('report-cdsi-dormant');
     Route::get('report-cdsi-dormant/data', [CdsiReportController::class, 'reportCdsiDormantData'])->name('report-cdsi-dormant.data');
     Route::get('report-cdsi-dormant/export', [CdsiReportController::class, 'exportCdsiDormant'])->name('report-cdsi-dormant.export');
+    Route::get('data-dormant', [CdsiReportController::class, 'dormantIndex'])->name('data-dormant');
+    Route::get('data-dormant/data', [CdsiReportController::class, 'dormantData'])->name('data-dormant.data');
+    Route::get('data-dormant/export', [CdsiReportController::class, 'exportDormant'])->name('data-dormant.export');
     Route::get('report-cdsi-province', [CdsiReportController::class, 'reportCdsiProvince'])->name('report-cdsi-province');
     Route::get('report-cdsi-province/data', [CdsiReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
     Route::get('report-cdsi-province/export', [CdsiReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
@@ -441,7 +444,6 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
-
 
 
 

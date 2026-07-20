@@ -377,7 +377,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
@@ -440,6 +440,8 @@ class BackController extends Controller
                     return redirect()->route('mpcc.report');
                 case 'Regional':
                     return redirect()->route('daily.topup.channel');
+                case 'Dormant':
+                    return redirect()->route('data-dormant');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
                 case 'Maxim':

@@ -55,6 +55,10 @@
 @endsection
 
 @section('content')
+@php
+    $isDormantRole = strtoupper(trim((string) (auth()->user()->role ?? ''))) === 'DORMANT';
+@endphp
+@unless($isDormantRole)
 <div class="row mb-3">
     <div class="col-lg-4 col-md-6 mb-3">
         <div class="card metric-card border-left-primary h-100">
@@ -73,6 +77,7 @@
         </div>
     </div>
 </div>
+@endunless
 
 <div class="row">
     <div class="col-12">
@@ -81,9 +86,11 @@
                 <h3 class="card-title mb-0">
                     <i class="fas fa-bed mr-2"></i>{{ $pageTitle ?? 'Data Dormant CDSI' }}
                 </h3>
-                <a href="{{ route('report-cdsi-dormant.export') }}" class="btn btn-success btn-sm">
+                @unless($isDormantRole)
+                <a href="{{ $exportUrl ?? route('report-cdsi-dormant.export') }}" class="btn btn-success btn-sm">
                     <i class="fas fa-file-excel mr-1"></i> Download Excel
                 </a>
+                @endunless
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -121,7 +128,7 @@
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('report-cdsi-dormant.data') }}"
+                url: "{{ $dataUrl ?? route('report-cdsi-dormant.data') }}"
             },
             columns: [
                 { data: 'email', name: 'cd.email' },
@@ -152,9 +159,11 @@
                 }
             },
             drawCallback: function(settings) {
+                @unless($isDormantRole)
                 var summary = (settings.json && settings.json.summary) ? settings.json.summary : {};
                 $('#countDormant').text(new Intl.NumberFormat('id-ID').format(summary.total_data || 0));
                 $('#countSettlement').text(formatRupiah(summary.total_settlement || 0));
+                @endunless
             }
         });
     });

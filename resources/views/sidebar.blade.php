@@ -12,21 +12,24 @@
                 <span class="badge badge-danger">{{ Str::limit(Auth::user()->name, 25) }}</span><br>
                 @php
                 $user = Auth::user();
-                $isAdmin = $user->role === 'Admin';
-                $isTsel = $user->role === 'Tsel';
-                $isTreg = $user->role === 'Treg';
-                $isCanv = $user->role === 'cvsr';
-                $isPH = $user->role === 'PH';
-                $isTcd = $user->role === 'TCD';
-                $isInternal = $user->role === 'Internal';
-                $isB2b = $user->role === 'b2b';
-                $isMaxim = $user->role === 'Maxim';
-                $isAutomatech = $user->role === 'Automatech';
-                $isGoto = $user->role === 'GOTO';
-                $isCdsi = $user->role === 'CDSI';
-                $isKss = $user->role === 'KSS' || $user->role === 'kss';
-                $isRegional = $user->role === 'Regional';
-                $isMpcc = $user->role === 'MPCC';
+                $roleValue = trim((string) $user->role);
+                $roleUpper = strtoupper($roleValue);
+                $isAdmin = $roleUpper === 'ADMIN';
+                $isTsel = $roleUpper === 'TSEL';
+                $isTreg = $roleUpper === 'TREG';
+                $isCanv = $roleValue === 'cvsr';
+                $isPH = $roleUpper === 'PH';
+                $isTcd = $roleUpper === 'TCD';
+                $isInternal = $roleUpper === 'INTERNAL';
+                $isB2b = strtolower($roleValue) === 'b2b';
+                $isMaxim = $roleUpper === 'MAXIM';
+                $isAutomatech = $roleUpper === 'AUTOMATECH';
+                $isGoto = $roleUpper === 'GOTO';
+                $isCdsi = $roleUpper === 'CDSI';
+                $isDormant = $roleUpper === 'DORMANT';
+                $isKss = $roleUpper === 'KSS';
+                $isRegional = $roleUpper === 'REGIONAL';
+                $isMpcc = $roleUpper === 'MPCC';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
                     'mpcc_area2@telkomsel.co.id',
@@ -50,6 +53,8 @@
                 <span class="badge badge-primary">B2B</span>
                 @elseif($isCdsi)
                 <span class="badge badge-danger">CDSI</span>
+                @elseif($isDormant)
+                <span class="badge badge-secondary">DORMANT</span>
                 @elseif($isKss)
                 <span class="badge badge-danger">KSS</span>
                 @elseif($isMaxim)
@@ -224,6 +229,32 @@
                             </a>
                         </li>
                     </ul>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isDormant)
+                <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item">
+                    <a href="{{ route('data-dormant') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('data-dormant*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-bed" style="color:#6f42c1;"></i>
+                        <p>Data Dormant</p>
+                    </a>
                 </li>
 
                 <li class="nav-header">System Management</li>
@@ -1316,8 +1347,6 @@
         </nav>
     </div>
 </aside>
-
-
 
 
 
