@@ -17,6 +17,7 @@ use App\Http\Controllers\PanenPoinV3Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
+use App\Http\Controllers\Powerhouse2MController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\LocationPresensiController;
 use App\Http\Controllers\MitraSbpController;
@@ -145,6 +146,12 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function
     Route::get('/get-powerhouse-semester-deal-topup-mom-data', [BackController::class, 'getPowerHouseSemesterDealTopupMom'])->name('powerhouse_semester_deal_topup_mom_data');
     Route::get('/get-powerhouse-semester-target-data', [BackController::class, 'getPowerHouseSemesterTargets'])->name('powerhouse_semester_target_data');
     Route::get('/export-powerhouse-voucher', [BackController::class, 'exportPowerHouseVoucher'])->name('export.powerhouse_voucher');
+    Route::get('/powerhouse-2m/input-leads', [FrontController::class, 'powerhouse2mInputLeads'])->name('powerhouse.2m.input-leads');
+    Route::get('/powerhouse-2m/summary-leads', [Powerhouse2MController::class, 'summary'])->name('powerhouse.2m.summary');
+    Route::get('/powerhouse-2m/summary-leads/data', [Powerhouse2MController::class, 'data'])->name('powerhouse.2m.summary-data');
+    Route::get('/powerhouse-2m/summary-leads/export', [Powerhouse2MController::class, 'export'])->name('powerhouse.2m.summary-export');
+    Route::get('/powerhouse-2m/report', [Powerhouse2MController::class, 'report'])->name('powerhouse.2m.report');
+    Route::post('/powerhouse-2m/input-leads', [Powerhouse2MController::class, 'store'])->name('powerhouse.2m.store');
 
     Route::get('/monitor-voucher', [FrontController::class, 'botVoucher'])->name('admin.voucher');
     Route::get('/monitor-claim-voucher', [FrontController::class, 'claimedVoucher'])->name('admin.claim.voucher');
@@ -459,6 +466,3 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
 });
-
-
-

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Models\LeadsSource;
+use App\Models\Sector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Session;
@@ -671,6 +673,26 @@ class FrontController extends Controller
         }
 
         return view('admin.powerhouse_semester', compact('semesters', 'selectedSemester'));
+    }
+    public function powerhouse2mInputLeads()
+    {
+        logUserLogin();
+        $leadSources = LeadsSource::all();
+        $sectors = Sector::all();
+
+        return view('admin.powerhouse_2m_input_leads', compact('leadSources', 'sectors'));
+    }
+
+    public function powerhouse2mSummaryLeads()
+    {
+        logUserLogin();
+        return redirect()->route('powerhouse.2m.summary');
+    }
+
+    public function powerhouse2mReport()
+    {
+        logUserLogin();
+        return view('admin.powerhouse_2m_report');
     }
     public function refreshSummarySimpatiTiktok()
     {
