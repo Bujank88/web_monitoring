@@ -6,6 +6,7 @@ use App\Models\LeadsPowerhouse;
 use App\Models\LeadsSource;
 use App\Models\Sector;
 use App\Models\User;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,7 +41,7 @@ class Powerhouse2MController extends Controller
         $leads = DB::table('leads_powerhouse')
             ->whereIn('user_id', $powerhouseIds)
             ->orderBy('company_name')
-            ->get(['id', 'user_id', 'company_name', 'email']);
+            ->get(['id', 'user_id', 'company_name', 'email', 'usecase', 'solusi']);
 
         $emails = $leads->pluck('email')
             ->filter()
@@ -86,8 +87,11 @@ class Powerhouse2MController extends Controller
                 }
 
                 return [
+                    'lead_id' => $lead->id,
                     'lead_name' => $lead->company_name ?: ($lead->email ?: 'Tanpa Nama'),
                     'email' => $lead->email,
+                    'usecase' => $lead->usecase,
+                    'solusi' => $lead->solusi,
                     'months' => $monthValues,
                     'achievement' => $achievement,
                 ];
@@ -114,6 +118,123 @@ class Powerhouse2MController extends Controller
             'months' => array_values($months),
             'reportYear' => $year,
         ]);
+    }
+
+    public function updateSolusi(Request $request, LeadsPowerhouse $lead)
+    {
+        $validated = $request->validate([
+            'solusi' => 'required|string|max:5000',
+        ], [
+            'solusi.required' => 'Solusi wajib diisi.',
+        ]);
+
+        $lead->update([
+            'solusi' => $validated['solusi'],
+        ]);
+
+        return redirect()
+            ->route('powerhouse.2m.report')
+            ->with('success', 'Solusi untuk lead ' . ($lead->company_name ?? $lead->email ?? 'Powerhouse 2M') . ' berhasil disimpan.');
+    }
+
+    public function show(LeadsPowerhouse $lead)
+    {
+        logUserLogin();
+
+        if (Auth::user()->role !== 'Admin' && (int) $lead->user_id !== (int) Auth::id()) {
+            abort(403);
+        }
+
+        $lead->load(['user', 'source', 'sector']);
+
+        return view('admin.powerhouse_2m_show', compact('lead'));
+    }
+
+    public function edit(LeadsPowerhouse $lead)
+    {
+        logUserLogin();
+
+        if (Auth::user()->role !== 'Admin' && (int) $lead->user_id !== (int) Auth::id()) {
+            abort(403);
+        }
+
+        $lead->load(['user', 'source', 'sector']);
+
+        $leadSources = LeadsSource::orderBy('name')->get();
+        $sectors = Sector::orderBy('name')->get();
+        $powerhouses = Cache::remember('users_list_powerhouse_2m_edit', 3600, fn() => User::whereRaw('UPPER(role) = ?', ['PH'])->orderBy('name')->get());
+
+        return view('admin.powerhouse_2m_edit', compact('lead', 'leadSources', 'sectors', 'powerhouses'));
+    }
+
+    public function update(Request $request, LeadsPowerhouse $lead)
+    {
+        if (Auth::user()->role !== 'Admin' && (int) $lead->user_id !== (int) Auth::id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'source_id' => 'required|exists:leads_source,id',
+            'sector_id' => 'required|exists:sectors,id',
+            'company_name' => 'required|string|max:255',
+            'mobile_phone' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^62\d{9,14}$/',
+                Rule::unique('leads_powerhouse', 'mobile_phone')->ignore($lead->id),
+            ],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('leads_powerhouse', 'email')->ignore($lead->id),
+                function ($attribute, $value, $fail) use ($lead) {
+                    if (DB::table('mitra_sbp')->where('email_myads', $value)->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+
+                    $emailExistsInLeadsMaster = DB::table('leads_master')
+                        ->where('email', $value)
+                        ->exists();
+
+                    if ($emailExistsInLeadsMaster && strtolower((string) $lead->email) !== strtolower((string) $value)) {
+                        $fail('Email sudah terdaftar di Data Leads & Akun.');
+                    }
+                },
+            ],
+            'nama' => 'nullable|string|max:255',
+            'myads_account' => 'nullable|string|max:255',
+            'usecase' => 'required|string|max:1000',
+            'solusi' => 'nullable|string|max:5000',
+        ], [
+            'mobile_phone.regex' => 'Nomor HP harus diawali dengan kode negara 62 dan hanya angka (9-12 digit).',
+            'mobile_phone.unique' => 'Nomor HP sudah terdaftar.',
+            'email.unique' => 'Email sudah terdaftar.',
+        ]);
+
+        $payload = [
+            'source_id' => $validated['source_id'],
+            'sector_id' => $validated['sector_id'],
+            'company_name' => $validated['company_name'],
+            'mobile_phone' => $validated['mobile_phone'],
+            'email' => $validated['email'],
+            'nama' => $validated['nama'] ?? null,
+            'myads_account' => $validated['myads_account'] ?? null,
+            'usecase' => $validated['usecase'],
+            'solusi' => $validated['solusi'] ?? null,
+        ];
+
+        if (Auth::user()->role === 'Admin') {
+            $payload['user_id'] = $validated['user_id'];
+        }
+
+        $lead->update($payload);
+
+        return redirect()
+            ->route('powerhouse.2m.summary')
+            ->with('success_with_schedule', 'Leads 2M untuk ' . $lead->company_name . ' berhasil diupdate.');
     }
 
     public function summary()
@@ -244,8 +365,15 @@ class Powerhouse2MController extends Controller
                 }
                 return '<span class="badge badge-danger">Push Topup</span>';
             })
-            ->addColumn('aksi', function () {
-                return '<span class="badge badge-light">-</span>';
+            ->addColumn('aksi', function ($row) {
+                return '
+                    <a href="' . route('powerhouse.2m.show', $row->leads_id) . '" class="btn btn-sm btn-warning mt-1">
+                        <i class="fas fa-search"></i> Read
+                    </a>
+                    <a href="' . route('powerhouse.2m.edit', $row->leads_id) . '" class="btn btn-sm btn-primary mt-1">
+                        <i class="fas fa-pencil-alt"></i> Update
+                    </a>
+                ';
             })
             ->rawColumns(['data_type', 'rekomendasi', 'aksi'])
             ->make(true);
