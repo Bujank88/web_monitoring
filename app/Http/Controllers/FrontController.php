@@ -34,6 +34,8 @@ class FrontController extends Controller
                 return redirect()->route('report-agency-advertising');
             } else if ('Internal' == Auth::user()->role) {
                 return redirect()->route('mitra-sbp');
+            } else if (in_array(Auth::user()->role, ['SBP', 'Canvasser SBP'])) {
+                return redirect()->route('pilot-sbp-sme');
             } else if ('Dormant' == Auth::user()->role) {
                 return redirect()->route('data-dormant');
             } else if ('GOTO' == Auth::user()->role) {
@@ -693,6 +695,30 @@ class FrontController extends Controller
     {
         logUserLogin();
         return view('admin.powerhouse_2m_report');
+    }
+
+    public function pilotSbpToSme()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_to_sme');
+    }
+
+    public function pilotSbpTopupReferral()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_topup_referral');
+    }
+
+    public function pilotSbpReferralCanvasserAgent()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_referral_canvasser_agent');
+    }
+
+    public function pilotSbpDataLeads()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_data_leads');
     }
     public function refreshSummarySimpatiTiktok()
     {

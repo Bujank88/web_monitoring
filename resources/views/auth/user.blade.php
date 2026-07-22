@@ -213,6 +213,8 @@
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
+                            <option value="SBP">SBP</option>
+                            <option value="Canvasser SBP">Canvasser SBP</option>
                             <option value="Dormant">Dormant</option>
                         </select>
                     </div>
@@ -345,6 +347,10 @@
                             badgeClass = 'badge-info';
                         } else if (data === 'MPCC') {
                             badgeClass = 'badge-info';
+                        } else if (data === 'SBP') {
+                            badgeClass = 'badge-success';
+                        } else if (data === 'Canvasser SBP') {
+                            badgeClass = 'badge-primary';
                         } else if (data === 'Dormant') {
                             badgeClass = 'badge-secondary';
                         } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
@@ -572,5 +578,4 @@
 </script>
 
 @endsection
-
 

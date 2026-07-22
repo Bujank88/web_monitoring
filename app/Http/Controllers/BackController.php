@@ -377,7 +377,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
@@ -452,6 +452,9 @@ class BackController extends Controller
                     return redirect()->route('report-goto');
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
+                case 'SBP':
+                case 'Canvasser SBP':
+                    return redirect()->route('pilot-sbp-sme');
                 case 'CDSI':
                 case 'KSS':
                 case 'kss':

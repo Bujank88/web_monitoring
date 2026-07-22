@@ -30,6 +30,8 @@
                 $isKss = $roleUpper === 'KSS';
                 $isRegional = $roleUpper === 'REGIONAL';
                 $isMpcc = $roleUpper === 'MPCC';
+                $isSbp = $roleUpper === 'SBP';
+                $isCanvasserSbp = $roleUpper === 'CANVASSER SBP';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
                     'mpcc_area2@telkomsel.co.id',
@@ -63,6 +65,10 @@
                 <span class="badge badge-primary">GOTO</span>
                 @elseif($isRegional)
                 <span class="badge badge-info">REGIONAL</span>
+                @elseif($isSbp)
+                <span class="badge badge-success">SBP</span>
+                @elseif($isCanvasserSbp)
+                <span class="badge badge-primary">CANVASSER SBP</span>
                 @elseif($isMpcc)
                 <span class="badge badge-info">MPCC</span>
                 @elseif($isCanv)
@@ -226,6 +232,69 @@
                                 class="nav-link waves-effect {{ request()->routeIs('report-saldo-maxim') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
                                 <p>Report Saldo Maxim</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isSbp || $isCanvasserSbp)
+                <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item has-treeview {{ request()->routeIs('pilot-sbp-sme*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-people-arrows" style="color:#20c997;"></i>
+                        <p>Pilot SBP to SME</p>
+                        <i class="right fas fa-angle-left"></i>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('pilot-sbp-sme.topup-referral-sbp') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.topup-referral-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-wallet" style="color:#f59e0b;"></i>
+                                <p>TopUp Referral SBP</p>
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a href="{{ route('pilot-sbp-sme.referral-canvasser-agent') }}"
+                                    class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-canvasser-agent') ? 'active' : '' }}" style="padding-left: 45px;">
+                                    <i class="nav-icon fas fa-user-friends" style="color:#38bdf8;"></i>
+                                    <p>Referral Canvasser / Agent</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('pilot-sbp-sme.referral-lead-mapping') }}"
+                                    class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-lead-mapping') ? 'active' : '' }}" style="padding-left: 45px;">
+                                    <i class="nav-icon fas fa-envelope-open-text" style="color:#a855f7;"></i>
+                                    <p>Data Leads by Referral</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('pilot-sbp-sme.input-leads') }}"
+                                    class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.input-leads') ? 'active' : '' }}" style="padding-left: 45px;">
+                                    <i class="nav-icon fas fa-file-circle-plus" style="color:#06b6d4;"></i>
+                                    <p>Input Leads</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                            <a href="{{ route('pilot-sbp-sme.data-leads') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.data-leads') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-address-book" style="color:#22c55e;"></i>
+                                <p>Data Leads</p>
                             </a>
                         </li>
                     </ul>
@@ -781,18 +850,64 @@
                         <p>New Leads</p>
                     </a>
                 </li>      
-                <li class="nav-item">
-                    <a href="{{ route('leads-master.create-existing') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
-                        <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
-                        <p>New/Eksisting Akun</p>
-                    </a>
-                </li>         
-                @if($isAdmin)
-                <li class="nav-item">
-                    <a href="{{ route('leads-master.create-enterprise') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('leads-master.create-enterprise') ? 'active' : '' }}">
-                        <i class="nav-icon fa-solid fa-building" style="color:rgb(245, 158, 11);"></i>
+                  <li class="nav-item">
+                      <a href="{{ route('leads-master.create-existing') }}"
+                          class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
+                          <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
+                          <p>New/Eksisting Akun</p>
+                      </a>
+                  </li>         
+                  @if($isAdmin)
+                  <li class="nav-item has-treeview {{ request()->routeIs('pilot-sbp-sme*') ? 'menu-open' : '' }}">
+                      <a href="#" class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme*') ? 'active' : '' }}">
+                          <i class="nav-icon fas fa-people-arrows" style="color:#20c997;"></i>
+                          <p>Pilot SBP to SME</p>
+                          <i class="right fas fa-angle-left"></i>
+                      </a>
+                      <ul class="nav nav-treeview">
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.topup-referral-sbp') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.topup-referral-sbp') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-wallet" style="color:#f59e0b;"></i>
+                                  <p>TopUp Referral SBP</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.referral-canvasser-agent') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-canvasser-agent') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-user-friends" style="color:#38bdf8;"></i>
+                                  <p>Referral Canvasser / Agent</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.referral-lead-mapping') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-lead-mapping') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-envelope-open-text" style="color:#a855f7;"></i>
+                                  <p>Data Leads by Referral</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.input-leads') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.input-leads') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-file-circle-plus" style="color:#06b6d4;"></i>
+                                  <p>Input Leads</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.data-leads') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.data-leads') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-address-book" style="color:#22c55e;"></i>
+                                  <p>Data Leads</p>
+                              </a>
+                          </li>
+                      </ul>
+                  </li>
+                  @endif
+                  @if($isAdmin)
+                  <li class="nav-item">
+                      <a href="{{ route('leads-master.create-enterprise') }}"
+                          class="nav-link waves-effect {{ request()->routeIs('leads-master.create-enterprise') ? 'active' : '' }}">
+                          <i class="nav-icon fa-solid fa-building" style="color:rgb(245, 158, 11);"></i>
                         <p>Enterprise Akun</p>
                     </a>
                 </li>
@@ -1376,7 +1491,7 @@
                 
             
                 
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc || $isSbp || $isCanvasserSbp)
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
                         class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -1389,7 +1504,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc || $isSbp || $isCanvasserSbp)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"
