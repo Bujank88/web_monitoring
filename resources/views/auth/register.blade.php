@@ -67,6 +67,8 @@
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="MPCC">MPCC</option>
+                            <option value="SBP">SBP</option>
+                            <option value="Canvasser SBP">Canvasser SBP</option>
                             <option value="Dormant">Dormant</option>
                         </select>
                     </div>

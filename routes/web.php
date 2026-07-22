@@ -14,6 +14,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
 use App\Http\Controllers\PanenPoinV3Controller;
+use App\Http\Controllers\PilotSbpController;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\LeadProgramController;
@@ -49,6 +50,24 @@ Route::get('/summary-tiktok', [FrontController::class, 'refreshSummarySimpatiTik
 Route::get('/change-password', [FrontController::class, 'changePassword'])->name('change-password');
 Route::post('/change-password', [FrontController::class, 'updatePassword'])->name('password.update');
 Route::get('/logout', [FrontController::class, 'logout'])->name('logout');
+Route::middleware(['auth', 'checkrole:Admin,SBP,Canvasser SBP'])->group(function () {
+    Route::get('/pilot-sbp-to-sme', [PilotSbpController::class, 'index'])->name('pilot-sbp-sme');
+    Route::get('/pilot-sbp-to-sme/topup-referral-sbp', [PilotSbpController::class, 'topupReferralIndex'])->name('pilot-sbp-sme.topup-referral-sbp');
+    Route::get('/pilot-sbp-to-sme/topup-referral-sbp/data', [PilotSbpController::class, 'topupReferralData'])->name('pilot-sbp-sme.topup-referral-sbp.data');
+    Route::get('/pilot-sbp-to-sme/topup-referral-sbp/detail-data', [PilotSbpController::class, 'topupReferralDetailData'])->name('pilot-sbp-sme.topup-referral-sbp.detail-data');
+    Route::get('/pilot-sbp-to-sme/referral-canvasser-agent', [PilotSbpController::class, 'referralIndex'])->name('pilot-sbp-sme.referral-canvasser-agent');
+    Route::get('/pilot-sbp-to-sme/referrals/data', [PilotSbpController::class, 'referralData'])->name('pilot-sbp-sme.referrals.data');
+    Route::get('/pilot-sbp-to-sme/referrals/generate', [PilotSbpController::class, 'generateReferralCode'])->name('pilot-sbp-sme.referrals.generate');
+    Route::post('/pilot-sbp-to-sme/referrals', [PilotSbpController::class, 'storeReferral'])->name('pilot-sbp-sme.referrals.store');
+    Route::post('/pilot-sbp-to-sme/referrals/{id}/status', [PilotSbpController::class, 'updateReferralStatus'])->name('pilot-sbp-sme.referrals.status');
+    Route::get('/pilot-sbp-to-sme/referral-lead-mapping', [PilotSbpController::class, 'referralLeadMappingIndex'])->name('pilot-sbp-sme.referral-lead-mapping');
+    Route::get('/pilot-sbp-to-sme/referral-lead-mapping/data', [PilotSbpController::class, 'referralLeadMappingData'])->name('pilot-sbp-sme.referral-lead-mapping.data');
+    Route::get('/pilot-sbp-to-sme/input-leads', [PilotSbpController::class, 'inputLeadsIndex'])->name('pilot-sbp-sme.input-leads');
+    Route::post('/pilot-sbp-to-sme/input-leads', [PilotSbpController::class, 'storeInputLeads'])->name('pilot-sbp-sme.input-leads.store');
+    Route::get('/pilot-sbp-to-sme/data-leads', [PilotSbpController::class, 'dataLeadsIndex'])->name('pilot-sbp-sme.data-leads');
+    Route::get('/pilot-sbp-to-sme/data-leads/data', [PilotSbpController::class, 'dataLeadsData'])->name('pilot-sbp-sme.data-leads.data');
+    Route::get('/pilot-sbp-to-sme/data-leads/export', [PilotSbpController::class, 'exportDataLeads'])->name('pilot-sbp-sme.data-leads.export');
+});
 
 Route::middleware(['auth', 'checkrole:Admin,Treg'])->group(function (){
     Route::get('/monitoring-akuisisi-treg', [FrontController::class, 'akuisisiVoucherTreg'])->name('monitoring_akuisisi_treg');
