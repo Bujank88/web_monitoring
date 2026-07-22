@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\LeadsSource;
+use App\Models\Sector;
+use App\Models\User;
 
 class LeadsPowerhouse extends Model
 {
@@ -27,6 +30,22 @@ class LeadsPowerhouse extends Model
         'remarks',
         'flag_event',
         'usecase',
+        'solusi',
         'reg_id',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function source()
+    {
+        return $this->belongsTo(LeadsSource::class, 'source_id');
+    }
+
+    public function sector()
+    {
+        return $this->belongsTo(Sector::class, 'sector_id');
+    }
 }

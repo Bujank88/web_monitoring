@@ -150,8 +150,12 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function
     Route::get('/powerhouse-2m/summary-leads', [Powerhouse2MController::class, 'summary'])->name('powerhouse.2m.summary');
     Route::get('/powerhouse-2m/summary-leads/data', [Powerhouse2MController::class, 'data'])->name('powerhouse.2m.summary-data');
     Route::get('/powerhouse-2m/summary-leads/export', [Powerhouse2MController::class, 'export'])->name('powerhouse.2m.summary-export');
+    Route::get('/powerhouse-2m/{lead}', [Powerhouse2MController::class, 'show'])->name('powerhouse.2m.show')->whereNumber('lead');
+    Route::get('/powerhouse-2m/{lead}/edit', [Powerhouse2MController::class, 'edit'])->name('powerhouse.2m.edit')->whereNumber('lead');
+    Route::put('/powerhouse-2m/{lead}', [Powerhouse2MController::class, 'update'])->name('powerhouse.2m.update')->whereNumber('lead');
     Route::get('/powerhouse-2m/report', [Powerhouse2MController::class, 'report'])->name('powerhouse.2m.report');
     Route::post('/powerhouse-2m/input-leads', [Powerhouse2MController::class, 'store'])->name('powerhouse.2m.store');
+    Route::post('/powerhouse-2m/{lead}/solusi', [Powerhouse2MController::class, 'updateSolusi'])->name('powerhouse.2m.solusi.update')->whereNumber('lead');
 
     Route::get('/monitor-voucher', [FrontController::class, 'botVoucher'])->name('admin.voucher');
     Route::get('/monitor-claim-voucher', [FrontController::class, 'claimedVoucher'])->name('admin.claim.voucher');
