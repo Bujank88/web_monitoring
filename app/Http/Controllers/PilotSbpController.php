@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Schema;
 class PilotSbpController extends Controller
 {
     protected const SBP_REFERRAL_SENDER_ID = 'REG-DO-000000662035';
+    protected const SBP_MONITORING_EMAIL = 'yung_fen@rajawalicellular.co.id';
 
     public function index()
     {
@@ -51,6 +52,41 @@ class PilotSbpController extends Controller
         ]);
     }
 
+    public function monitoringSaldoIndex(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $history = $this->getMonitoringSaldoHistory($month);
+
+        return view('pilot_sbp.monitoring_saldo', [
+            'pageTitle' => 'Monitoring Saldo',
+            'month' => $month,
+            'months' => $months,
+            'monitoringEmail' => self::SBP_MONITORING_EMAIL,
+            'senderId' => self::SBP_REFERRAL_SENDER_ID,
+            'remainingBalance' => $history['remaining_balance'],
+            'openingBalance' => $history['opening_balance'],
+            'totalIn' => $history['total_in'],
+            'totalOut' => $history['total_out'],
+            'endingBalance' => $history['ending_balance'],
+            'historyRows' => $history['rows'],
+        ]);
+    }
+
     public function topupReferralData(Request $request)
     {
         try {
@@ -80,6 +116,125 @@ class PilotSbpController extends Controller
             \Log::error($e->getTraceAsString());
 
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function reportCampaignIndex(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        return view('pilot_sbp.report_campaign', [
+            'pageTitle' => 'Report Campaign',
+            'month' => $month,
+            'months' => $months,
+        ]);
+    }
+
+    public function reportCampaignData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        $query = $this->pilotSbpCampaignBaseQuery($month);
+
+        $summaryTotal = (clone $query)->count();
+
+        return datatables()->of($query)
+            ->with('summary', [
+                'total_campaign' => $summaryTotal,
+            ])
+            ->editColumn('balance_terpakai', function ($row) {
+                return 'Rp ' . number_format((float) $row->balance_terpakai, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function exportReportCampaign(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+
+            $data = $this->pilotSbpCampaignBaseQuery($month)
+                ->orderByRaw('COALESCE(campaign.broadcast_date, campaign.tanggal_iklan) DESC')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $filename = 'Report_Campaign_Pilot_SBP_' . $month . '.csv';
+            $headers = [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ];
+
+            return response()->stream(function () use ($data) {
+                $handle = fopen('php://output', 'w');
+                fwrite($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+                fputcsv($handle, [
+                    'Tanggal Iklan',
+                    'Broadcast Date',
+                    'Email',
+                    'ID Iklan',
+                    'Nama Iklan',
+                    'Nama Instansi',
+                    'Area Provinsi',
+                    'Campaign Type',
+                    'Inventory Type',
+                    'Total',
+                    'Success',
+                    'Failed',
+                    'Delivered',
+                    'Read',
+                    'Click',
+                    'Balance Terpakai',
+                    'Pesan',
+                    'Campaign Status',
+                    'Sumber',
+                ]);
+
+                foreach ($data as $row) {
+                    fputcsv($handle, [
+                        $row->tanggal_iklan,
+                        $row->broadcast_date,
+                        $row->email,
+                        $row->id_iklan,
+                        $row->nama_iklan,
+                        $row->nama_instansi,
+                        $row->area_provinsi,
+                        $row->campaign_type,
+                        $row->inventory_type,
+                        $row->total,
+                        $row->success,
+                        $row->failed,
+                        $row->delivered,
+                        $row->read,
+                        $row->click,
+                        $row->balance_terpakai,
+                        $row->pesan,
+                        $row->campaign_status,
+                        $row->source_label,
+                    ]);
+                }
+
+                fclose($handle);
+            }, 200, $headers);
+        } catch (\Throwable $e) {
+            \Log::error('Export Pilot SBP Campaign Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data report campaign');
         }
     }
 
@@ -810,5 +965,153 @@ class PilotSbpController extends Controller
             ->whereNotNull('tbt.email_penerima')
             ->orderByDesc('tbt.tanggal')
             ->get();
+    }
+
+    protected function pilotSbpCampaignBaseQuery(string $month)
+    {
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $transferEmailsSubQuery = DB::table('transaksi_balance_transfer as tbt')
+            ->selectRaw('LOWER(TRIM(tbt.email_penerima)) as email_key')
+            ->where('tbt.id_klien_pengirim', self::SBP_REFERRAL_SENDER_ID)
+            ->whereNotNull('tbt.email_penerima')
+            ->where('tbt.email_penerima', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(tbt.email_penerima))'));
+
+        return DB::query()->fromSub(
+            DB::table('data_registarsi_status_approveorreject as dsa')
+                ->joinSub($transferEmailsSubQuery, 'transfer_emails', function ($join) {
+                    $join->on(
+                        DB::raw('LOWER(TRIM(dsa.email))'),
+                        '=',
+                        'transfer_emails.email_key'
+                    );
+                })
+                ->join('myads_request_soadb as b', 'dsa.user_id', '=', 'b.user_id')
+                ->whereNotNull('dsa.user_id')
+                ->where('dsa.user_id', '!=', '')
+                ->whereBetween('b.created_at', [$startDate, $endDate])
+                ->select(
+                    DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                    'b.broadcast_date',
+                    'dsa.email as email',
+                    'b.id_iklan',
+                    'b.nama_iklan',
+                    'b.nama_brand as nama_instansi',
+                    'b.area_provinsi',
+                    'b.tipe_iklan as campaign_type',
+                    'b.tipe_inventori as inventory_type',
+                    'b.total',
+                    'b.sukses as success',
+                    'b.gagal as failed',
+                    'b.delivered',
+                    'b.read',
+                    'b.click',
+                    DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                    'b.pesan as pesan',
+                    'b.status as campaign_status',
+                    DB::raw("'Transfer SBP' as source_label")
+                ),
+            'campaign'
+        );
+    }
+
+    protected function getMonitoringSaldoHistory(string $month): array
+    {
+        $monthDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
+        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+        $targetEmail = strtolower(trim(self::SBP_MONITORING_EMAIL));
+
+        $openingIn = (float) DB::table('report_balance_top_up')
+            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
+            ->where('tgl_transaksi', '<', $startDate)
+            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
+
+        $openingOut = (float) DB::table('transaksi_balance_transfer')
+            ->where('id_klien_pengirim', self::SBP_REFERRAL_SENDER_ID)
+            ->where('tanggal', '<', $startDate)
+            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
+
+        $openingBalance = $openingIn - $openingOut;
+
+        $remainingIn = (float) DB::table('report_balance_top_up')
+            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
+            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
+
+        $remainingOut = (float) DB::table('transaksi_balance_transfer')
+            ->where('id_klien_pengirim', self::SBP_REFERRAL_SENDER_ID)
+            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
+
+        $remainingBalance = $remainingIn - $remainingOut;
+
+        $incomingRows = DB::table('report_balance_top_up')
+            ->select([
+                DB::raw("'Masuk' as transaction_type"),
+                DB::raw("'Top Up' as source"),
+                'tgl_transaksi as transaction_datetime',
+                'email_client as reference_email',
+                DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2)) as amount_in'),
+                DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_out'),
+            ])
+            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
+            ->whereBetween('tgl_transaksi', [$startDate, $endDate])
+            ->get();
+
+        $outgoingRows = DB::table('transaksi_balance_transfer')
+            ->select([
+                DB::raw("'Keluar' as transaction_type"),
+                DB::raw("'Balance Transfer' as source"),
+                'tanggal as transaction_datetime',
+                'email_penerima as reference_email',
+                DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_in'),
+                DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2)) as amount_out'),
+            ])
+            ->where('id_klien_pengirim', self::SBP_REFERRAL_SENDER_ID)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->get();
+
+        $rows = $incomingRows
+            ->concat($outgoingRows)
+            ->sortBy(function ($row) {
+                return Carbon::parse($row->transaction_datetime)->timestamp;
+            })
+            ->values();
+
+        $runningBalance = $openingBalance;
+        $totalIn = 0;
+        $totalOut = 0;
+
+        $formattedRows = $rows->map(function ($row) use (&$runningBalance, &$totalIn, &$totalOut) {
+            $amountIn = (float) $row->amount_in;
+            $amountOut = (float) $row->amount_out;
+
+            $totalIn += $amountIn;
+            $totalOut += $amountOut;
+            $runningBalance += $amountIn - $amountOut;
+
+            return [
+                'transaction_date' => $row->transaction_datetime
+                    ? Carbon::parse($row->transaction_datetime)->format('d-m-Y H:i')
+                    : '-',
+                'transaction_type' => $row->transaction_type,
+                'source' => $row->source,
+                'reference_email' => $row->reference_email ?: '-',
+                'amount_in' => $amountIn,
+                'amount_out' => $amountOut,
+                'running_balance' => $runningBalance,
+            ];
+        })->all();
+
+        return [
+            'remaining_balance' => $remainingBalance,
+            'opening_balance' => $openingBalance,
+            'total_in' => $totalIn,
+            'total_out' => $totalOut,
+            'ending_balance' => $openingBalance + $totalIn - $totalOut,
+            'rows' => $formattedRows,
+        ];
     }
 }
