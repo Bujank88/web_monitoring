@@ -269,6 +269,15 @@
                                 <p>TopUp Referral SBP</p>
                             </a>
                         </li>
+                        @if($isSbp)
+                        <li class="nav-item">
+                            <a href="{{ route('pilot-sbp-sme.monitoring-saldo') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.monitoring-saldo') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-scale-balanced" style="color:#60a5fa;"></i>
+                                <p>Monitoring Saldo</p>
+                            </a>
+                        </li>
+                        @endif
                             <li class="nav-item">
                                 <a href="{{ route('pilot-sbp-sme.referral-canvasser-agent') }}"
                                     class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-canvasser-agent') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -290,6 +299,15 @@
                                     <p>Input Leads</p>
                                 </a>
                             </li>
+                            @if($isSbp)
+                            <li class="nav-item">
+                                <a href="{{ route('pilot-sbp-sme.report-campaign') }}"
+                                    class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.report-campaign') ? 'active' : '' }}" style="padding-left: 45px;">
+                                    <i class="nav-icon fas fa-bullhorn" style="color:#ef4444;"></i>
+                                    <p>Report Campaign</p>
+                                </a>
+                            </li>
+                            @endif
                             <li class="nav-item">
                             <a href="{{ route('pilot-sbp-sme.data-leads') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.data-leads') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -873,6 +891,13 @@
                               </a>
                           </li>
                           <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.monitoring-saldo') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.monitoring-saldo') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-scale-balanced" style="color:#60a5fa;"></i>
+                                  <p>Monitoring Saldo</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
                               <a href="{{ route('pilot-sbp-sme.referral-canvasser-agent') }}"
                                   class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.referral-canvasser-agent') ? 'active' : '' }}" style="padding-left: 45px;">
                                   <i class="nav-icon fas fa-user-friends" style="color:#38bdf8;"></i>
@@ -891,6 +916,13 @@
                                   class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.input-leads') ? 'active' : '' }}" style="padding-left: 45px;">
                                   <i class="nav-icon fas fa-file-circle-plus" style="color:#06b6d4;"></i>
                                   <p>Input Leads</p>
+                              </a>
+                          </li>
+                          <li class="nav-item">
+                              <a href="{{ route('pilot-sbp-sme.report-campaign') }}"
+                                  class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme.report-campaign') ? 'active' : '' }}" style="padding-left: 45px;">
+                                  <i class="nav-icon fas fa-bullhorn" style="color:#ef4444;"></i>
+                                  <p>Report Campaign</p>
                               </a>
                           </li>
                           <li class="nav-item">

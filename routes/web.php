@@ -69,6 +69,13 @@ Route::middleware(['auth', 'checkrole:Admin,SBP,Canvasser SBP'])->group(function
     Route::get('/pilot-sbp-to-sme/data-leads/export', [PilotSbpController::class, 'exportDataLeads'])->name('pilot-sbp-sme.data-leads.export');
 });
 
+Route::middleware(['auth', 'checkrole:Admin,SBP'])->group(function () {
+    Route::get('/pilot-sbp-to-sme/monitoring-saldo', [PilotSbpController::class, 'monitoringSaldoIndex'])->name('pilot-sbp-sme.monitoring-saldo');
+    Route::get('/pilot-sbp-to-sme/report-campaign', [PilotSbpController::class, 'reportCampaignIndex'])->name('pilot-sbp-sme.report-campaign');
+    Route::get('/pilot-sbp-to-sme/report-campaign/data', [PilotSbpController::class, 'reportCampaignData'])->name('pilot-sbp-sme.report-campaign.data');
+    Route::get('/pilot-sbp-to-sme/report-campaign/export', [PilotSbpController::class, 'exportReportCampaign'])->name('pilot-sbp-sme.report-campaign.export');
+});
+
 Route::middleware(['auth', 'checkrole:Admin,Treg'])->group(function (){
     Route::get('/monitoring-akuisisi-treg', [FrontController::class, 'akuisisiVoucherTreg'])->name('monitoring_akuisisi_treg');
     Route::get('/race-summary-treg', [FrontController::class, 'raceSummaryTreg'])->name('race_summary_treg');
