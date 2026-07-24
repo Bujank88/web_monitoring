@@ -539,7 +539,6 @@
                         <p>New/Eksisting Akun</p>
                     </a>
                 </li>
-
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -1445,6 +1444,21 @@
                         <p>Logbook Event April 2026</p>
                     </a>
                 </li> --}}
+                <li class="nav-header">FBM</li>
+                <li class="nav-item">
+                    <a href="{{ route('fbm.sof.create') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('fbm.sof.create') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-file-circle-plus" style="color:#38bdf8;"></i>
+                        <p>Pengajuan SOF</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('fbm.sof.index') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('fbm.sof.index') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-table-list" style="color:#f59e0b;"></i>
+                        <p>List SOF</p>
+                    </a>
+                </li>
                 @endif
 
                 {{-- ===== PRESENSI: Hanya untuk CVSR dan Admin ===== --}}
