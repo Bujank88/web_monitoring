@@ -24,6 +24,7 @@ use App\Http\Controllers\LocationPresensiController;
 use App\Http\Controllers\MitraSbpController;
 use App\Http\Controllers\CdsiReportController;
 use App\Http\Controllers\GotoController;
+use App\Http\Controllers\FbmSofController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -238,6 +239,13 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::view('faq-l0', 'faq.l0')->name('faq-l0');
     Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
     Route::get('tips-sales/pdf', [FrontController::class, 'downloadTipsSalesPdf'])->name('tips-sales.pdf');
+
+    Route::get('fbm/pengajuan-sof', [FbmSofController::class, 'create'])->name('fbm.sof.create');
+    Route::post('fbm/pengajuan-sof', [FbmSofController::class, 'store'])->name('fbm.sof.store');
+    Route::get('fbm/list-sof', [FbmSofController::class, 'index'])->name('fbm.sof.index');
+    Route::get('fbm/list-sof/data', [FbmSofController::class, 'data'])->name('fbm.sof.data');
+    Route::get('fbm/list-sof/{sof}/edit', [FbmSofController::class, 'edit'])->name('fbm.sof.edit')->whereNumber('sof');
+    Route::put('fbm/list-sof/{sof}', [FbmSofController::class, 'update'])->name('fbm.sof.update')->whereNumber('sof');
 
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
