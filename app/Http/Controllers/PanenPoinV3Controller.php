@@ -270,8 +270,7 @@ class PanenPoinV3Controller extends Controller
 
         $redeemByAkunId = DB::table('prize_redeems_v3')
             ->select('user_id', DB::raw('SUM(point_used) as total_redeem'))
-            ->whereDate('period_start', $period['start']->toDateString())
-            ->whereDate('period_end', $period['end']->toDateString())
+            ->whereBetween(DB::raw('DATE(created_at)'), [$period['start']->toDateString(), $period['end']->toDateString()])
             ->groupBy('user_id')
             ->pluck('total_redeem', 'user_id');
 
@@ -389,7 +388,7 @@ class PanenPoinV3Controller extends Controller
                 throw new \Exception('Hadiah tidak tersedia.');
             }
 
-            $summary = DB::table('summary_panen_poin_v3')
+        $summary = DB::table('summary_panen_poin_v3')
                 ->whereRaw('LOWER(TRIM(email_client)) = ?', [strtolower(trim($akun->email_client))])
                 ->whereDate('period_start', $period['start']->toDateString())
                 ->whereDate('period_end', $period['end']->toDateString())
@@ -433,8 +432,7 @@ class PanenPoinV3Controller extends Controller
     {
         $totalRedeem = (int) DB::table('prize_redeems_v3')
             ->where('user_id', $akunId)
-            ->whereDate('period_start', $period['start']->toDateString())
-            ->whereDate('period_end', $period['end']->toDateString())
+            ->whereBetween(DB::raw('DATE(created_at)'), [$period['start']->toDateString(), $period['end']->toDateString()])
             ->sum('point_used');
 
         $akun = AkunPanenPoinV3::findOrFail($akunId);
@@ -631,8 +629,7 @@ class PanenPoinV3Controller extends Controller
         $akun = AkunPanenPoinV3::whereRaw('LOWER(TRIM(email_client)) = ?', [$email])->first();
         $poinRedeem = $akun ? (int) DB::table('prize_redeems_v3')
             ->where('user_id', $akun->id)
-            ->whereDate('period_start', $period['start']->toDateString())
-            ->whereDate('period_end', $period['end']->toDateString())
+            ->whereBetween(DB::raw('DATE(created_at)'), [$period['start']->toDateString(), $period['end']->toDateString()])
             ->sum('point_used') : 0;
 
         if ($totalSettlement == 0 && $poinAkumulasi == 0 && $poinPackage == 0) {
