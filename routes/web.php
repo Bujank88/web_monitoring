@@ -244,6 +244,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::post('fbm/pengajuan-sof', [FbmSofController::class, 'store'])->name('fbm.sof.store');
     Route::get('fbm/list-sof', [FbmSofController::class, 'index'])->name('fbm.sof.index');
     Route::get('fbm/list-sof/data', [FbmSofController::class, 'data'])->name('fbm.sof.data');
+    Route::get('fbm/list-sof/{sof}/download', [FbmSofController::class, 'download'])->name('fbm.sof.download')->whereNumber('sof');
     Route::get('fbm/list-sof/{sof}/edit', [FbmSofController::class, 'edit'])->name('fbm.sof.edit')->whereNumber('sof');
     Route::put('fbm/list-sof/{sof}', [FbmSofController::class, 'update'])->name('fbm.sof.update')->whereNumber('sof');
 
