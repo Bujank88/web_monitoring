@@ -247,7 +247,6 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('fbm/list-sof/{sof}/edit', [FbmSofController::class, 'edit'])->name('fbm.sof.edit')->whereNumber('sof');
     Route::put('fbm/list-sof/{sof}', [FbmSofController::class, 'update'])->name('fbm.sof.update')->whereNumber('sof');
 
-    Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
     Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
@@ -339,6 +338,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 });
 
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
+    Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
     Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
