@@ -257,6 +257,7 @@ class PanenPoinV3Controller extends Controller
                     );
                 })
                 ->selectRaw('LOWER(TRIM(a.email)) as email, SUM(COALESCE(b.point, 0)) as point')
+                ->whereBetween(DB::raw('DATE(a.created_at)'), [$period['start']->toDateString(), $period['end']->toDateString()])
                 ->whereIn(DB::raw('LOWER(TRIM(a.email))'), $allClientEmails)
                 ->groupBy(DB::raw('LOWER(TRIM(a.email))'))
                 ->pluck('point', 'email')
@@ -624,6 +625,7 @@ class PanenPoinV3Controller extends Controller
                     DB::raw('LOWER(TRIM(b.code))')
                 );
             })
+            ->whereBetween(DB::raw('DATE(a.created_at)'), [$period['start']->toDateString(), $period['end']->toDateString()])
             ->where(DB::raw('LOWER(TRIM(a.email))'), $email)
             ->sum(DB::raw('COALESCE(b.point, 0)')) ?? 0);
         $akun = AkunPanenPoinV3::whereRaw('LOWER(TRIM(email_client)) = ?', [$email])->first();
