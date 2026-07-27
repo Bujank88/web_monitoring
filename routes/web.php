@@ -255,7 +255,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
     Route::post('leads-master/store-existing', [LeadsMasterController::class, 'storeExisting'])->name('leads-master.store-existing');
     Route::post('leads-master/store-enterprise', [LeadsMasterController::class, 'storeEnterprise'])->name('leads-master.store-enterprise');
-    Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show');
+    Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show')->whereNumber('id');
     Route::get('leads-master/{lead}/edit', [LeadsMasterController::class, 'edit'])->name('leads-master.edit')->whereNumber('lead');
     Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
 
@@ -345,7 +345,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
     Route::get('leads-master/data', [LeadsMasterController::class, 'data'])->name('leads-master.data');
     Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
     Route::post('leads-master/store-existing', [LeadsMasterController::class, 'storeExisting'])->name('leads-master.store-existing');
-    Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show');
+    Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show')->whereNumber('id');
     Route::get('leads-master/{lead}/edit', [LeadsMasterController::class, 'edit'])->name('leads-master.edit')->whereNumber('lead');
     Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
     Route::get('/mpcc-report', [FrontController::class, 'monitoringMpccReport'])->name('mpcc.report');
