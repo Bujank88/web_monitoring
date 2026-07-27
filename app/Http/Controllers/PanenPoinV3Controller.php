@@ -246,6 +246,22 @@ class PanenPoinV3Controller extends Controller
                 ->pluck('total', 'email')
                 ->toArray();
 
+        $packagePointsByEmail = empty($allClientEmails)
+            ? []
+            : DB::table('data_paket_seasonal as a')
+                ->join('panen_poin_package_v2 as b', function ($join) {
+                    $join->on(
+                        DB::raw('LOWER(TRIM(a.name))'),
+                        '=',
+                        DB::raw('LOWER(TRIM(b.code))')
+                    );
+                })
+                ->selectRaw('LOWER(TRIM(a.email)) as email, SUM(COALESCE(b.point, 0)) as point')
+                ->whereIn(DB::raw('LOWER(TRIM(a.email))'), $allClientEmails)
+                ->groupBy(DB::raw('LOWER(TRIM(a.email))'))
+                ->pluck('point', 'email')
+                ->toArray();
+
         $akunByEmail = AkunPanenPoinV3::query()
             ->select('id', 'email_client')
             ->get()
@@ -300,10 +316,11 @@ class PanenPoinV3Controller extends Controller
                 $email = $client['email'];
                 $totalSettlement = (float) ($settlementsByEmail[$email] ?? 0);
                 $poinAkumulasi = (int) ($previousSummary[$email]->poin_sisa ?? 0);
+                $poinPackage = (int) ($packagePointsByEmail[$email] ?? 0);
                 $akun = $akunByEmail->get($email);
                 $poinRedeem = $akun ? (int) ($redeemByAkunId[$akun->id] ?? 0) : 0;
 
-                if ($totalSettlement == 0 && $poinAkumulasi == 0) {
+                if ($totalSettlement == 0 && $poinAkumulasi == 0 && $poinPackage == 0) {
                     $existingKey = $canvasser->id . '|' . $email;
                     if ($existingSummary->has($existingKey)) {
                         DB::table('summary_panen_poin_v3')
@@ -326,9 +343,9 @@ class PanenPoinV3Controller extends Controller
                     'poin_bulan_ini' => $poinBulanIni,
                     'poin_akumulasi' => $poinAkumulasi,
                     'poin' => $poin,
-                    'poin_package' => 0,
+                    'poin_package' => $poinPackage,
                     'poin_redeem' => $poinRedeem,
-                    'remark' => $this->calculateRemark($poinSisa),
+                    'remark' => $this->calculateRemark($poinSisa + $poinPackage),
                     'period_start' => $period['start']->toDateString(),
                     'period_end' => $period['end']->toDateString(),
                     'periode_label' => $period['label'],
@@ -599,12 +616,32 @@ class PanenPoinV3Controller extends Controller
 
         $totalSettlement = (float) ($settlement->total ?? 0);
         $poinAkumulasi = 0;
+        $poinPackage = (int) (DB::table('data_paket_seasonal as a')
+            ->join('panen_poin_package_v2 as b', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(a.name))'),
+                    '=',
+                    DB::raw('LOWER(TRIM(b.code))')
+                );
+            })
+            ->where(DB::raw('LOWER(TRIM(a.email))'), $email)
+            ->sum(DB::raw('COALESCE(b.point, 0)')) ?? 0);
         $akun = AkunPanenPoinV3::whereRaw('LOWER(TRIM(email_client)) = ?', [$email])->first();
         $poinRedeem = $akun ? (int) DB::table('prize_redeems_v3')
             ->where('user_id', $akun->id)
             ->whereDate('period_start', $period['start']->toDateString())
             ->whereDate('period_end', $period['end']->toDateString())
             ->sum('point_used') : 0;
+
+        if ($totalSettlement == 0 && $poinAkumulasi == 0 && $poinPackage == 0) {
+            DB::table('summary_panen_poin_v3')
+                ->where('user_id', $userId)
+                ->where('email_client', $email)
+                ->whereDate('period_start', $period['start']->toDateString())
+                ->whereDate('period_end', $period['end']->toDateString())
+                ->delete();
+            return;
+        }
 
         $poinBulanIni = (int) floor($totalSettlement / 250000);
         $poin = $poinBulanIni + $poinAkumulasi;
@@ -619,9 +656,9 @@ class PanenPoinV3Controller extends Controller
             'poin_bulan_ini' => $poinBulanIni,
             'poin_akumulasi' => $poinAkumulasi,
             'poin' => $poin,
-            'poin_package' => 0,
+            'poin_package' => $poinPackage,
             'poin_redeem' => $poinRedeem,
-            'remark' => $this->calculateRemark($poin - $poinRedeem),
+            'remark' => $this->calculateRemark(($poin - $poinRedeem) + $poinPackage),
             'period_start' => $period['start']->toDateString(),
             'period_end' => $period['end']->toDateString(),
             'periode_label' => $period['label'],
