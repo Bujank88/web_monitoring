@@ -901,16 +901,19 @@ class LeadProgramController extends Controller
                 '2026-12-25',
             ];
 
+            $todayReference = Carbon::today();
+            $holidayLookup = array_flip($holidays);
+
             $remainingWorkingDays = 0;
-            if ($today->month == Carbon::today()->month && $today->year == Carbon::today()->year) {
-                $currentDate = Carbon::today();
+            if ($today->month == $todayReference->month && $today->year == $todayReference->year) {
+                $currentDate = $todayReference->copy();
             } else {
                 $currentDate = $today->copy();
             }
 
             while ($currentDate->lte($endOfMonth)) {
                 $isWeekday = $currentDate->isWeekday();
-                $isNotHoliday = !in_array($currentDate->format('Y-m-d'), $holidays);
+                $isNotHoliday = !isset($holidayLookup[$currentDate->format('Y-m-d')]);
                 if ($isWeekday && $isNotHoliday) {
                     $remainingWorkingDays++;
                 }
@@ -1118,6 +1121,7 @@ class LeadProgramController extends Controller
                     'mom_current_partial' => number_format($topUpCurrentMonthPartial, 0, ',', '.'),
                     'mom_prev_remaining' => number_format($topUpPrevMonthRemaining, 0, ',', '.'),
                     'mom_gap' => number_format($momGap, 0, ',', '.'),
+                    '_achievement_percent_value' => $achievementPercent,
                 ];
 
                 $totals['leads'] += $totalLeads;
@@ -1137,10 +1141,13 @@ class LeadProgramController extends Controller
             }
 
             usort($result, function ($a, $b) {
-                $percentA = floatval(str_replace(['%', ','], ['.', '.'], $a['achievement_percent']));
-                $percentB = floatval(str_replace(['%', ','], ['.', '.'], $b['achievement_percent']));
-                return $percentB <=> $percentA;
+                return ($b['_achievement_percent_value'] ?? 0) <=> ($a['_achievement_percent_value'] ?? 0);
             });
+
+            foreach ($result as &$row) {
+                unset($row['_achievement_percent_value']);
+            }
+            unset($row);
 
             if (!empty($result)) {
                 $totalAchievementPercent = $totals['target'] > 0 ? ($totals['total_top_up_rp'] / $totals['target']) * 100 : 0;
