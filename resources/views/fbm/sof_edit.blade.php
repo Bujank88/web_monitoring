@@ -77,8 +77,8 @@
                         @if($isAdmin)
                             @if($sof->sof_file)
                                 <div>
-                                    <a href="{{ asset($sof->sof_file) }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-file-pdf mr-1"></i> Lihat PDF
+                                    <a href="{{ route('fbm.sof.download', $sof->id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-file-pdf mr-1"></i> Download PDF
                                     </a>
                                 </div>
                             @else

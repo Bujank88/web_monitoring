@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FbmSof;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class FbmSofController extends Controller
@@ -95,7 +96,7 @@ class FbmSofController extends Controller
                     return '-';
                 }
 
-                return '<a href="' . asset($row->sof_file) . '" class="btn btn-sm btn-outline-success" download>
+                return '<a href="' . route('fbm.sof.download', $row->id) . '" class="btn btn-sm btn-outline-success">
                             <i class="fas fa-download mr-1"></i> Download SOF
                         </a>';
             })
@@ -173,5 +174,28 @@ class FbmSofController extends Controller
         return redirect()
             ->route('fbm.sof.index')
             ->with('success', 'Data SOF berhasil diperbarui.');
+    }
+
+    public function download(FbmSof $sof)
+    {
+        $roleUpper = strtoupper(trim((string) optional(Auth::user())->role));
+        if ($roleUpper !== 'ADMIN') {
+            abort(403);
+        }
+
+        if (!$sof->sof_file) {
+            abort(404);
+        }
+
+        $filePath = public_path($sof->sof_file);
+        if (!File::exists($filePath)) {
+            abort(404);
+        }
+
+        $downloadName = 'SOF_' . Str::slug($sof->sender_name ?: 'fbm') . '.pdf';
+
+        return response()->download($filePath, $downloadName, [
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 }
