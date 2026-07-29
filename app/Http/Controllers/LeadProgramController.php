@@ -860,7 +860,7 @@ class LeadProgramController extends Controller
             : Carbon::now()->format('Y-m');
 
         return Cache::remember(
-            "dashboard:regional:{$month}",
+            "dashboard:regional:v2:{$month}",
             now()->addMinutes(10),
             fn () => $this->buildRegionalData($request)
         );
@@ -1117,6 +1117,7 @@ class LeadProgramController extends Controller
 
                 $result[] = [
                     'no' => $index + 1,
+                    'user_id' => $canvaserId,
                     'regional' => $regional,
                     'canvaser_name' => $canvaser->name ?? '-',
                     'leads' => $totalLeads,

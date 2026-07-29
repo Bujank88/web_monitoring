@@ -25,6 +25,7 @@ use App\Http\Controllers\MitraSbpController;
 use App\Http\Controllers\CdsiReportController;
 use App\Http\Controllers\GotoController;
 use App\Http\Controllers\FbmSofController;
+use App\Http\Controllers\CanvasserDetailController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -280,6 +281,11 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 
     // Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
+    Route::get('topup-canvasser/detail', [CanvasserDetailController::class, 'page'])->name('topup-canvasser.detail');
+    Route::get('topup-canvasser/detail/overview', [CanvasserDetailController::class, 'overview'])->name('topup-canvasser.detail.overview');
+    Route::get('topup-canvasser/detail/mom', [CanvasserDetailController::class, 'mom'])->name('topup-canvasser.detail.mom');
+    Route::get('topup-canvasser/detail/trend', [CanvasserDetailController::class, 'trend'])->name('topup-canvasser.detail.trend');
+    Route::get('topup-canvasser/detail/transactions', [CanvasserDetailController::class, 'transactions'])->name('topup-canvasser.detail.transactions');
     Route::get('topup-canvasser/data', [ReportController::class, 'topupCanvasserData']);
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
