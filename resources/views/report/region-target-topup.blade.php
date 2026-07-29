@@ -604,6 +604,9 @@
             $.ajax({
                 url: "{{ route('regional_chart_data_for_ph') }}",
                 type: "GET",
+                data: {
+                    month: @json($month)
+                },
                 success: function(response) {
                     console.log("Chart Data:", response);
                     renderRegionalChart(response);
