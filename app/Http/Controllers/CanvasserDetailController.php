@@ -151,7 +151,7 @@ class CanvasserDetailController extends Controller
             ->whereBetween(DB::raw($dateExpr),[$start->copy()->startOfDay(),$end->copy()->endOfDay()])
             ->where('rp.payment_method_name','!=','Voucher Bonus')
             ->selectRaw("{$dateExpr} as tgl_transaksi")
-            ->addSelect(['rp.no_invoice','rp.company_name','rp.payment_method_name','rp.payment_history_status','rp.voucher_code'])
+            ->addSelect(['rp.no_invoice','rp.company_name','rp.payment_method_name','rp.voucher_code'])
             ->selectRaw("CAST({$amountColumn} AS DECIMAL(15,2)) as total_settlement_klien")
             ->addSelect([
                 DB::raw("CONCAT(LEFT(TRIM(rp.email_client),5),REPEAT('*',GREATEST(CHAR_LENGTH(TRIM(rp.email_client))-5,0))) masked_email"),
