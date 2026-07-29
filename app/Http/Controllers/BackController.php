@@ -3162,6 +3162,7 @@ class BackController extends Controller
             $target = (float) ($targetByUser[$mpccUser->id]->target_amount ?? 0);
 
             $result[] = [
+                'user_id' => (int) $mpccUser->id,
                 'area' => $mpccUser->area ?: '-',
                 'branch' => $mpccUser->branch ?: '-',
                 'team_powerhouse' => $mpccUser->name,
