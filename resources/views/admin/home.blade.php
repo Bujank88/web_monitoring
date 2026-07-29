@@ -762,11 +762,29 @@
                     data: 'canvaser_name',
                     className: 'text-center',
                     render: function(data, type, row) {
+                        const safeName = $('<div>').text(data || '-').html();
+
                         // Jika baris total, tampilkan HTML
                         if (row.is_total) {
-                            return `<div style="text-align: center; font-weight: bold; font-size: 14px;">${data}</div>`;
+                            return `<div style="text-align: center; font-weight: bold; font-size: 14px;">${safeName}</div>`;
                         }
-                        return `<div style="text-align: center;">${data}</div>`;
+
+                        if (!row.user_id) {
+                            return `<div style="text-align: center;">${safeName}</div>`;
+                        }
+
+                        let month = $('#filterMonthDashboard').val() || '';
+                        month = month.substring(0, 7);
+                        const detailUrl = "{{ route('topup-canvasser.detail') }}"
+                            + '?user_id=' + encodeURIComponent(row.user_id)
+                            + '&month=' + encodeURIComponent(month);
+
+                        return `<div style="text-align: center;">
+                            <a href="${detailUrl}" class="font-weight-bold text-primary"
+                               title="Lihat detail ${safeName}">
+                                ${safeName}
+                            </a>
+                        </div>`;
                     }
                 },
                 {

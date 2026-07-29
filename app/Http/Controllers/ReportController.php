@@ -32,6 +32,208 @@ class ReportController extends Controller
         ]);
     }
 
+    public function topupCanvasserDetail(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $canvasser = DB::table('users')
+            ->where('id', $validated['user_id'])
+            ->where('role', 'cvsr')
+            ->select('id', 'name', 'email', 'regional')
+            ->first();
+
+        abort_if(!$canvasser, 404, 'User canvasser tidak ditemukan.');
+
+        $period = Carbon::createFromFormat('Y-m-d', $validated['month'] . '-01');
+        $regionalRequest = Request::create('/get-regional-data', 'GET', [
+            'month' => $validated['month'],
+        ]);
+        $regionalRows = collect(
+            app(LeadProgramController::class)->getRegionalData($regionalRequest)
+        );
+
+        $row = $regionalRows->first(
+            fn ($item) => empty($item['is_total'])
+                && ($item['canvaser_name'] ?? null) === $canvasser->name
+        );
+
+        abort_if(!$row, 404, 'Data report canvasser tidak ditemukan.');
+
+        $toNumber = static function ($value): float {
+            if (is_int($value) || is_float($value)) {
+                return (float) $value;
+            }
+
+            return (float) str_replace(',', '.', str_replace('.', '', (string) $value));
+        };
+
+        $leads = (int) ($row['leads'] ?? 0);
+        $existingProspect = (int) ($row['existing_akun'] ?? 0);
+        $dealNew = (int) ($row['top_up_new_akun_count'] ?? 0);
+        $dealExisting = (int) ($row['top_up_existing_akun_count'] ?? 0);
+        $revenueNew = $toNumber($row['top_up_new_akun_rp'] ?? 0);
+        $revenueExisting = $toNumber($row['top_up_existing_akun_rp'] ?? 0);
+        $totalTopup = $toNumber($row['total_top_up_rp'] ?? 0);
+        $target = $toNumber($row['target'] ?? 0);
+        $achievement = $target > 0 ? ($totalTopup / $target) * 100 : 0;
+
+        $transactionEnd = $period->isSameMonth(Carbon::today())
+            ? Carbon::today()
+            : $period->copy()->endOfMonth();
+        $currentStart = $period->copy()->startOfMonth();
+        $previousStart = $period->copy()->subMonthNoOverflow()->startOfMonth();
+        $previousEnd = $period->copy()->subMonthNoOverflow()->day(
+            min($transactionEnd->day, $period->copy()->subMonthNoOverflow()->daysInMonth)
+        );
+        $previousMonthEnd = $previousStart->copy()->endOfMonth();
+        $previousRemainingStart = $previousEnd->copy()->addDay();
+
+        $momTotals = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+            ->where('lm.user_id', $canvasser->id)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->whereBetween('rp.tgl_transaksi', [
+                $previousStart->copy()->startOfDay(),
+                $transactionEnd->copy()->endOfDay(),
+            ])
+            ->selectRaw(
+                'SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as previous_total,
+                 SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as current_total,
+                 SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as previous_remaining',
+                [
+                    $previousStart->copy()->startOfDay(),
+                    $previousEnd->copy()->endOfDay(),
+                    $currentStart->copy()->startOfDay(),
+                    $transactionEnd->copy()->endOfDay(),
+                    $previousRemainingStart->copy()->startOfDay(),
+                    $previousMonthEnd->copy()->endOfDay(),
+                ]
+            )
+            ->first();
+
+        $monthlyTopup = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+            ->where('lm.user_id', $canvasser->id)
+            ->whereYear('rp.tgl_transaksi', $period->year)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->groupByRaw('MONTH(rp.tgl_transaksi)')
+            ->selectRaw(
+                'MONTH(rp.tgl_transaksi) as month_number,
+                 SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total'
+            )
+            ->pluck('total', 'month_number');
+
+        $today = Carbon::today();
+        $lastTrendMonth = $period->year === $today->year
+            ? $today->month
+            : ($period->year < $today->year ? 12 : 0);
+
+        $annualTrend = collect($lastTrendMonth > 0 ? range(1, $lastTrendMonth) : [])
+            ->map(fn ($monthNumber) => [
+            'label' => Carbon::create($period->year, $monthNumber, 1)->translatedFormat('M'),
+            'total' => (float) ($monthlyTopup[$monthNumber] ?? 0),
+            ]);
+
+        $leadByEmail = DB::table('leads_master')
+            ->where('user_id', $canvasser->id)
+            ->whereNotNull('email')
+            ->groupBy(DB::raw('LOWER(TRIM(email))'))
+            ->selectRaw('LOWER(TRIM(email)) as normalized_email');
+
+        $approvalByEmail = DB::table('data_registarsi_status_approveorreject')
+            ->where('status', 'APPROVE')
+            ->whereNotNull('email')
+            ->groupBy(DB::raw('LOWER(TRIM(email))'))
+            ->selectRaw(
+                "LOWER(TRIM(email)) as normalized_email,
+                 MIN(STR_TO_DATE(tanggal_approval_aktivasi, '%Y-%m-%d')) as approval_date"
+            );
+
+        $transactions = DB::table('report_balance_top_up as rp')
+            ->joinSub($leadByEmail, 'lm', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+            })
+            ->leftJoinSub($approvalByEmail, 'dt', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'dt.normalized_email');
+            })
+            ->whereBetween('rp.tgl_transaksi', [
+                $period->copy()->startOfMonth()->startOfDay(),
+                $period->copy()->endOfMonth()->endOfDay(),
+            ])
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->select(
+                'rp.tgl_transaksi',
+                'rp.no_invoice',
+                'rp.company_name',
+                'rp.total_settlement_klien',
+                'rp.payment_method_name',
+                'rp.payment_history_status',
+                'rp.voucher_code',
+                DB::raw(
+                    "CASE
+                        WHEN rp.email_client IS NULL OR TRIM(rp.email_client) = '' THEN '-'
+                        ELSE CONCAT(
+                            LEFT(TRIM(rp.email_client), 5),
+                            REPEAT('*', GREATEST(CHAR_LENGTH(TRIM(rp.email_client)) - 5, 0))
+                        )
+                    END as masked_email"
+                ),
+                DB::raw(
+                    "CASE
+                        WHEN dt.approval_date BETWEEN '{$currentStart->format('Y-m-d')}' AND '{$period->copy()->endOfMonth()->format('Y-m-d')}'
+                         AND DATE(rp.tgl_transaksi) >= dt.approval_date
+                        THEN 'New Account'
+                        ELSE 'Existing Account'
+                    END as account_status"
+                )
+            )
+            ->orderByDesc('rp.tgl_transaksi')
+            ->get();
+
+        return view('report.topup-canvasser-detail', [
+            'canvasser' => $canvasser,
+            'month' => $validated['month'],
+            'periodLabel' => $period->translatedFormat('F Y'),
+            'dashboard' => [
+                'prospect' => [$leads, $existingProspect],
+                'deal' => [$dealNew, $dealExisting],
+                'revenue' => [$revenueNew, $revenueExisting],
+                'target' => [
+                    'target' => $target,
+                    'total' => $totalTopup,
+                    'achieved' => min($totalTopup, $target),
+                    'remaining' => max($target - $totalTopup, 0),
+                    'achievement' => $achievement,
+                    'over_target' => max($totalTopup - $target, 0),
+                ],
+                'mom' => [
+                    'labels' => [
+                        $previousStart->translatedFormat('d M') . ' - ' . $previousEnd->translatedFormat('d M Y'),
+                        $currentStart->translatedFormat('d M') . ' - ' . $transactionEnd->translatedFormat('d M Y'),
+                        'Sisa untuk menyamai ' . $previousEnd->translatedFormat('d M Y'),
+                    ],
+                    'values' => [
+                        (float) ($momTotals->previous_total ?? 0),
+                        (float) ($momTotals->current_total ?? 0),
+                        max(
+                            (float) ($momTotals->previous_total ?? 0)
+                                - (float) ($momTotals->current_total ?? 0),
+                            0
+                        ),
+                    ],
+                ],
+                'annual_trend' => [
+                    'year' => $period->year,
+                    'rows' => $annualTrend,
+                ],
+            ],
+            'transactions' => $transactions,
+        ]);
+    }
+
     
 
     public function topupCanvasserData(Request $request)
