@@ -380,7 +380,7 @@
         <div class="card-header">
             <h5 class="mb-0">
                 Target vs Topup per Region
-                ({{ \Carbon\Carbon::createFromFormat('Y-m', $month)->format('M Y') }})
+                ({{ \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01')->format('M Y') }})
             </h5>
         </div>
         <div class="card-body" style="height: 400px">
@@ -434,7 +434,7 @@
 
                 <h5 class="text-center mb-3">
                     Report Powerhouse –
-                    {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->format('M Y') }}
+                    {{ \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01')->format('M Y') }}
                 </h5>
 
                 <p class="text-center text-muted mb-4">
