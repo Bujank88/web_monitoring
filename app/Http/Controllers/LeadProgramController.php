@@ -1262,9 +1262,21 @@ class LeadProgramController extends Controller
     }
 
 
-    public function getRegionalChartDataForPH()
+    public function getRegionalChartDataForPH(Request $request)
     {
         try {
+            $month = $request->get('month', Carbon::now()->format('Y-m'));
+            $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+            $startOfMonth = $period->copy()->startOfMonth();
+            $endOfMonth = $period->copy()->endOfMonth();
+            $transactionEnd = $period->isSameMonth(Carbon::today())
+                ? Carbon::now()
+                : $endOfMonth->copy();
+
+            $startDate = $startOfMonth->format('Y-m-d');
+            $endDate = $endOfMonth->format('Y-m-d');
+            $transactionEndDate = $transactionEnd->format('Y-m-d');
+
             // Ambil semua canvasser
             $canvasers = DB::table('users')
                 ->where('role', 'PH')
@@ -1276,14 +1288,6 @@ class LeadProgramController extends Controller
                     'canvassers' => []
                 ]);
             }
-
-            $today = Carbon::now();
-            $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $currentMonth = $today->format('Y-m');
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth();
-            // $result = [];
-
 
             $regionalMap = [
                 'SUMBAGSEL'      => 'Angga Satria Gusti',
@@ -1309,6 +1313,7 @@ class LeadProgramController extends Controller
                 'Naqsaybandi'               => 'naqsyabandi@telkomsel.co.id',
                 'Ikrar Dharmawan'           => 'ikrar_dharmawan@telkomsel.co.id',
             ];
+            $userIdByEmail = DB::table('users')->pluck('id', 'email');
 
             foreach ($regionalMap as $region => $picName) {
 
@@ -1316,20 +1321,20 @@ class LeadProgramController extends Controller
                 $userId = null;
 
                 if ($picName) {
-                    $userIdByEmail = DB::table('users')
-                        ->pluck('id', 'email'); // [email => id]
                     $picEmail = $picAliasMap[$picName] ?? null;
                     $userId   = $picEmail ? ($userIdByEmail[$picEmail] ?? null) : null;
                 }
 
                 // 1. New Leads (BERDASARKAN USER_ID)
                 $newLeads = 0;
+                $newAkun = 0;
 
                 if ($userId) {
 
                     $newLeads = DB::table('leads_master as lm')
                         ->where('lm.user_id', $userId)
                         ->where('lm.data_type', 'Leads')
+                        ->whereBetween('lm.created_at', [$startOfMonth, $endOfMonth])
                         ->distinct()
                         ->count('lm.id');
                     // 2. New Akun
@@ -1343,9 +1348,9 @@ class LeadProgramController extends Controller
                         ->where('dt.status', 'APPROVE')
                         ->whereBetween(
                             DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                            [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                            [$startDate, $endDate]
                         )
-                        ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                        ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDate, $transactionEndDate])
                         ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                         ->distinct()
                         ->count(DB::raw('LOWER(dt.email)'));
@@ -1357,6 +1362,8 @@ class LeadProgramController extends Controller
                     ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
                     ->where('lm.regional', $region)
                     ->where('lm.data_type', 'Eksisting Akun')
+                    ->where('lb.bulan', $period->month)
+                    ->where('lb.tahun', $period->year)
                     ->distinct()
                     ->count('lb.leads_master_id');
 
@@ -1365,11 +1372,11 @@ class LeadProgramController extends Controller
                     ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                     ->leftJoin('data_registarsi_status_approveorreject as dt', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                     ->where('lm.regional', $region)
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDate, $transactionEndDate])
                     ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
-                    ->where(function ($query) use ($startOfMonth) {
+                    ->where(function ($query) use ($startDate) {
                         $query->whereNull('dt.email')
-                            ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth]);
+                            ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDate]);
                     })
                     ->distinct()
                     ->count(DB::raw('LOWER(rp.email_client)'));
@@ -1377,7 +1384,8 @@ class LeadProgramController extends Controller
                 // 5. Target (optional jika masih per user → boleh di-skip)
                 $targetData = DB::table('region_target')
                     ->where('region_name', strtoupper($region))
-                    ->where('date', now()->startOfMonth()->format('Y-m-d'))
+                    ->where('data_type', 'PowerHouse')
+                    ->where('date', $startDate)
                     ->first();
 
                 $target = $targetData->target_amount ?? 0;
@@ -1401,7 +1409,7 @@ class LeadProgramController extends Controller
                     ->table(DB::raw("(
                         SELECT
                             CASE
-                                WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkkulu','Lampung','Bangka Belitung','Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
+                                WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung','Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
                                 WHEN data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
                                 WHEN data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
                                 WHEN data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
@@ -1415,10 +1423,15 @@ class LeadProgramController extends Controller
                                 ELSE 'UNKNOWN'
                             END AS region,
                             total_settlement_klien,
-                            tgl_transaksi
+                            tgl_transaksi,
+                            email_client,
+                            payment_method_name
                         FROM report_balance_top_up
                     ) AS x"))
-                    ->whereBetween('tgl_transaksi', [$startOfMonth, $todayDate])
+                    ->whereBetween('tgl_transaksi', [$startOfMonth, $transactionEnd])
+                    ->whereNotNull('email_client')
+                    ->whereNotNull('total_settlement_klien')
+                    ->where('payment_method_name', '!=', 'Voucher Bonus')
                     ->whereRaw('UPPER(region) = ?', [strtoupper(trim($region))])
                     ->sum('total_settlement_klien');
 

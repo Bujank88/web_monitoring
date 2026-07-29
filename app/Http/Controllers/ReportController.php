@@ -224,8 +224,12 @@ class ReportController extends Controller
         /* ================= FILTER BULAN ================= */
         $month = $request->get('month', now()->format('Y-m'));
 
-        $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $end   = Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+        // Tambahkan tanggal 01 secara eksplisit. createFromFormat('Y-m', ...)
+        // mempertahankan tanggal hari ini dan dapat overflow, misalnya
+        // 2026-02 pada tanggal 29 akan berubah menjadi 2026-03-01.
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $start  = $period->copy()->startOfMonth();
+        $end    = $period->copy()->endOfMonth();
 
         /* ================= TOPUP PER REGION ================= */
         $topupPerRegion = DB::connection('mysql')
@@ -305,11 +309,12 @@ class ReportController extends Controller
             ->values();
             // ->filter(fn ($r) => $r !== 'UNKNOWN');
 
-        // Hitung sisa hari di bulan berjalan
-            $today = Carbon::now();
-            $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth(); // Untuk hitung sisa hari kerja
+        // Hitung hari kerja berdasarkan bulan yang sedang dipilih.
+        $today = Carbon::today();
+        $currentDate = $period->isSameMonth($today)
+            ? $today->copy()
+            : $start->copy();
+        $endOfMonth = $end->copy();
         // Daftar tanggal merah Indonesia 2026 (bisa disesuaikan atau query dari database)
         $holidays = [
             '2026-01-01', // Tahun Baru
@@ -331,8 +336,6 @@ class ReportController extends Controller
 
         // Hitung hanya hari kerja (Senin-Jumat) yang tersisa, exclude weekend dan tanggal merah
         $remainingWorkingDays = 0;
-        $currentDate = $today->copy();
-        
         while ($currentDate->lte($endOfMonth)) {
             // Cek apakah hari ini adalah weekday (Senin-Jumat)
             $isWeekday = $currentDate->isWeekday(); // true jika Senin-Jumat
