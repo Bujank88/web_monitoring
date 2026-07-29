@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use App\Models\RegionalSummary;
 
@@ -852,6 +853,20 @@ class LeadProgramController extends Controller
     }
 
     public function getRegionalData(Request $request)
+    {
+        $month = $request->get('month');
+        $month = !empty($month)
+            ? Carbon::parse(strlen($month) === 7 ? $month . '-01' : $month)->format('Y-m')
+            : Carbon::now()->format('Y-m');
+
+        return Cache::remember(
+            "dashboard:regional:{$month}",
+            now()->addMinutes(10),
+            fn () => $this->buildRegionalData($request)
+        );
+    }
+
+    private function buildRegionalData(Request $request)
     {
         try {
             $monthFilter = $request->get('month');

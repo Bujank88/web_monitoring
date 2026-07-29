@@ -647,8 +647,6 @@
             const monthOnly = selectedMonth.substring(0, 7);
             $('#displayedMonth').text(monthOnly);
             
-            // Reset flag dan reload table dulu, chart akan di-load otomatis setelah table selesai
-            window.chartLoaded = false;
             if (typeof regionalTable !== 'undefined') {
                 regionalTable.ajax.reload();
             }
@@ -742,7 +740,9 @@
                 },
                 dataSrc: function(json) {
                     console.log("Regional Data:", json);
-                    return json.data || [];
+                    const rows = json.data || [];
+                    renderRegionalChartFromRows(rows);
+                    return rows;
                 }
             },
             preDrawCallback: function() {
@@ -750,14 +750,6 @@
             },
             drawCallback: function(settings) {
                 $('#loading-overlay').removeClass('show');
-                
-                // Lazy load chart setelah table selesai render (hanya sekali)
-                if (!window.chartLoaded) {
-                    window.chartLoaded = true;
-                    setTimeout(function() {
-                        loadRegionalChart();
-                    }, 100);
-                }
             },
             columns: [{
                     data: 'no',
@@ -916,38 +908,35 @@
                 }
             }
         });
-        // Function untuk load Regional Chart
-        function loadRegionalChart(month = null) {
-            // Gunakan selected month dari dropdown jika tidak diberikan parameter
-            if (!month) {
-                month = $('#filterMonthDashboard').val();
-            }
-            
-            // Convert Y-m-d to Y-m format untuk backend
-            if (month && month.includes('-')) {
-                month = month.substring(0, 7); // Ambil hanya Y-m-d menjadi Y-m
-            }
-            
-            $.ajax({
-                url: "{{ route('regional_chart_data') }}",
-                type: "GET",
-                data: {
-                    month: month
-                },
-                success: function(response) {
-                    console.log("Chart Data:", response);
-                    renderRegionalChart(response);
-                    // Hide loading after chart is rendered
-                    $('#loading-overlay').removeClass('show');
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error loading chart data:", error);
-                    console.error("XHR Status:", xhr.status);
-                    console.error("Response:", xhr.responseText);
-                    // Hide loading on error
-                    $('#loading-overlay').removeClass('show');
+        // Bentuk data chart dari response DataTable yang sama agar query regional
+        // tidak dijalankan untuk kedua kalinya.
+        function renderRegionalChartFromRows(rows) {
+            const toNumber = value => {
+                if (typeof value === 'number') {
+                    return value;
                 }
-            });
+
+                return Number(
+                    String(value ?? 0)
+                        .replace(/\./g, '')
+                        .replace(',', '.')
+                        .replace('%', '')
+                ) || 0;
+            };
+
+            const canvassers = rows
+                .filter(row => !row.is_total)
+                .map(row => ({
+                    name: row.canvaser_name || '-',
+                    new_leads: Number(row.leads) || 0,
+                    new_akun: Number(row.new_akun) || 0,
+                    existing_akun_count: Number(row.existing_akun) || 0,
+                    top_up_existing_akun_count: Number(row.top_up_existing_akun_count) || 0,
+                    target: toNumber(row.target),
+                    acv: toNumber(row.total_top_up_rp)
+                }));
+
+            renderRegionalChart({ canvassers });
         }
 
         // Function untuk render Chart
