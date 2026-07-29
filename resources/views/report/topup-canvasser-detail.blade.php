@@ -24,7 +24,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
- const params={user_id:@json($canvasser->id),month:@json($month)}, name=@json($canvasser->name);
+ const params={user_id:@json($canvasser->id),month:@json($month),source:@json($source)}, name=@json($canvasser->name);
  const urls={overview:@json(route('topup-canvasser.detail.overview')),mom:@json(route('topup-canvasser.detail.mom')),trend:@json(route('topup-canvasser.detail.trend')),transactions:@json(route('topup-canvasser.detail.transactions'))};
  const money=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(v||0), num=v=>new Intl.NumberFormat('id-ID').format(v||0), pct=v=>new Intl.NumberFormat('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0)+'%';
  const request=url=>$.ajax({url,data:params});

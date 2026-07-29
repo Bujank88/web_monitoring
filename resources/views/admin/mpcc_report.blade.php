@@ -974,7 +974,23 @@
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'area', name: 'area', className: 'text-center' },
                 { data: 'branch', name: 'branch', className: 'text-center' },
-                { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
+                {
+                    data: 'team_powerhouse',
+                    name: 'team_powerhouse',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        const safeName = $('<div>').text(data || '-').html();
+                        if (!row.user_id) return safeName;
+                        const startDate = $('#startDatePH').val() || '';
+                        const month = startDate.substring(0, 7);
+                        const url = "{{ route('topup-canvasser.detail') }}"
+                            + '?user_id=' + encodeURIComponent(row.user_id)
+                            + '&month=' + encodeURIComponent(month)
+                            + '&source=mpcc';
+                        return `<a href="${url}" class="font-weight-bold text-primary"
+                                   title="Lihat detail ${safeName}">${safeName}</a>`;
+                    }
+                },
                 { data: 'target', name: 'target', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
                 { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
