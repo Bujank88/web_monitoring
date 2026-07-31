@@ -3013,7 +3013,7 @@ class ReportController extends Controller
 
     private function getPerformanceExportPeriod(string $month): array
     {
-        $period = Carbon::createFromFormat('Y-m', $month);
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
 
         return [
             $period->copy()->startOfMonth(),
@@ -3833,7 +3833,7 @@ class ReportController extends Controller
 
     protected function cdsiProvinceTopupBaseQuery(string $month)
     {
-        $monthDate = Carbon::createFromFormat('Y-m', $month);
+        $monthDate = Carbon::createFromFormat('Y-m-d', $month . '-01');
         $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
         $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
 
@@ -3902,7 +3902,7 @@ class ReportController extends Controller
     {
         try {
             $month = $request->get('month', now()->format('Y-m'));
-            $monthDate = Carbon::createFromFormat('Y-m', $month);
+            $monthDate = Carbon::createFromFormat('Y-m-d', $month . '-01');
             $displayMonth = $monthDate->translatedFormat('F Y');
 
             $data = $this->cdsiProvinceTopupBaseQuery($month)
