@@ -3011,6 +3011,16 @@ class ReportController extends Controller
         }
     }
 
+    private function getPerformanceExportPeriod(string $month): array
+    {
+        $period = Carbon::createFromFormat('Y-m', $month);
+
+        return [
+            $period->copy()->startOfMonth(),
+            $period->copy()->endOfMonth(),
+        ];
+    }
+
     public function exportMitraSBP()
     {
         try {
@@ -3023,8 +3033,7 @@ class ReportController extends Controller
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
@@ -3140,8 +3149,7 @@ class ReportController extends Controller
 
     private function getPerformanceExportDataByRemark(string $month, string $remark)
     {
-        $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-        $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+        [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
         return DB::table('mitra_sbp as a')
             ->leftJoin('report_balance_top_up as b', function ($join) use ($startDate, $endDate) {
@@ -3272,8 +3280,7 @@ class ReportController extends Controller
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
@@ -3398,8 +3405,7 @@ class ReportController extends Controller
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
