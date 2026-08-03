@@ -123,15 +123,22 @@ class CanvasserDetailController extends Controller
         [$user,$period,,$source]=$this->context($request);
         $dateExpr=$source==='mpcc'?'COALESCE(rp.paid_date, rp.tgl_transaksi)':'rp.tgl_transaksi';
         $amountExpr=$source==='mpcc'?'rp.amount':'rp.total_settlement_klien';
-        $totals=DB::table('report_balance_top_up as rp')->join('leads_master as lm','rp.email_client','=','lm.email')
+        $trendRows=DB::table('report_balance_top_up as rp')->join('leads_master as lm','rp.email_client','=','lm.email')
             ->where('lm.user_id',$user->id)->whereYear(DB::raw($dateExpr),$period->year)
             ->where('rp.payment_method_name','!=','Voucher Bonus')->groupByRaw("MONTH({$dateExpr})")
-            ->selectRaw("MONTH({$dateExpr}) month_number, SUM(CAST({$amountExpr} AS DECIMAL(15,2))) total")
-            ->pluck('total','month_number');
+            ->selectRaw("
+                MONTH({$dateExpr}) month_number,
+                SUM(CAST({$amountExpr} AS DECIMAL(15,2))) total,
+                COUNT(DISTINCT LOWER(TRIM(rp.email_client))) user_count
+            ")
+            ->get()
+            ->keyBy('month_number');
         $today=Carbon::today();
         $last=$period->year===$today->year?$today->month:($period->year<$today->year?12:0);
         return response()->json(['year'=>$period->year,'rows'=>collect($last?range(1,$last):[])->map(fn($m)=>[
-            'label'=>Carbon::create($period->year,$m,1)->translatedFormat('M'),'total'=>(float)($totals[$m]??0)
+            'label'=>Carbon::create($period->year,$m,1)->translatedFormat('M'),
+            'total'=>(float)($trendRows[$m]->total??0),
+            'user_count'=>(int)($trendRows[$m]->user_count??0),
         ])->values()]);
     }
 
