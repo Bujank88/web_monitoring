@@ -14,6 +14,14 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PanenPoinV3Controller extends Controller
 {
+    private const PROGRAM_PERIOD_START = '2026-07-01';
+    private const PROGRAM_PERIOD_END = '2026-08-10';
+    private const PROGRAM_PERIOD_LABEL = '01 Jul 2026 - 10 Agu 2026';
+
+    private const PREVIOUS_PERIOD_START = '2026-05-21';
+    private const PREVIOUS_PERIOD_END = '2026-06-30';
+    private const PREVIOUS_PERIOD_LABEL = '21 Mei 2026 - 30 Jun 2026';
+
     public function index()
     {
         logUserLogin();
@@ -556,21 +564,21 @@ class PanenPoinV3Controller extends Controller
     protected function currentPeriod(): array
     {
         return [
-            'start' => Carbon::create(2026, 7, 1, 0, 0, 0, 'Asia/Jakarta')->startOfDay(),
-            'end' => Carbon::create(2026, 8, 10, 0, 0, 0, 'Asia/Jakarta')->startOfDay(),
-            'label' => '01 Jul 2026 - 10 Agu 2026',
+            'start' => Carbon::createFromFormat('Y-m-d', self::PROGRAM_PERIOD_START, 'Asia/Jakarta')->startOfDay(),
+            'end' => Carbon::createFromFormat('Y-m-d', self::PROGRAM_PERIOD_END, 'Asia/Jakarta')->startOfDay(),
+            'label' => self::PROGRAM_PERIOD_LABEL,
         ];
     }
 
     protected function previousPeriod(Carbon $currentStart): array
     {
-        $previousStart = Carbon::create(2026, 5, 21, 0, 0, 0, 'Asia/Jakarta')->startOfDay();
-        $previousEnd = Carbon::create(2026, 6, 30, 0, 0, 0, 'Asia/Jakarta')->startOfDay();
+        $previousStart = Carbon::createFromFormat('Y-m-d', self::PREVIOUS_PERIOD_START, 'Asia/Jakarta')->startOfDay();
+        $previousEnd = Carbon::createFromFormat('Y-m-d', self::PREVIOUS_PERIOD_END, 'Asia/Jakarta')->startOfDay();
 
         return [
             'start' => $previousStart,
             'end' => $previousEnd,
-            'label' => '21 Mei 2026 - 30 Jun 2026',
+            'label' => self::PREVIOUS_PERIOD_LABEL,
         ];
     }
 
