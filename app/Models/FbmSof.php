@@ -11,6 +11,7 @@ class FbmSof extends Model
     protected $fillable = [
         'sender_name',
         'nomor_wa',
+        'waba_id',
         'pic',
         'verif_bisnis',
         'credit_line',
