@@ -427,6 +427,8 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss,Dormant'])->group(funct
     Route::get('cdsi/referral-topup-channel/data', [CdsiReportController::class, 'referralTopupChannelData'])->name('cdsi.referral-topup-channel.data');
     Route::get('cdsi/referral-topup-channel/detail-data', [CdsiReportController::class, 'referralTopupChannelDetailData'])->name('cdsi.referral-topup-channel.detail-data');
     Route::post('cdsi/referral-topup-channel/update-myads-invoice', [CdsiReportController::class, 'updateReferralTopupMyadsInvoice'])->name('cdsi.referral-topup-channel.update-myads-invoice');
+    Route::get('cdsi/monitoring-deposit', [CdsiReportController::class, 'monitoringDeposit'])->name('cdsi.monitoring-deposit');
+    Route::get('cdsi/monitoring-deposit/data', [CdsiReportController::class, 'monitoringDepositData'])->name('cdsi.monitoring-deposit.data');
     Route::get('cdsi/brand-list', [CdsiReportController::class, 'brandListIndex'])->name('cdsi.brand-list');
     Route::get('cdsi/brand-list/data', [CdsiReportController::class, 'brandListData'])->name('cdsi.brand-list.data');
     Route::get('report-cdsi', [CdsiReportController::class, 'reportCdsi'])->name('report-cdsi');
