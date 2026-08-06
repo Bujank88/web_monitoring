@@ -42,8 +42,26 @@
             <div class="row">
                 <div class="col-md-6">
                     <div class="form-group">
-                        <label for="pic_display">PIC</label>
-                        <input type="text" id="pic_display" class="form-control" value="{{ optional(Auth::user())->name }}" readonly>
+                        <label for="waba_id">WABA ID</label>
+                        <input type="text" name="waba_id" id="waba_id" class="form-control" value="{{ old('waba_id') }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="pic{{ $isAdmin ? '' : '_display' }}">PIC</label>
+                        @if($isAdmin)
+                            <select name="pic" id="pic" class="form-control select2" required>
+                                <option value="">Pilih PIC</option>
+                                @foreach($picOptions as $picOption)
+                                    <option value="{{ $picOption }}" {{ old('pic') === $picOption ? 'selected' : '' }}>{{ $picOption }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" id="pic_display" class="form-control" value="{{ optional(Auth::user())->name }}" readonly>
+                        @endif
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -67,4 +85,36 @@
         </form>
     </div>
 </div>
+@endsection
+
+@section('js')
+<style>
+    .select2-container--default .select2-selection--single {
+        height: calc(2.25rem + 2px);
+        padding: .375rem .75rem;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5rem;
+        padding-left: 0;
+        color: #495057;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(2.25rem + 2px);
+        right: .5rem;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(function () {
+        $('.select2').select2({
+            width: '100%',
+            placeholder: 'Pilih PIC',
+            allowClear: false
+        });
+    });
+</script>
 @endsection

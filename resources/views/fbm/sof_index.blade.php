@@ -18,6 +18,7 @@
                         <th>No</th>
                         <th>Sender Name</th>
                         <th>Nomor WA</th>
+                        <th>WABA ID</th>
                         <th>PIC</th>
                         <th>Verif Bisnis</th>
                         <th>Credit Line</th>
@@ -44,11 +45,12 @@
             ajax: '{{ route('fbm.sof.data') }}',
             pageLength: 10,
             lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-            order: [[7, 'desc']],
+            order: [[8, 'desc']],
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false },
                 { data: 'sender_name', name: 'sender_name' },
                 { data: 'nomor_wa', name: 'nomor_wa' },
+                { data: 'waba_id', name: 'waba_id' },
                 { data: 'pic', name: 'pic' },
                 { data: 'verif_bisnis', name: 'verif_bisnis' },
                 { data: 'credit_line', name: 'credit_line' },

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FbmSof;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -14,27 +15,59 @@ class FbmSofController extends Controller
     {
         logUserLogin();
 
+        $roleUpper = strtoupper(trim((string) optional(Auth::user())->role));
+        $isAdmin = $roleUpper === 'ADMIN';
+
+        $picOptions = [];
+        if ($isAdmin) {
+            $picOptions = User::query()
+                ->select('name')
+                ->whereNotNull('name')
+                ->where('name', '<>', '')
+                ->distinct()
+                ->orderBy('name')
+                ->pluck('name')
+                ->values()
+                ->all();
+        }
+
         return view('fbm.sof_create', [
             'pageTitle' => 'Pengajuan SOF',
+            'isAdmin' => $isAdmin,
+            'picOptions' => $picOptions,
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $roleUpper = strtoupper(trim((string) optional(Auth::user())->role));
+        $isAdmin = $roleUpper === 'ADMIN';
+
+        $rules = [
             'sender_name' => 'required|string|max:255',
             'nomor_wa' => 'required|string|max:50',
+            'waba_id' => 'nullable|string|max:255',
             'verif_bisnis' => 'required|in:Yes,On Progress,No',
+        ];
+
+        if ($isAdmin) {
+            $rules['pic'] = 'required|string|max:255';
+        }
+
+        $validated = $request->validate([
+            ...$rules,
         ], [
             'sender_name.required' => 'Sender Name wajib diisi.',
             'nomor_wa.required' => 'Nomor WA wajib diisi.',
+            'pic.required' => 'PIC wajib dipilih.',
             'verif_bisnis.required' => 'Verif Bisnis wajib dipilih.',
         ]);
 
         FbmSof::create([
             'sender_name' => trim($validated['sender_name']),
             'nomor_wa' => trim($validated['nomor_wa']),
-            'pic' => (string) optional(Auth::user())->name,
+            'waba_id' => !empty($validated['waba_id']) ? trim($validated['waba_id']) : null,
+            'pic' => $isAdmin ? trim($validated['pic']) : (string) optional(Auth::user())->name,
             'verif_bisnis' => $validated['verif_bisnis'],
             'credit_line' => 'No',
             'sof_uploaded_at' => null,
@@ -67,6 +100,7 @@ class FbmSofController extends Controller
             'id',
             'sender_name',
             'nomor_wa',
+            'waba_id',
             'pic',
             'verif_bisnis',
             'credit_line',
@@ -120,10 +154,24 @@ class FbmSofController extends Controller
         $roleUpper = strtoupper(trim((string) optional(Auth::user())->role));
         $isAdmin = $roleUpper === 'ADMIN';
 
+        $picOptions = [];
+        if ($isAdmin) {
+            $picOptions = User::query()
+                ->select('name')
+                ->whereNotNull('name')
+                ->where('name', '<>', '')
+                ->distinct()
+                ->orderBy('name')
+                ->pluck('name')
+                ->values()
+                ->all();
+        }
+
         return view('fbm.sof_edit', [
             'pageTitle' => 'Edit SOF',
             'sof' => $sof,
             'isAdmin' => $isAdmin,
+            'picOptions' => $picOptions,
         ]);
     }
 
@@ -133,10 +181,12 @@ class FbmSofController extends Controller
         $isAdmin = $roleUpper === 'ADMIN';
 
         $rules = [
+            'waba_id' => 'nullable|string|max:255',
             'verif_bisnis' => 'required|in:Yes,On Progress,No',
         ];
 
         if ($isAdmin) {
+            $rules['pic'] = 'required|string|max:255';
             $rules['credit_line'] = 'required|in:Yes,On Progress,No';
             $rules['sof_file'] = 'nullable|file|mimes:pdf|max:5120';
         }
@@ -149,10 +199,12 @@ class FbmSofController extends Controller
         ]);
 
         $payload = [
+            'waba_id' => !empty($validated['waba_id']) ? trim($validated['waba_id']) : null,
             'verif_bisnis' => $validated['verif_bisnis'],
         ];
 
         if ($isAdmin) {
+            $payload['pic'] = trim($validated['pic']);
             $payload['credit_line'] = $validated['credit_line'];
 
             if ($request->hasFile('sof_file')) {
