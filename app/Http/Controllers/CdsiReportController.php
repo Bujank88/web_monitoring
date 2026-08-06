@@ -14,6 +14,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class CdsiReportController extends Controller
 {
+    protected const CDSI_DEPOSIT_TARGET = 14000000000;
+
     public function referralIndex()
     {
         logUserLogin();
@@ -151,6 +153,46 @@ class CdsiReportController extends Controller
         return view('cdsi.referral-topup-channel', compact('months', 'month', 'channels', 'pageTitle'));
     }
 
+    public function monitoringDeposit(Request $request)
+    {
+        logUserLogin();
+
+        $periods = $this->getCdsiMonitoringDepositPeriods();
+        $allMonthSummaries = collect();
+        $remainingTarget = (float) self::CDSI_DEPOSIT_TARGET;
+
+        foreach ($periods as $period) {
+            $monthSummary = $this->getCdsiDepositSummary($period['value']);
+            $monthTarget = $remainingTarget;
+            $monthGap = $monthTarget - (float) $monthSummary['total_topup'];
+
+            $allMonthSummaries->push([
+                'month' => $period['value'],
+                'label' => $period['label'],
+                'total_topup' => (float) $monthSummary['total_topup'],
+                'target' => $monthTarget,
+                'gap_to_target' => $monthGap,
+                'achievement_percent' => $monthTarget > 0 ? (((float) $monthSummary['total_topup']) / $monthTarget) * 100 : 0,
+                'total_transactions' => (int) $monthSummary['total_transactions'],
+                'total_accounts' => (int) $monthSummary['total_accounts'],
+            ]);
+
+            $remainingTarget = max($monthGap, 0);
+        }
+
+        $summary = $this->getCdsiDepositAggregateSummary(
+            $periods[0]['value'],
+            $periods[count($periods) - 1]['value']
+        );
+        $pageTitle = 'Monitoring Deposit CDSI';
+
+        return view('cdsi.monitoring-deposit', [
+            'summary' => $summary,
+            'allMonthSummaries' => $allMonthSummaries->reverse()->values(),
+            'pageTitle' => $pageTitle,
+        ]);
+    }
+
     private function resolveBrandListColumn(array $columns): ?string
     {
         $preferredColumns = ['brand', 'brand_name', 'nama_brand', 'nama_brand_list', 'nama_brand_cdsi', 'brand_cdsi'];
@@ -200,6 +242,23 @@ class CdsiReportController extends Controller
             return datatables()->of(collect($rows))->make(true);
         } catch (\Exception $e) {
             \Log::error('Error in referralTopupChannelData: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function monitoringDepositData(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $rows = $this->getCdsiDepositDetailRows($month);
+
+            return datatables()->of(collect($rows))
+                ->addIndexColumn()
+                ->make(true);
+        } catch (\Exception $e) {
+            \Log::error('Error in monitoringDepositData: ' . $e->getMessage());
             \Log::error($e->getTraceAsString());
 
             return response()->json(['error' => $e->getMessage()], 500);
@@ -609,6 +668,93 @@ class CdsiReportController extends Controller
             })
             ->orderByDesc(DB::raw('COALESCE(pt.payment_date, pt.transaction_date)'))
             ->get();
+    }
+
+    protected function getCdsiMonitoringDepositPeriods(): array
+    {
+        $periods = [];
+        $start = Carbon::create(2026, 6, 1)->startOfMonth();
+        $end = Carbon::create(2026, 12, 1)->startOfMonth();
+        $cursor = $start->copy();
+
+        while ($cursor->lte($end)) {
+            $periods[] = [
+                'value' => $cursor->format('Y-m'),
+                'label' => $cursor->translatedFormat('F Y'),
+            ];
+
+            $cursor->addMonth();
+        }
+
+        return $periods;
+    }
+
+    protected function getCdsiDepositSummary(string $month): array
+    {
+        $monthDate = Carbon::createFromFormat('Y-m', $month);
+        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
+        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+
+        $transactions = $this->getCdsiPaymentTransactions($startDate, $endDate);
+        $totalTopup = (float) $transactions->sum(function ($row) {
+            return (float) ($row->transaction_amount ?? 0);
+        });
+        $target = (float) self::CDSI_DEPOSIT_TARGET;
+
+        return [
+            'total_topup' => $totalTopup,
+            'target' => $target,
+            'gap_to_target' => $target - $totalTopup,
+            'achievement_percent' => $target > 0 ? ($totalTopup / $target) * 100 : 0,
+            'total_transactions' => $transactions->count(),
+            'total_accounts' => $transactions->pluck('customer_email')->filter()->map(fn ($email) => strtolower(trim((string) $email)))->unique()->count(),
+        ];
+    }
+
+    protected function getCdsiDepositAggregateSummary(string $startMonth, string $endMonth): array
+    {
+        $startDate = Carbon::createFromFormat('Y-m', $startMonth)->startOfMonth()->format('Y-m-d 00:00:00');
+        $endDate = Carbon::createFromFormat('Y-m', $endMonth)->endOfMonth()->format('Y-m-d 23:59:59');
+
+        $transactions = $this->getCdsiPaymentTransactions($startDate, $endDate);
+        $totalTopup = (float) $transactions->sum(function ($row) {
+            return (float) ($row->transaction_amount ?? 0);
+        });
+        $target = (float) self::CDSI_DEPOSIT_TARGET;
+
+        return [
+            'total_topup' => $totalTopup,
+            'target' => $target,
+            'gap_to_target' => $target - $totalTopup,
+            'achievement_percent' => $target > 0 ? ($totalTopup / $target) * 100 : 0,
+            'total_transactions' => $transactions->count(),
+            'total_accounts' => $transactions->pluck('customer_email')->filter()->map(fn ($email) => strtolower(trim((string) $email)))->unique()->count(),
+        ];
+    }
+
+    protected function getCdsiDepositDetailRows(string $month): array
+    {
+        $monthDate = Carbon::createFromFormat('Y-m', $month);
+        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
+        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+
+        return $this->getCdsiPaymentTransactions($startDate, $endDate)
+            ->map(function ($transaction) {
+                $amount = (float) ($transaction->transaction_amount ?? 0);
+
+                return [
+                    'paid_date' => $transaction->payment_datetime
+                        ? Carbon::parse($transaction->payment_datetime)->format('d-m-Y')
+                        : '-',
+                    'transaction_id' => $transaction->transaction_id ?: '-',
+                    'customer_email' => $transaction->customer_email ?: '-',
+                    'amount' => number_format($amount, 0, ',', '.'),
+                    'amount_raw' => $amount,
+                    'transfer_status' => ($transaction->is_received || !empty($transaction->id_transaksi_myads)) ? 'Receive' : 'Pending',
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function getMatchedCdsiTransactions(string $startDate, string $endDate)

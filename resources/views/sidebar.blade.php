@@ -640,8 +640,8 @@
                     </a>
                 </li>
                 @elseif($isCdsi || $isKss)
-                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
                           <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
                           <p>
                             {{ 'CDSI' }}
@@ -649,6 +649,13 @@
                           </p>
                       </a>
                     <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('cdsi.monitoring-deposit') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('cdsi.monitoring-deposit*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-coins" style="color:#f59e0b;"></i>
+                                <p>Monitoring Deposit</p>
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a href="{{ route('cdsi.referral-topup-channel') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}" style="padding-left: 45px;">
@@ -1137,8 +1144,8 @@
                     </ul>
                 </li>
                 @if($isAdmin)
-                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
-                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
+                <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
                         <p>
                             CDSI
@@ -1146,6 +1153,13 @@
                         </p>
                     </a>
                     <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('cdsi.monitoring-deposit') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('cdsi.monitoring-deposit*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-coins" style="color:#f59e0b;"></i>
+                                <p>Monitoring Deposit</p>
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a href="{{ route('cdsi.referral-topup-channel') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('cdsi.referral-topup-channel*') ? 'active' : '' }}" style="padding-left: 45px;">
