@@ -170,6 +170,9 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <a href="#" id="btnTransactionDetailAkun" class="btn btn-info d-none">
+                    <i class="fas fa-receipt mr-1"></i> Transaction Detail
+                </a>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
             </div>
         </div>
@@ -276,6 +279,8 @@
                 url: "{{ url('am-level-up/akun-detail') }}/" + id,
                 type: 'GET',
                 success: function(res) {
+                    const transactionBaseUrl = @json(route('transaction-detail', ['email' => '__EMAIL__']));
+
                     $('#d_nama_akun').text(res.nama_akun || '-');
                     $('#d_email_client').text(res.email_client || '-');
                     $('#d_nama_canvasser').text(res.nama_canvasser || '-');
@@ -292,6 +297,16 @@
                     $('#d_data_type').text(res.data_type || '-');
                     $('#d_remarks').text(res.remarks || '-');
 
+                    if (res.email_client) {
+                        $('#btnTransactionDetailAkun')
+                            .removeClass('d-none')
+                            .attr('href', transactionBaseUrl.replace('__EMAIL__', encodeURIComponent(res.email_client)));
+                    } else {
+                        $('#btnTransactionDetailAkun')
+                            .addClass('d-none')
+                            .attr('href', '#');
+                    }
+
                     $('#modalDetailAkun').modal('show');
                 },
                 error: function(xhr) {
@@ -303,4 +318,3 @@
     });
 </script>
 @endsection
-

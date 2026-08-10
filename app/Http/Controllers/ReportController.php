@@ -15,6 +15,32 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class ReportController extends Controller
 {
+    protected function authorizeTransactionDetailEmailAccess(string $email): void
+    {
+        $normalizedEmail = strtolower(trim($email));
+
+        if (auth()->user()->role === 'Admin') {
+            return;
+        }
+
+        $hasAccess = DB::table('leads_master')
+            ->where('user_id', auth()->id())
+            ->where(function ($query) use ($normalizedEmail) {
+                $query->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+                    ->orWhereRaw('LOWER(TRIM(myads_account)) = ?', [$normalizedEmail]);
+            })
+            ->exists();
+
+        if (!$hasAccess && Schema::hasTable('akun_am_level_up')) {
+            $hasAccess = DB::table('akun_am_level_up')
+                ->where('user_id', auth()->id())
+                ->whereRaw('LOWER(TRIM(email_client)) = ?', [$normalizedEmail])
+                ->exists();
+        }
+
+        abort_unless($hasAccess, 403, 'Anda tidak punya akses untuk melihat transaksi email ini.');
+    }
+
      /* ================= PAGE LOAD ================= */
     public function topupCanvasser(Request $request)
     {
@@ -1081,6 +1107,47 @@ class ReportController extends Controller
         logUserLogin();
 
         return view('report.report-balance-top-up');
+    }
+
+    public function transactionDetailByEmail(Request $request)
+    {
+        logUserLogin();
+
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'month' => ['nullable', 'date_format:Y-m'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $this->authorizeTransactionDetailEmailAccess($email);
+        $month = $validated['month'] ?? now()->format('Y-m');
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+
+        return view('report.transaction-detail-by-email', [
+            'email' => $email,
+            'month' => $month,
+            'periodLabel' => $period->translatedFormat('F Y'),
+        ]);
+    }
+
+    public function transactionDetailByEmailData(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $this->authorizeTransactionDetailEmailAccess($email);
+        $period = Carbon::createFromFormat('Y-m-d', $validated['month'] . '-01');
+        $request->merge([
+            'email' => $email,
+            'start_date' => $period->copy()->startOfMonth()->format('Y-m-d'),
+            'end_date' => $period->copy()->endOfMonth()->format('Y-m-d'),
+            'name' => null,
+        ]);
+
+        return $this->reportBalanceTopUpData($request);
     }
 
     public function reportBalanceTopUpData(Request $request)
