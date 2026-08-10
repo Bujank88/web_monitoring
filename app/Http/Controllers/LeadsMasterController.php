@@ -150,6 +150,14 @@ class LeadsMasterController extends Controller
                     </a>
                 ';
 
+                if (!empty($row->email)) {
+                    $btn .= '
+                        <a href="' . route('transaction-detail', ['email' => $row->email]) . '" class="btn btn-sm btn-info mt-1">
+                            <i class="fas fa-receipt"></i> Transaction Detail
+                        </a>
+                    ';
+                }
+
                 // hanya admin dan canvasser yang boleh add to logbook
                 if (auth()->check() && in_array(auth()->user()->role, ['Admin', 'cvsr'])) {
                     $btn .= '

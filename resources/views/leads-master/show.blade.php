@@ -89,6 +89,11 @@
             <textarea class="form-control" rows="3" readonly>{{ $lead->remarks }}</textarea>
         </div>
 
+        @if(!empty($lead->email))
+        <a href="{{ route('transaction-detail', ['email' => $lead->email]) }}" class="btn btn-info">
+            <i class="fas fa-receipt mr-1"></i> Transaction Detail
+        </a>
+        @endif
         <a href="{{ route('leads-master.index') }}" class="btn btn-secondary btn-danger">Kembali</a>
     </div>
 </div>

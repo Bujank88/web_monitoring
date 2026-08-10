@@ -289,6 +289,8 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('topup-canvasser/data', [ReportController::class, 'topupCanvasserData']);
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
+    Route::get('transaction-detail', [ReportController::class, 'transactionDetailByEmail'])->name('transaction-detail');
+    Route::get('transaction-detail/data', [ReportController::class, 'transactionDetailByEmailData'])->name('transaction-detail.data');
 
     // Panen Poin Routes
     Route::get('panen-poin/input', [PanenPoinController::class, 'index'])->name('panenpoin.index');

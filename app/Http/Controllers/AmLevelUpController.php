@@ -70,7 +70,8 @@ class AmLevelUpController extends Controller
                     'nama_canvasser' => $item->user->name ?? '-',
                     'created_at' => $item->created_at->format('d M Y H:i'),
                     'created_at_raw' => $item->created_at->format('Y-m-d H:i:s'),
-                    'action' => '<button class="btn btn-sm btn-primary btn-lihat-akun" data-id="' . $item->id . '"><i class="fas fa-eye mr-1"></i>Lihat</button>',
+                    'action' => '<button class="btn btn-sm btn-primary btn-lihat-akun mr-1" data-id="' . $item->id . '"><i class="fas fa-eye mr-1"></i>Lihat</button>'
+                        . '<a href="' . route('transaction-detail', ['email' => $item->email_client]) . '" class="btn btn-sm btn-info mt-1 mt-md-0"><i class="fas fa-receipt mr-1"></i>Transaction Detail</a>',
                 ];
             });
             
