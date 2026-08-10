@@ -50,13 +50,6 @@
             <label for="filter_month">Bulan Transaksi</label>
             <input type="month" id="filter_month" class="form-control" value="{{ $month }}">
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <div class="w-100">
-                <button type="button" id="btnFilter" class="btn btn-info btn-sm">
-                    <i class="fas fa-search mr-1"></i> Tampilkan
-                </button>
-            </div>
-        </div>
     </div>
     <div class="mt-3">
         <small class="text-muted">Menampilkan transaksi berdasarkan email yang dipassing dari detail lead atau detail akun.</small>
@@ -132,10 +125,6 @@ $(function () {
             info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
             paginate: { next: 'Next', previous: 'Prev' }
         }
-    });
-
-    $('#btnFilter').on('click', function () {
-        table.ajax.reload();
     });
 
     $('#filter_month').on('change', function () {
