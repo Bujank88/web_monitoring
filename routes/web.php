@@ -26,6 +26,7 @@ use App\Http\Controllers\CdsiReportController;
 use App\Http\Controllers\GotoController;
 use App\Http\Controllers\FbmSofController;
 use App\Http\Controllers\CanvasserDetailController;
+use App\Http\Controllers\Area2LeadsController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -366,6 +367,12 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
     Route::get('/mpcc-report-area-branch/data', [BackController::class, 'getMpccAreaBranchReport'])->name('mpcc.report.area-branch.data');
     Route::get('/mpcc-report-area-branch/export', [BackController::class, 'exportMpccAreaBranchReport'])->name('mpcc.report.area-branch.export');
     Route::get('/mpcc-report-pilot-city', [BackController::class, 'showMpccPilotCityReport'])->name('mpcc.report.pilot-city');
+});
+Route::middleware(['auth', 'checkrole:Area 2'])->prefix('area2')->name('area2.')->group(function () {
+    Route::get('leads-master', [Area2LeadsController::class, 'index'])->name('leads-master.index');
+    Route::get('leads-master/data', [Area2LeadsController::class, 'data'])->name('leads-master.data');
+    Route::get('leads-master/export', [Area2LeadsController::class, 'export'])->name('leads-master.export');
+    Route::get('leads-master/{id}', [Area2LeadsController::class, 'show'])->name('leads-master.show')->whereNumber('id');
 });
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
     // AM Level UP Routes

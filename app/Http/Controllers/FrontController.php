@@ -40,6 +40,8 @@ class FrontController extends Controller
                 return redirect()->route('data-dormant');
             } else if ('GOTO' == Auth::user()->role) {
                 return redirect()->route('report-goto');
+            } else if ('Area 2' == Auth::user()->role) {
+                return redirect()->route('area2.leads-master.index');
             } else if ('b2b' == Auth::user()->role) {
                 return redirect()->route('amlevelup.index');
             } else {

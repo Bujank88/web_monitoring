@@ -15,11 +15,26 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class ReportController extends Controller
 {
+    private const AREA_2_REGIONALS = ['JABODETABEK', 'JABAR', 'DKI Jakarta', 'BANDUNG'];
+
     protected function authorizeTransactionDetailEmailAccess(string $email): void
     {
         $normalizedEmail = strtolower(trim($email));
 
         if (auth()->user()->role === 'Admin') {
+            return;
+        }
+
+        if (auth()->user()->role === 'Area 2') {
+            $hasArea2Access = DB::table('leads_master')
+                ->whereIn('regional', self::AREA_2_REGIONALS)
+                ->where(function ($query) use ($normalizedEmail) {
+                    $query->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+                        ->orWhereRaw('LOWER(TRIM(myads_account)) = ?', [$normalizedEmail]);
+                })
+                ->exists();
+
+            abort_unless($hasArea2Access, 403, 'Anda tidak punya akses untuk melihat transaksi email ini.');
             return;
         }
 
