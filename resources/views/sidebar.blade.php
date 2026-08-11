@@ -29,6 +29,7 @@
                 $isDormant = $roleUpper === 'DORMANT';
                 $isKss = $roleUpper === 'KSS';
                 $isRegional = $roleUpper === 'REGIONAL';
+                $isArea2 = $roleUpper === 'AREA 2';
                 $isMpcc = $roleUpper === 'MPCC';
                 $isSbp = $roleUpper === 'SBP';
                 $isCanvasserSbp = $roleUpper === 'CANVASSER SBP';
@@ -65,6 +66,8 @@
                 <span class="badge badge-primary">GOTO</span>
                 @elseif($isRegional)
                 <span class="badge badge-info">REGIONAL</span>
+                @elseif($isArea2)
+                <span class="badge badge-primary">AREA 2</span>
                 @elseif($isSbp)
                 <span class="badge badge-success">SBP</span>
                 @elseif($isCanvasserSbp)
@@ -703,6 +706,30 @@
                     </ul>
                 </li>
 
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isArea2)
+                <li class="nav-item">
+                    <a href="{{ route('area2.leads-master.index') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('area2.leads-master.*') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
+                        <p>Data Leads & Akun</p>
+                    </a>
+                </li>
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"

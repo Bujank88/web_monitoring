@@ -212,6 +212,7 @@
                             <option value="CDSI">CDSI</option>
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
+                            <option value="Area 2">Area 2</option>
                             <option value="MPCC">MPCC</option>
                             <option value="SBP">SBP</option>
                             <option value="Canvasser SBP">Canvasser SBP</option>
@@ -578,4 +579,3 @@
 </script>
 
 @endsection
-
