@@ -363,17 +363,17 @@ $(function () {
             }
         },
         columns: [
-            { data: 'user_name', searchable: true },
-            { data: 'regional', searchable: true },
-            { data: 'company_name', searchable: true },
-            { data: 'email', searchable: true },
-            { data: 'mobile_phone', searchable: true },
-            { data: 'data_type', searchable: false },
-            { data: 'flag_event', searchable: true },
-            { data: 'created_at', searchable: false },
-            { data: 'total_settlement_klien', searchable: false },
-            { data: 'saldo_utama', searchable: false },
-            { data: 'rekomendasi', searchable: false },
+            { data: 'user_name', name: 'dls.user_name', searchable: true },
+            { data: 'regional', name: 'dls.regional', searchable: true },
+            { data: 'company_name', name: 'dls.company_name', searchable: true },
+            { data: 'email', name: 'dls.email', searchable: true },
+            { data: 'mobile_phone', name: 'dls.mobile_phone', searchable: true },
+            { data: 'data_type', name: 'dls.data_type', searchable: false },
+            { data: 'flag_event', name: 'dls.flag_event', searchable: true },
+            { data: 'created_at', name: 'dls.created_at', searchable: false },
+            { data: 'total_settlement_klien', name: 'dls.total_settlement_klien', searchable: false },
+            { data: 'saldo_utama', name: 'dls.saldo_utama', searchable: false },
+            { data: 'rekomendasi', name: 'rekomendasi', searchable: false },
             { data: 'aksi', orderable: false, searchable: false }
         ]
     });

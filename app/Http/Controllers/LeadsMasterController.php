@@ -54,7 +54,13 @@ class LeadsMasterController extends Controller
         // Base query dari summary table (sudah precomputed, lebih cepat)
         $query = DB::table('detail_leads_summary as dls')
             ->select(
-                'dls.*'
+                'dls.*',
+                DB::raw("
+                    CASE
+                        WHEN COALESCE(dls.saldo_utama, 0) >= 1000000 THEN 1
+                        ELSE 0
+                    END as rekomendasi_sort
+                ")
             )
             ->orderBy('dls.total_settlement_klien', 'desc')
             ->orderBy('dls.saldo_utama', 'desc');
@@ -102,6 +108,7 @@ class LeadsMasterController extends Controller
         }
 
         return datatables()->of($query)
+            ->orderColumn('rekomendasi', 'rekomendasi_sort $1')
             ->addColumn('user_name', function ($row) {
                 return $row->user_name ?? '-';
             })            
