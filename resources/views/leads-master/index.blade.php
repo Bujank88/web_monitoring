@@ -191,6 +191,16 @@
         </div>
 
         <div class="filter-group">
+            <label for="filter_rekomendasi">Rekomendasi</label>
+            <select id="filter_rekomendasi" class="form-control select2">
+                <option value="">Semua Rekomendasi</option>
+                <option value="Push Campaign">Push Campaign</option>
+                <option value="Push Topup">Push Topup</option>
+            </select>
+            <small>Pilih rekomendasi untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
             <label for="start_date">Tanggal Mulai</label>
             <input type="date" id="start_date" class="form-control">
             <small>Pilih tanggal awal periode</small>
@@ -354,6 +364,7 @@ $(function () {
                 d.end_date   = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
                 d.flag_event = $('#filter_flag_event').val();
+                d.rekomendasi = $('#filter_rekomendasi').val();
             },
             beforeSend: function() {
                 showLoading();
@@ -388,6 +399,10 @@ $(function () {
     });
 
     $('#filter_flag_event').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_rekomendasi').on('change', function () {
         table.ajax.reload();
     });
 
@@ -426,7 +441,8 @@ $(function () {
             end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val(),
             regional: $('#filter_regional').val(),
-            flag_event: $('#filter_flag_event').val()
+            flag_event: $('#filter_flag_event').val(),
+            rekomendasi: $('#filter_rekomendasi').val()
         };
 
         let query = $.param(params);

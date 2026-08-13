@@ -87,6 +87,13 @@ class LeadsMasterController extends Controller
             $query->where('dls.flag_event', $request->flag_event);
         }
 
+        // Filter Rekomendasi
+        if ($request->rekomendasi === 'Push Campaign') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) >= 1000000');
+        } elseif ($request->rekomendasi === 'Push Topup') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) < 1000000');
+        }
+
         // Filter Tanggal
         if ($request->start_date && $request->end_date) {
             $query->whereBetween('dls.created_at', [
@@ -228,6 +235,13 @@ class LeadsMasterController extends Controller
         // Filter Flag Event
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Rekomendasi
+        if ($request->rekomendasi === 'Push Campaign') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) >= 1000000');
+        } elseif ($request->rekomendasi === 'Push Topup') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) < 1000000');
         }
 
         // Filter Tanggal
