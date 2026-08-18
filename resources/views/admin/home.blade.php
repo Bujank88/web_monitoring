@@ -688,11 +688,12 @@
                 allowTaint: true,
                 useCORS: true,
                 width: tableElement.scrollWidth,
-                height: tableElement.scrollHeight,
+                height: tableElement.scrollHeight + 80,
                 windowWidth: tableElement.scrollWidth,
-                windowHeight: tableElement.scrollHeight,
+                windowHeight: tableElement.scrollHeight + 80,
                 scrollX: 0,
                 scrollY: 0,
+                backgroundColor: '#ffffff',
                 onclone: function(clonedDoc) {
                     const clonedWrapper = clonedDoc.getElementById('captureRegionalTable');
                     const clonedTable = clonedDoc.getElementById('regionalTable');
@@ -701,10 +702,13 @@
                         clonedWrapper.style.overflow = 'visible';
                         clonedWrapper.style.maxWidth = 'none';
                         clonedWrapper.style.width = clonedTable ? clonedTable.scrollWidth + 'px' : 'auto';
+                        clonedWrapper.style.paddingBottom = '80px';
+                        clonedWrapper.style.backgroundColor = '#ffffff';
                     }
 
                     if (clonedTable) {
                         clonedTable.style.width = clonedTable.scrollWidth + 'px';
+                        clonedTable.style.marginBottom = '40px';
                     }
                 }
             })
