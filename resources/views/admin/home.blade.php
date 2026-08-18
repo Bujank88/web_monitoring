@@ -518,7 +518,12 @@
     <div class="col-12">
         <div class="card" id="canvaserTableCard">
            <div class="card-header bg-gradient-success text-white">
-                <h4 class="mb-0"><i class="fas fa-table"></i> Report Canvaser All Region</h4>
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <h4 class="mb-0"><i class="fas fa-table"></i> Report Canvaser All Region</h4>
+                    <button type="button" id="btnSaveRegionalTableImage" class="btn btn-light btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-image mr-1"></i> Save Image
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 @php
@@ -670,21 +675,49 @@
 
         // Save Regional Table Image
         $('#btnSaveRegionalTableImage').on('click', function() {
-            html2canvas(document.getElementById('captureRegionalTable'), {
+            const tableWrapper = document.getElementById('captureRegionalTable');
+            const tableElement = document.getElementById('regionalTable');
+
+            if (!tableWrapper || !tableElement) {
+                alert('Tabel tidak ditemukan.');
+                return;
+            }
+
+            html2canvas(tableWrapper, {
                 scale: 2,
                 allowTaint: true,
-                useCORS: true
+                useCORS: true,
+                width: tableElement.scrollWidth,
+                height: tableElement.scrollHeight,
+                windowWidth: tableElement.scrollWidth,
+                windowHeight: tableElement.scrollHeight,
+                scrollX: 0,
+                scrollY: 0,
+                onclone: function(clonedDoc) {
+                    const clonedWrapper = clonedDoc.getElementById('captureRegionalTable');
+                    const clonedTable = clonedDoc.getElementById('regionalTable');
+
+                    if (clonedWrapper) {
+                        clonedWrapper.style.overflow = 'visible';
+                        clonedWrapper.style.maxWidth = 'none';
+                        clonedWrapper.style.width = clonedTable ? clonedTable.scrollWidth + 'px' : 'auto';
+                    }
+
+                    if (clonedTable) {
+                        clonedTable.style.width = clonedTable.scrollWidth + 'px';
+                    }
+                }
             })
-            .then(canvas => {
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL('image/png');
-                link.download = 'regional_table_' + new Date().getTime() + '.png';
-                link.click();
-            })
-            .catch(err => {
-                console.error('Error capturing table:', err);
-                alert('Gagal menyimpan gambar. Silakan coba lagi.');
-            });
+                .then(canvas => {
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = 'regional_table_' + new Date().getTime() + '.png';
+                    link.click();
+                })
+                .catch(err => {
+                    console.error('Error capturing table:', err);
+                    alert('Gagal menyimpan gambar. Silakan coba lagi.');
+                });
         });
 
         // Filter functionality

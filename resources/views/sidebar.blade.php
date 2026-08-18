@@ -774,6 +774,7 @@
                         <p>Tips Sales</p>
                     </a>
                 </li>
+                @if(!$isCanv)
                 <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
@@ -803,6 +804,7 @@
                         </li>
                     </ul>
                 </li>
+                @endif
                 @if($isAdmin || $isPH)
                 <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'active' : '' }}">
