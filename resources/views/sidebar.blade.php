@@ -437,7 +437,6 @@
                     </ul>
                 </li>
                 @endif
-                @endif
                 <li class="nav-item has-treeview {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>
