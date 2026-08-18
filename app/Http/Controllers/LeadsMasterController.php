@@ -87,6 +87,11 @@ class LeadsMasterController extends Controller
             $query->where('dls.flag_event', $request->flag_event);
         }
 
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
+        }
+
         // Filter Rekomendasi
         if ($request->rekomendasi === 'Push Campaign') {
             $query->whereRaw('COALESCE(dls.saldo_utama, 0) >= 1000000');
@@ -235,6 +240,11 @@ class LeadsMasterController extends Controller
         // Filter Flag Event
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
         }
 
         // Filter Rekomendasi

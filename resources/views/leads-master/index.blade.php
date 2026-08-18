@@ -191,6 +191,16 @@
         </div>
 
         <div class="filter-group">
+            <label for="filter_data_type">Tipe Data</label>
+            <select id="filter_data_type" class="form-control select2">
+                <option value="">Semua Tipe Data</option>
+                <option value="Leads">Leads</option>
+                <option value="Eksisting Akun">Eksisting Akun</option>
+            </select>
+            <small>Pilih tipe data untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
             <label for="filter_rekomendasi">Rekomendasi</label>
             <select id="filter_rekomendasi" class="form-control select2">
                 <option value="">Semua Rekomendasi</option>
@@ -364,6 +374,7 @@ $(function () {
                 d.end_date   = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
                 d.flag_event = $('#filter_flag_event').val();
+                d.data_type = $('#filter_data_type').val();
                 d.rekomendasi = $('#filter_rekomendasi').val();
             },
             beforeSend: function() {
@@ -399,6 +410,10 @@ $(function () {
     });
 
     $('#filter_flag_event').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_data_type').on('change', function () {
         table.ajax.reload();
     });
 
@@ -442,6 +457,7 @@ $(function () {
             canvasser: $('#filter_canvasser').val(),
             regional: $('#filter_regional').val(),
             flag_event: $('#filter_flag_event').val(),
+            data_type: $('#filter_data_type').val(),
             rekomendasi: $('#filter_rekomendasi').val()
         };
 
