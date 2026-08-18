@@ -535,11 +535,12 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="regionalTable" style="font-size: 11px;">
                         <thead class="thead-light">
                             <tr>
-                                <th colspan="17" class="text-center" style="background-color: #d1ecf1;">Data Bulan Berjalan: <span id="displayedMonth">{{ $date->format('Y-m') }}</span></th>
+                                <th colspan="18" class="text-center" style="background-color: #d1ecf1;">Data Bulan Berjalan: <span id="displayedMonth">{{ $date->format('Y-m') }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">No</th>
                                 <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">Canvaser Name</th>
+                                <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">Lokasi Kerja</th>
                             </tr>
                             <tr>
                                 <th colspan="2" class="text-center" style="background-color: #cfe2ff;">Data Prospect (Leads & Eksisting Akun)</th>
@@ -785,6 +786,19 @@
                                 ${safeName}
                             </a>
                         </div>`;
+                    }
+                },
+                {
+                    data: 'lokasi_kerja',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        const safeLocation = $('<div>').text(data || '-').html();
+
+                        if (row.is_total) {
+                            return `<div style="text-align: center; font-weight: bold; font-size: 14px;">${safeLocation}</div>`;
+                        }
+
+                        return `<div style="text-align: center;">${safeLocation}</div>`;
                     }
                 },
                 {

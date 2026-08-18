@@ -406,6 +406,7 @@
                         <p>Daily Top Up Channel</p>
                     </a>
                 </li>
+                @if(!$isCanv)
                 <li class="nav-item has-treeview {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('mpcc.report') || request()->routeIs('mpcc.report.area-branch*') || request()->routeIs('mpcc.report.pilot-city')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-headset" style="color:#17a2b8;"></i>
@@ -435,6 +436,7 @@
                         </li>
                     </ul>
                 </li>
+                @endif
                 <li class="nav-item has-treeview {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('mitra-sbp') || request()->routeIs('report-campaign-sbp') || request()->routeIs('report-saldo-sbp') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-network-wired" style="color:#28a745;"></i>

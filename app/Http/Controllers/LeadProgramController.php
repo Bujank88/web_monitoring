@@ -880,7 +880,7 @@ class LeadProgramController extends Controller
             $canvasers = DB::table('users')
                 ->where('role', 'cvsr')
                 ->where('name', '!=', 'self service')
-                ->select('id', 'name')
+                ->select('id', 'name', 'lokasi_kerja')
                 ->get();
 
             if ($canvasers->isEmpty()) {
@@ -1085,6 +1085,9 @@ class LeadProgramController extends Controller
             foreach ($canvasers as $index => $canvaser) {
                 $canvaserId = $canvaser->id;
                 $regional = $regionalMap[$canvaserId] ?? '-';
+                $lokasiKerja = trim((string) ($canvaser->lokasi_kerja ?? ''));
+                $lokasiKerja = $lokasiKerja !== '' ? $lokasiKerja : '-';
+
                 $totalLeads = (int) ($leadStats[$canvaserId]->leads ?? 0);
                 $existingAkun = (int) ($leadStats[$canvaserId]->existing_akun ?? 0);
                 $newAkun = (int) ($newAkunStats[$canvaserId]->new_akun ?? 0);
@@ -1120,6 +1123,7 @@ class LeadProgramController extends Controller
                     'user_id' => $canvaserId,
                     'regional' => $regional,
                     'canvaser_name' => $canvaser->name ?? '-',
+                    'lokasi_kerja' => $lokasiKerja,
                     'leads' => $totalLeads,
                     'existing_akun' => $existingAkun,
                     'new_akun' => $newAkun,
@@ -1174,6 +1178,7 @@ class LeadProgramController extends Controller
                     'no' => '',
                     'regional' => '',
                     'canvaser_name' => 'TOTAL',
+                    'lokasi_kerja' => '-',
                     'leads' => $totals['leads'],
                     'existing_akun' => $totals['existing_akun'],
                     'new_akun' => $totals['new_akun'],

@@ -358,6 +358,9 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,MPCC'])->group(function () {
     Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show')->whereNumber('id');
     Route::get('leads-master/{lead}/edit', [LeadsMasterController::class, 'edit'])->name('leads-master.edit')->whereNumber('lead');
     Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,PH,MPCC'])->group(function () {
     Route::get('/mpcc-report', [FrontController::class, 'monitoringMpccReport'])->name('mpcc.report');
     Route::get('/mpcc-report/data', [BackController::class, 'getMpccVoucherReport'])->name('mpcc.report.data');
     Route::get('/mpcc-report/performance-data', [BackController::class, 'getMpccDealTopupMom'])->name('mpcc.report.performance-data');
