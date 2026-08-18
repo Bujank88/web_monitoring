@@ -2737,9 +2737,9 @@ class BackController extends Controller
 
                 // Set header
                 $headers = [
-                    'No', 'Canvaser Name', 'Leads', 'Existing Akun', 'New Akun', 
-                    'Top Up Existing Akun Count', 'Top Up New Akun (Rp)', 'Top Up Existing Akun (Rp)', 
-                    'Total Top Up (Rp)', 'Target (Rp)', 'Achievement (%)', 'Gap (Rp)', 
+                    'No', 'Canvaser Name', 'Lokasi Kerja', 'Leads', 'Existing Akun', 'New Akun',
+                    'Top Up Existing Akun Count', 'Top Up New Akun (Rp)', 'Top Up Existing Akun (Rp)',
+                    'Total Top Up (Rp)', 'Target (Rp)', 'Achievement (%)', 'Gap (Rp)',
                     'Gap Daily (Rp)', 'MOM (1-Current Date Prev)', 'MOM (1-Current Date Current)',
                     'MOM (Remaining Prev)', 'MOM Gap (Rp)'
                 ];
@@ -2752,7 +2752,7 @@ class BackController extends Controller
                     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
                     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]
                 ];
-                $sheet->getStyle('A1:Q1')->applyFromArray($headerStyle);
+                $sheet->getStyle('A1:R1')->applyFromArray($headerStyle);
 
                 // Add data
                 $row = 2;
@@ -2760,21 +2760,22 @@ class BackController extends Controller
                 foreach ($data as $item) {
                     $sheet->setCellValue('A' . $row, $no);
                     $sheet->setCellValue('B' . $row, $item['canvaser_name']);
-                    $sheet->setCellValue('C' . $row, $item['leads']);
-                    $sheet->setCellValue('D' . $row, $item['existing_akun']);
-                    $sheet->setCellValue('E' . $row, $item['new_akun']);
-                    $sheet->setCellValue('F' . $row, $item['top_up_existing_akun_count']);
-                    $sheet->setCellValue('G' . $row, $item['top_up_new_akun_rp']);
-                    $sheet->setCellValue('H' . $row, $item['top_up_existing_akun_rp']);
-                    $sheet->setCellValue('I' . $row, $item['total_top_up_rp']);
-                    $sheet->setCellValue('J' . $row, $item['target']);
-                    $sheet->setCellValue('K' . $row, $item['achievement_percent']);
-                    $sheet->setCellValue('L' . $row, $item['gap']);
-                    $sheet->setCellValue('M' . $row, $item['gap_daily']);
-                    $sheet->setCellValue('N' . $row, $item['mom_prev_partial']);
-                    $sheet->setCellValue('O' . $row, $item['mom_current_partial']);
-                    $sheet->setCellValue('P' . $row, $item['mom_prev_remaining']);
-                    $sheet->setCellValue('Q' . $row, $item['mom_gap']);
+                    $sheet->setCellValue('C' . $row, $item['lokasi_kerja'] ?? '-');
+                    $sheet->setCellValue('D' . $row, $item['leads']);
+                    $sheet->setCellValue('E' . $row, $item['existing_akun']);
+                    $sheet->setCellValue('F' . $row, $item['new_akun']);
+                    $sheet->setCellValue('G' . $row, $item['top_up_existing_akun_count']);
+                    $sheet->setCellValue('H' . $row, $item['top_up_new_akun_rp']);
+                    $sheet->setCellValue('I' . $row, $item['top_up_existing_akun_rp']);
+                    $sheet->setCellValue('J' . $row, $item['total_top_up_rp']);
+                    $sheet->setCellValue('K' . $row, $item['target']);
+                    $sheet->setCellValue('L' . $row, $item['achievement_percent']);
+                    $sheet->setCellValue('M' . $row, $item['gap']);
+                    $sheet->setCellValue('N' . $row, $item['gap_daily']);
+                    $sheet->setCellValue('O' . $row, $item['mom_prev_partial']);
+                    $sheet->setCellValue('P' . $row, $item['mom_current_partial']);
+                    $sheet->setCellValue('Q' . $row, $item['mom_prev_remaining']);
+                    $sheet->setCellValue('R' . $row, $item['mom_gap']);
                     
                     // Add color for total rows
                     if ($item['is_total']) {
@@ -2782,7 +2783,7 @@ class BackController extends Controller
                             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFC107']],
                             'font' => ['bold' => true],
                         ];
-                        $sheet->getStyle('A' . $row . ':Q' . $row)->applyFromArray($styleTotal);
+                        $sheet->getStyle('A' . $row . ':R' . $row)->applyFromArray($styleTotal);
                     }
 
                     $row++;
@@ -2792,21 +2793,22 @@ class BackController extends Controller
                 // Set column widths
                 $sheet->getColumnDimension('A')->setWidth(5);
                 $sheet->getColumnDimension('B')->setWidth(20);
-                $sheet->getColumnDimension('C')->setWidth(12);
-                $sheet->getColumnDimension('D')->setWidth(15);
-                $sheet->getColumnDimension('E')->setWidth(12);
-                $sheet->getColumnDimension('F')->setWidth(18);
+                $sheet->getColumnDimension('C')->setWidth(24);
+                $sheet->getColumnDimension('D')->setWidth(12);
+                $sheet->getColumnDimension('E')->setWidth(15);
+                $sheet->getColumnDimension('F')->setWidth(12);
                 $sheet->getColumnDimension('G')->setWidth(18);
                 $sheet->getColumnDimension('H')->setWidth(18);
                 $sheet->getColumnDimension('I')->setWidth(18);
-                $sheet->getColumnDimension('J')->setWidth(15);
+                $sheet->getColumnDimension('J')->setWidth(18);
                 $sheet->getColumnDimension('K')->setWidth(15);
                 $sheet->getColumnDimension('L')->setWidth(15);
                 $sheet->getColumnDimension('M')->setWidth(15);
-                $sheet->getColumnDimension('N')->setWidth(18);
+                $sheet->getColumnDimension('N')->setWidth(15);
                 $sheet->getColumnDimension('O')->setWidth(18);
                 $sheet->getColumnDimension('P')->setWidth(18);
-                $sheet->getColumnDimension('Q')->setWidth(15);
+                $sheet->getColumnDimension('Q')->setWidth(18);
+                $sheet->getColumnDimension('R')->setWidth(15);
 
                 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
                 $writer->save('php://output');
