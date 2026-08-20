@@ -40,6 +40,14 @@ class LeadsMasterController extends Controller
                     ->orderBy('flag_event')
                     ->pluck('flag_event')
             ),
+            'dataTypes' => Cache::remember('data_types_list_leads', 3600, fn() =>
+                DB::table('detail_leads_summary')
+                    ->whereNotNull('data_type')
+                    ->where('data_type', '!=', '')
+                    ->distinct()
+                    ->orderBy('data_type')
+                    ->pluck('data_type')
+            ),
         ]);
     }
 
@@ -85,6 +93,11 @@ class LeadsMasterController extends Controller
         // Filter Flag Event
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
         }
 
         // Filter Rekomendasi
@@ -235,6 +248,11 @@ class LeadsMasterController extends Controller
         // Filter Flag Event
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
         }
 
         // Filter Rekomendasi

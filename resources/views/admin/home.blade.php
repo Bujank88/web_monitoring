@@ -683,7 +683,32 @@
                 return;
             }
 
-            html2canvas(tableWrapper, {
+            const exportContainer = document.createElement('div');
+            exportContainer.style.position = 'fixed';
+            exportContainer.style.left = '-100000px';
+            exportContainer.style.top = '0';
+            exportContainer.style.backgroundColor = '#ffffff';
+            exportContainer.style.padding = '0 0 80px 0';
+            exportContainer.style.overflow = 'visible';
+            exportContainer.style.zIndex = '-1';
+
+            const clonedWrapper = tableWrapper.cloneNode(true);
+            clonedWrapper.style.overflow = 'visible';
+            clonedWrapper.style.maxWidth = 'none';
+            clonedWrapper.style.width = tableElement.scrollWidth + 'px';
+            clonedWrapper.style.paddingBottom = '80px';
+            clonedWrapper.style.backgroundColor = '#ffffff';
+
+            const clonedTable = clonedWrapper.querySelector('#regionalTable');
+            if (clonedTable) {
+                clonedTable.style.width = tableElement.scrollWidth + 'px';
+                clonedTable.style.marginBottom = '40px';
+            }
+
+            exportContainer.appendChild(clonedWrapper);
+            document.body.appendChild(exportContainer);
+
+            html2canvas(clonedWrapper, {
                 scale: 2,
                 allowTaint: true,
                 useCORS: true,
@@ -693,24 +718,7 @@
                 windowHeight: tableElement.scrollHeight + 80,
                 scrollX: 0,
                 scrollY: 0,
-                backgroundColor: '#ffffff',
-                onclone: function(clonedDoc) {
-                    const clonedWrapper = clonedDoc.getElementById('captureRegionalTable');
-                    const clonedTable = clonedDoc.getElementById('regionalTable');
-
-                    if (clonedWrapper) {
-                        clonedWrapper.style.overflow = 'visible';
-                        clonedWrapper.style.maxWidth = 'none';
-                        clonedWrapper.style.width = clonedTable ? clonedTable.scrollWidth + 'px' : 'auto';
-                        clonedWrapper.style.paddingBottom = '80px';
-                        clonedWrapper.style.backgroundColor = '#ffffff';
-                    }
-
-                    if (clonedTable) {
-                        clonedTable.style.width = clonedTable.scrollWidth + 'px';
-                        clonedTable.style.marginBottom = '40px';
-                    }
-                }
+                backgroundColor: '#ffffff'
             })
                 .then(canvas => {
                     const link = document.createElement('a');
@@ -721,6 +729,11 @@
                 .catch(err => {
                     console.error('Error capturing table:', err);
                     alert('Gagal menyimpan gambar. Silakan coba lagi.');
+                })
+                .finally(() => {
+                    if (exportContainer.parentNode) {
+                        exportContainer.parentNode.removeChild(exportContainer);
+                    }
                 });
         });
 
