@@ -194,8 +194,9 @@
             <label for="filter_data_type">Tipe Data</label>
             <select id="filter_data_type" class="form-control select2">
                 <option value="">Semua Tipe Data</option>
-                <option value="Leads">Leads</option>
-                <option value="Eksisting Akun">Eksisting Akun</option>
+                @foreach($dataTypes as $dataType)
+                    <option value="{{ $dataType }}">{{ $dataType }}</option>
+                @endforeach
             </select>
             <small>Pilih tipe data untuk memfilter data</small>
         </div>

@@ -88,6 +88,17 @@
         </div>
 
         <div class="filter-group">
+            <label for="filter_data_type">Tipe Data</label>
+            <select id="filter_data_type" class="form-control select2">
+                <option value="">Semua Tipe Data</option>
+                @foreach($dataTypes as $dataType)
+                    <option value="{{ $dataType }}">{{ $dataType }}</option>
+                @endforeach
+            </select>
+            <small>Pilih tipe data untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
             <label for="start_date">Tanggal Mulai</label>
             <input type="date" id="start_date" class="form-control">
             <small>Pilih tanggal awal periode</small>
@@ -159,6 +170,7 @@ $(function () {
                 d.end_date = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
                 d.flag_event = $('#filter_flag_event').val();
+                d.data_type = $('#filter_data_type').val();
             },
             dataSrc: function (json) {
                 return json.data || [];
@@ -183,7 +195,7 @@ $(function () {
         ]
     });
 
-    $('#filter_regional, #filter_flag_event').on('change', function () {
+    $('#filter_regional, #filter_flag_event, #filter_data_type').on('change', function () {
         table.ajax.reload();
     });
 
@@ -196,7 +208,8 @@ $(function () {
             start_date: $('#start_date').val(),
             end_date: $('#end_date').val(),
             regional: $('#filter_regional').val(),
-            flag_event: $('#filter_flag_event').val()
+            flag_event: $('#filter_flag_event').val(),
+            data_type: $('#filter_data_type').val()
         };
 
         window.location = @json(route('area2.leads-master.export')) + '?' + $.param(params);

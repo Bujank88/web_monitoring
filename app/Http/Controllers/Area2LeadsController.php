@@ -39,6 +39,16 @@ class Area2LeadsController extends Controller
                     ->orderBy('flag_event')
                     ->pluck('flag_event')
             ),
+            'dataTypes' => Cache::remember('data_types_list_leads_area2_without_enterprise', 3600, fn() =>
+                DB::table('leads_master')
+                    ->whereIn('regional', self::REGIONALS)
+                    ->whereNotNull('data_type')
+                    ->where('data_type', '!=', '')
+                    ->where('data_type', '!=', 'Enterprise Akun')
+                    ->distinct()
+                    ->orderBy('data_type')
+                    ->pluck('data_type')
+            ),
         ]);
     }
 
@@ -80,6 +90,10 @@ class Area2LeadsController extends Controller
 
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        if ($request->data_type) {
+            $query->where('lm.data_type', $request->data_type);
         }
 
         if ($request->start_date && $request->end_date) {
@@ -188,6 +202,10 @@ class Area2LeadsController extends Controller
 
         if ($request->flag_event) {
             $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        if ($request->data_type) {
+            $query->where('lm.data_type', $request->data_type);
         }
 
         if ($request->start_date && $request->end_date) {
