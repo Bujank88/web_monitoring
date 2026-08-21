@@ -963,6 +963,11 @@ class LeadsMasterController extends Controller
         $validReferralCodes = [
             'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
             'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25',
+            'EXTRA26', 'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30',
+            'EXTRA31', 'EXTRA32', 'EXTRA33', 'EXTRA34', 'EXTRA35',
+            'EXTRA36', 'EXTRA37', 'EXTRA38', 'EXTRA39', 'EXTRA40',
             'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
             'HEBAT1','HEBAT2','HEBAT3','HEBAT4','HEBAT5','HEBAT6','HEBAT7',
             'HEBAT8','HEBAT9','HEBAT10','HEBAT11','HEBAT12','HEBAT13',
