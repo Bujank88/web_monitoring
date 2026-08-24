@@ -206,7 +206,7 @@ class Powerhouse2MController extends Controller
             ],
             'nama' => 'nullable|string|max:255',
             'myads_account' => 'nullable|string|max:255',
-            'usecase' => 'required|string|max:1000',
+            'usecase' => 'required|string',
             'solusi' => 'nullable|string|max:5000',
         ], [
             'mobile_phone.regex' => 'Nomor HP harus diawali dengan kode negara 62 dan hanya angka (9-12 digit).',
@@ -520,7 +520,7 @@ class Powerhouse2MController extends Controller
             'nama' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
             'myads_account' => 'nullable|string|max:255',
-            'usecase' => 'required|string|max:1000',
+            'usecase' => 'required|string',
             'schedule_lokasi' => 'nullable|string|max:255',
             'schedule_tanggal' => 'nullable|date',
             'schedule_waktu_mulai' => 'nullable|date_format:H:i',
