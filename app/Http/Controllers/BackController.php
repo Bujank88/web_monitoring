@@ -1780,7 +1780,7 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24'
         ];
         // Query dengan JOIN (per akun, bukan aggregate)
         $data = DB::table('report_balance_top_up as rb')
@@ -2306,7 +2306,7 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24'
         ];
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
@@ -2381,7 +2381,7 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24'
         ];
         
         // Mapping voucher code ke nama canvasser
@@ -2461,7 +2461,7 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24'
         ];
         
         // Mapping voucher code ke nama canvasser
