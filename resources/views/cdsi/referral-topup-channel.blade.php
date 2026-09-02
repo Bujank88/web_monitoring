@@ -1,4 +1,5 @@
 @extends('master')
+@php($brandLabel = $brandLabel ?? 'CDSI')
 @section('title') {{ $pageTitle ?? 'Daily Top Up Referral CDSI' }} @endsection
 
 @section('css')
@@ -73,7 +74,7 @@
                     <tr>
                         <th rowspan="3" style="background-color: #f8f9fa; text-align: center; vertical-align: middle;">Tanggal</th>
                         <th colspan="{{ (count($channels) * 2) + 2 }}" class="text-center" style="background-color: #f8d7da;">
-                            Report Daily TopUp Referral CDSI | Bulan: <span id="displayedMonthCdsi">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->translatedFormat('F Y') }}</span>
+                            Report Daily TopUp Referral {{ $brandLabel }} | Bulan: <span id="displayedMonthCdsi">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->translatedFormat('F Y') }}</span>
                         </th>
                     </tr>
                     <tr>
@@ -215,7 +216,7 @@
             searching: false,
             autoWidth: false,
             ajax: {
-                url: "{{ route('cdsi.referral-topup-channel.data') }}",
+                url: @json($topupDataUrl ?? route('cdsi.referral-topup-channel.data')),
                 type: 'GET',
                 data: function(d) {
                     d.month = $('#filterMonthCdsi').val();
@@ -234,7 +235,7 @@
             serverSide: true,
             pageLength: 25,
             ajax: {
-                url: "{{ route('cdsi.referral-topup-channel.detail-data') }}",
+                url: @json($topupDetailUrl ?? route('cdsi.referral-topup-channel.detail-data')),
                 type: 'GET',
                 data: function(d) {
                     d.month = $('#filterMonthCdsi').val();
@@ -280,7 +281,7 @@
             $submitButton.prop('disabled', true).text('Menyimpan...');
 
             $.ajax({
-                url: "{{ route('cdsi.referral-topup-channel.update-myads-invoice') }}",
+                url: @json($updateInvoiceUrl ?? route('cdsi.referral-topup-channel.update-myads-invoice')),
                 type: 'POST',
                 data: $(this).serialize(),
                 success: function(response) {

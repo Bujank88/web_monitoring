@@ -377,7 +377,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP,1Synergy',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
@@ -459,6 +459,8 @@ class BackController extends Controller
                 case 'KSS':
                 case 'kss':
                     return redirect()->route('report-cdsi');
+                case '1Synergy':
+                    return redirect()->route('one-synergy.report');
                 case 'b2b':
                     return redirect()->route('amlevelup.index');
                 default:

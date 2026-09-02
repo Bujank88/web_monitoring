@@ -27,6 +27,7 @@ use App\Http\Controllers\GotoController;
 use App\Http\Controllers\FbmSofController;
 use App\Http\Controllers\CanvasserDetailController;
 use App\Http\Controllers\Area2LeadsController;
+use App\Http\Controllers\OneSynergyReportController;
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);
@@ -474,7 +475,26 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC'])->group(function 
     Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
 });
 
+Route::middleware(['auth', 'checkrole:Admin,1Synergy'])->group(function () {
+    Route::get('/one-synergy/report', [OneSynergyReportController::class, 'index'])->name('one-synergy.report');
+    Route::get('/one-synergy/report/data', [OneSynergyReportController::class, 'data'])->name('one-synergy.report.data');
+    Route::get('/one-synergy/report/export', [OneSynergyReportController::class, 'export'])->name('one-synergy.report.export');
+    Route::get('/one-synergy/monitoring-saldo', [OneSynergyReportController::class, 'monitoringSaldo'])->name('one-synergy.monitoring-saldo');
+    Route::get('/one-synergy/referral-topup', [OneSynergyReportController::class, 'referralTopup'])->name('one-synergy.referral-topup');
+    Route::get('/one-synergy/referral-topup/data', [OneSynergyReportController::class, 'referralTopupData'])->name('one-synergy.referral-topup.data');
+    Route::get('/one-synergy/referral-topup/detail-data', [OneSynergyReportController::class, 'referralTopupDetailData'])->name('one-synergy.referral-topup.detail-data');
+});
+
 Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::post('/one-synergy/referral-topup/update-myads-invoice', [OneSynergyReportController::class, 'updateMyadsInvoice'])->name('one-synergy.referral-topup.update-myads-invoice');
+    Route::get('/one-synergy/referrals', [OneSynergyReportController::class, 'referralIndex'])->name('one-synergy.referrals');
+    Route::get('/one-synergy/referrals/data', [OneSynergyReportController::class, 'referralData'])->name('one-synergy.referrals.data');
+    Route::get('/one-synergy/referrals/generate', [OneSynergyReportController::class, 'generateReferralCode'])->name('one-synergy.referrals.generate');
+    Route::post('/one-synergy/referrals', [OneSynergyReportController::class, 'storeReferral'])->name('one-synergy.referrals.store');
+    Route::post('/one-synergy/referrals/{id}/status', [OneSynergyReportController::class, 'updateReferralStatus'])->name('one-synergy.referrals.status');
+    Route::get('/one-synergy/upload', [OneSynergyReportController::class, 'upload'])->name('one-synergy.upload');
+    Route::get('/one-synergy/upload/template', [OneSynergyReportController::class, 'template'])->name('one-synergy.upload.template');
+    Route::post('/one-synergy/upload', [OneSynergyReportController::class, 'store'])->name('one-synergy.upload.store');
     Route::get('/upload-maxim-report', [FrontController::class, 'uploadMaximReport'])->name('admin.upload.maxim-report');
     Route::get('/upload-maxim-report/template', [FrontController::class, 'downloadMaximReportTemplate'])->name('admin.upload.maxim-report.template');
     Route::post('/upload-maxim-report', [BackController::class, 'storeUploadMaximReport'])->name('admin.upload.maxim-report.store');
