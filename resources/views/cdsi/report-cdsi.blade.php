@@ -1,4 +1,5 @@
 @extends('master')
+@php($brandLabel = $brandLabel ?? 'CDSI')
 @section('title') {{ $pageTitle ?? 'Report Campaign CDSI' }} @endsection
 
 @section('css')
@@ -73,7 +74,7 @@
 
 @section('content')
 <div class="filter-card">
-    <h5><i class="fas fa-filter"></i> CDSI REPORT FILTER</h5>
+    <h5><i class="fas fa-filter"></i> {{ strtoupper($brandLabel) }} REPORT FILTER</h5>
     <div class="filter-row">
         <div class="filter-group">
             <label for="month">Month</label>
@@ -85,6 +86,21 @@
                 @endforeach
             </select>
         </div>
+        @if($showMerchantFilter ?? false)
+        <div class="filter-group">
+            <label for="merchant">Merchant</label>
+            <select id="merchant" name="merchant" class="form-control" {{ empty($merchants) ? 'disabled' : '' }}>
+                @if(empty($merchants))
+                    <option value="">-- Mapping merchant belum tersedia --</option>
+                @else
+                    <option value="">Semua Merchant</option>
+                    @foreach($merchants as $merchant)
+                    <option value="{{ $merchant }}" {{ ($selectedMerchant ?? '') === $merchant ? 'selected' : '' }}>{{ $merchant }}</option>
+                    @endforeach
+                @endif
+            </select>
+        </div>
+        @endif
     </div>
 </div>
 
@@ -179,7 +195,7 @@
 
         function updateExportLink() {
             var month = $('#month').val();
-            var url = "{{ route('report-cdsi.export') }}" + "?month=" + encodeURIComponent(month);
+            var url = @json($exportUrl ?? route('report-cdsi.export')) + "?month=" + encodeURIComponent(month);
             $('#btnExportCampaign').attr('href', url);
         }
 
@@ -188,9 +204,12 @@
             serverSide: true,
             responsive: true,
             ajax: {
-                url: "{{ route('report-cdsi.data') }}",
+                url: @json($dataUrl ?? route('report-cdsi.data')),
                 data: function(d) {
                     d.month = $('#month').val();
+                    if ($('#merchant').length && !$('#merchant').prop('disabled')) {
+                        d.merchant = $('#merchant').val();
+                    }
                 }
             },
             columns: [
@@ -238,6 +257,10 @@
 
         $('#month').on('change', function() {
             updateExportLink();
+            table.ajax.reload();
+        });
+
+        $('#merchant').on('change', function() {
             table.ajax.reload();
         });
 

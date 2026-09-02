@@ -1,4 +1,5 @@
 @extends('master')
+@php($brandLabel = $brandLabel ?? 'CDSI')
 @section('title') {{ $pageTitle ?? 'Monitoring Deposit CDSI' }} @endsection
 
 @section('css')
@@ -65,7 +66,7 @@
             <div class="card-body">
                 <div class="deposit-summary-label">Total Topup</div>
                 <div class="deposit-summary-value text-primary">Rp {{ number_format($summary['total_topup'] ?? 0, 0, ',', '.') }}</div>
-                <p class="deposit-summary-note">Akumulasi Juni 2026 - Desember 2026</p>
+                <p class="deposit-summary-note">Akumulasi {{ $periodLabel ?? 'Juni 2026 - Desember 2026' }}</p>
             </div>
         </div>
     </div>
@@ -74,7 +75,7 @@
             <div class="card-body">
                 <div class="deposit-summary-label">Target Full</div>
                 <div class="deposit-summary-value text-success">Rp {{ number_format($summary['target'] ?? 0, 0, ',', '.') }}</div>
-                <p class="deposit-summary-note">Target full program deposit CDSI</p>
+                <p class="deposit-summary-note">Target full program deposit {{ $brandLabel }}</p>
             </div>
         </div>
     </div>

@@ -64,6 +64,7 @@
                             <option value="Internal">Internal</option>
                             <option value="b2b">B2B</option>
                             <option value="CDSI">CDSI</option>
+                            <option value="1Synergy">1Synergy</option>
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="Area 2">Area 2</option>

@@ -1,4 +1,5 @@
 @extends('master')
+@php($brandLabel = $brandLabel ?? 'CDSI')
 @section('title') {{ $pageTitle ?? 'Referral CDSI' }} @endsection
 
 @section('css')
@@ -76,7 +77,7 @@
         <div class="card referral-panel">
             <div class="referral-header">
                 <h3 class="card-title mb-0">
-                    <i class="fas fa-list mr-2"></i>Daftar Referral CDSI
+                    <i class="fas fa-list mr-2"></i>Daftar Referral {{ $brandLabel }}
                 </h3>
             </div>
             <div class="card-body">
@@ -114,7 +115,7 @@
             processing: true,
             serverSide: true,
             responsive: true,
-            ajax: "{{ route('cdsi.referrals.data') }}",
+            ajax: @json($referralDataUrl ?? route('cdsi.referrals.data')),
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'name', name: 'name' },
@@ -159,7 +160,7 @@
                 return;
             }
 
-            $.get("{{ route('cdsi.referrals.generate') }}", { name: name }, function(response) {
+            $.get(@json($referralGenerateUrl ?? route('cdsi.referrals.generate')), { name: name }, function(response) {
                 $('#referral_code').val(response.referral_code || '');
             });
         }
@@ -173,7 +174,7 @@
             clearErrors();
 
             $.ajax({
-                url: "{{ route('cdsi.referrals.store') }}",
+                url: @json($referralStoreUrl ?? route('cdsi.referrals.store')),
                 method: 'POST',
                 data: form.serialize(),
                 success: function(response) {
@@ -189,7 +190,7 @@
                             const el = $('[data-error-for="' + field + '"]');
                             el.removeClass('d-none').text(xhr.responseJSON.errors[field][0]);
                         });
-                        showError('Mohon cek kembali form referral CDSI.');
+                        showError('Mohon cek kembali form referral {{ $brandLabel }}.');
                         return;
                     }
 
@@ -219,7 +220,7 @@
                 }
 
                 $.ajax({
-                    url: "{{ url('cdsi/referrals') }}/" + referralId + "/status",
+                    url: @json($referralStatusBaseUrl ?? url('cdsi/referrals')) + "/" + referralId + "/status",
                     method: 'POST',
                     data: {
                         _token: "{{ csrf_token() }}",

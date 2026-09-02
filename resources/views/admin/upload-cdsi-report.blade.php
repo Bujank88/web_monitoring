@@ -1,5 +1,6 @@
 @extends('master')
-@section('title') Upload Report CDSI @endsection
+@php($brandLabel = $brandLabel ?? 'CDSI')
+@section('title') Upload Report {{ $brandLabel }} @endsection
 
 @section('css')
 <style>
@@ -34,6 +35,9 @@
 @if(session('success'))
 <div class="alert alert-success">{{ session('success') }}</div>
 @endif
+@if(session('error'))
+<div class="alert alert-danger">{{ session('error') }}</div>
+@endif
 
 @if($errors->any())
 <div class="alert alert-danger">
@@ -50,13 +54,13 @@
         <div class="card upload-card h-100">
             <div class="card-header">
                 <h3 class="card-title mb-0" style="font-weight: 700;">
-                    <i class="fas fa-file-arrow-up mr-2"></i>Upload Excel Report CDSI
+                    <i class="fas fa-file-arrow-up mr-2"></i>Upload Excel Report {{ $brandLabel }}
                 </h3>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-4">Upload file report CDSI khusus admin. Format file mengikuti template yang sudah disediakan.</p>
+                <p class="text-muted mb-4">Upload file report {{ $brandLabel }} khusus admin. Format file mengikuti template yang sudah disediakan.</p>
 
-                <form action="{{ route('admin.upload.cdsi-report.store') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ $uploadAction ?? route('admin.upload.cdsi-report.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="form-group">
                         <label for="report_file">Pilih File Excel</label>
@@ -68,7 +72,7 @@
                         <h5 class="mb-2" style="font-weight: 700;">Contoh File</h5>
                         <p class="mb-3">Gunakan template berikut sebagai acuan sebelum upload.</p>
                         <a href="{{ $templateFile }}" class="btn btn-outline-primary" target="_blank">
-                            <i class="fas fa-file-excel mr-1"></i>Download Template Laporan CDSI
+                            <i class="fas fa-file-excel mr-1"></i>Download Template Laporan {{ $brandLabel }}
                         </a>
                     </div>
 
@@ -89,7 +93,7 @@
             </div>
             <div class="card-body">
                 @if($uploadedFiles->isEmpty())
-                <div class="text-muted">Belum ada file report CDSI yang diupload.</div>
+                <div class="text-muted">Belum ada file report {{ $brandLabel }} yang diupload.</div>
                 @else
                 <div class="table-responsive">
                     <table class="table table-bordered recent-table mb-0">
@@ -117,4 +121,3 @@
     </div>
 </div>
 @endsection
-

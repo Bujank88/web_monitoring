@@ -33,6 +33,7 @@
                 $isMpcc = $roleUpper === 'MPCC';
                 $isSbp = $roleUpper === 'SBP';
                 $isCanvasserSbp = $roleUpper === 'CANVASSER SBP';
+                $isOneSynergy = $roleUpper === '1SYNERGY';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
                     'mpcc_area2@telkomsel.co.id',
@@ -72,6 +73,8 @@
                 <span class="badge badge-success">SBP</span>
                 @elseif($isCanvasserSbp)
                 <span class="badge badge-primary">CANVASSER SBP</span>
+                @elseif($isOneSynergy)
+                <span class="badge badge-primary">1SYNERGY</span>
                 @elseif($isMpcc)
                 <span class="badge badge-info">MPCC</span>
                 @elseif($isCanv)
@@ -333,6 +336,37 @@
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isOneSynergy)
+                <li class="nav-header">1SYNERGY REPORTING</li>
+                <li class="nav-item">
+                    <a href="{{ route('one-synergy.monitoring-saldo') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('one-synergy.monitoring-saldo') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-scale-balanced" style="color:#60a5fa;"></i>
+                        <p>Monitoring Saldo</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('one-synergy.report') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('one-synergy.report*') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-column" style="color:#60a5fa;"></i>
+                        <p>Report 1Synergy</p>
+                    </a>
+                </li>
+
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}" class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
                         <p>Logout</p>
                     </a>
@@ -1245,7 +1279,53 @@
                     </ul>
                 </li>
 
-                
+                <li class="nav-item {{ request()->routeIs('one-synergy.*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('one-synergy.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-people-arrows" style="color:#3b82f6;"></i>
+                        <p>
+                            1Synergy
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.monitoring-saldo') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.monitoring-saldo') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-scale-balanced" style="color:#60a5fa;"></i>
+                                <p>Monitoring Saldo</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.referral-topup') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.referral-topup*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-table" style="color:#fb7185;"></i>
+                                <p>TopUp Referral 1Synergy</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.report') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.report*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-column" style="color:#60a5fa;"></i>
+                                <p>Report 1Synergy</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.referrals') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
+                                <p>Referral 1Synergy</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.upload') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.upload*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
+                                <p>Upload Report 1Synergy</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
                 @endif
                 @endif
                 @if($isAdmin || $isPH || $isMpcc)

@@ -210,6 +210,7 @@
                             <option value="Automatech">Automatech</option>
                             <option value="GOTO">GOTO</option>
                             <option value="CDSI">CDSI</option>
+                            <option value="1Synergy">1Synergy</option>
                             <option value="KSS">KSS</option>
                             <option value="Regional">Regional</option>
                             <option value="Area 2">Area 2</option>
