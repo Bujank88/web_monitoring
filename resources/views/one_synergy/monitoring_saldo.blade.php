@@ -53,13 +53,20 @@
             </div>
         </div>
     </div>
-    @foreach([
+    @php
+        $balanceCards = [
         ['Saldo Awal', $openingBalance, 'text-dark', 'Akumulasi sebelum bulan terpilih'],
-        ['Total Masuk', $totalIn, 'text-success', 'Saldo masuk melalui top up'],
         ['Total Keluar', $totalOut, 'text-danger', 'Saldo keluar melalui transfer'],
         ['Saldo Akhir', $endingBalance, 'text-primary', 'Saldo akhir bulan terpilih'],
-    ] as [$label, $value, $class, $note])
-    <div class="col-lg-3 col-md-6 mb-3">
+        ];
+        if ($canViewIncomingBalance) {
+            array_splice($balanceCards, 1, 0, [[
+                'Total Masuk', $totalIn, 'text-success', 'Saldo masuk melalui top up'
+            ]]);
+        }
+    @endphp
+    @foreach($balanceCards as [$label, $value, $class, $note])
+    <div class="{{ $canViewIncomingBalance ? 'col-lg-3' : 'col-lg-4' }} col-md-6 mb-3">
         <div class="card one-synergy-saldo-card h-100">
             <div class="card-body">
                 <div class="one-synergy-saldo-label">{{ $label }}</div>
@@ -76,7 +83,7 @@
     <div class="card-body">
         <div class="table-responsive">
             <table id="oneSynergyMonitoringSaldoTable" class="table table-bordered table-striped one-synergy-history w-100">
-                <thead><tr><th>No</th><th>Tanggal</th><th>Tipe</th><th>Sumber</th><th>Email Reference</th><th>Saldo Masuk</th><th>Saldo Keluar</th><th>Running Balance</th></tr></thead>
+                <thead><tr><th>No</th><th>Tanggal</th><th>Tipe</th><th>Sumber</th><th>Email Reference</th>@if($canViewIncomingBalance)<th>Saldo Masuk</th>@endif<th>Saldo Keluar</th><th>Running Balance</th></tr></thead>
                 <tbody>
                     @foreach($historyRows as $index => $row)
                     <tr>
@@ -85,7 +92,9 @@
                         <td><span class="one-synergy-chip {{ $row['transaction_type'] === 'Masuk' ? 'one-synergy-chip-in' : 'one-synergy-chip-out' }}">{{ $row['transaction_type'] }}</span></td>
                         <td>{{ $row['source'] }}</td>
                         <td>{{ $row['reference_email'] }}</td>
+                        @if($canViewIncomingBalance)
                         <td>{{ $row['amount_in'] > 0 ? 'Rp ' . number_format($row['amount_in'], 0, ',', '.') : '-' }}</td>
+                        @endif
                         <td>{{ $row['amount_out'] > 0 ? 'Rp ' . number_format($row['amount_out'], 0, ',', '.') : '-' }}</td>
                         <td><strong>Rp {{ number_format($row['running_balance'], 0, ',', '.') }}</strong></td>
                     </tr>

@@ -95,7 +95,7 @@
                 @else
                     <option value="">Semua Merchant</option>
                     @foreach($merchants as $merchant)
-                    <option value="{{ $merchant }}" {{ ($selectedMerchant ?? '') === $merchant ? 'selected' : '' }}>{{ $merchant }}</option>
+                    <option value="{{ $merchant['id'] }}" {{ ($selectedMerchant ?? '') === $merchant['id'] ? 'selected' : '' }}>{{ $merchant['label'] }}</option>
                     @endforeach
                 @endif
             </select>
@@ -196,6 +196,9 @@
         function updateExportLink() {
             var month = $('#month').val();
             var url = @json($exportUrl ?? route('report-cdsi.export')) + "?month=" + encodeURIComponent(month);
+            if ($('#merchant').length && !$('#merchant').prop('disabled') && $('#merchant').val()) {
+                url += "&merchant=" + encodeURIComponent($('#merchant').val());
+            }
             $('#btnExportCampaign').attr('href', url);
         }
 
@@ -261,6 +264,7 @@
         });
 
         $('#merchant').on('change', function() {
+            updateExportLink();
             table.ajax.reload();
         });
 

@@ -356,6 +356,13 @@
                         <p>Report 1Synergy</p>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="{{ route('one-synergy.merchant-summary') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('one-synergy.merchant-summary*') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-pie" style="color:#34d399;"></i>
+                        <p>Summary Merchant</p>
+                    </a>
+                </li>
 
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
@@ -1296,13 +1303,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route('one-synergy.referral-topup') }}"
-                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.referral-topup*') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="nav-icon fa-solid fa-table" style="color:#fb7185;"></i>
-                                <p>TopUp Referral 1Synergy</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a href="{{ route('one-synergy.report') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('one-synergy.report*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-chart-column" style="color:#60a5fa;"></i>
@@ -1310,10 +1310,10 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route('one-synergy.referrals') }}"
-                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.referrals*') ? 'active' : '' }}" style="padding-left: 45px;">
-                                <i class="nav-icon fa-solid fa-user-plus" style="color:#38bdf8;"></i>
-                                <p>Referral 1Synergy</p>
+                            <a href="{{ route('one-synergy.merchant-summary') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.merchant-summary*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-chart-pie" style="color:#34d399;"></i>
+                                <p>Summary Merchant</p>
                             </a>
                         </li>
                         <li class="nav-item">
