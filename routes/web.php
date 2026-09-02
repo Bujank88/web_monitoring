@@ -483,6 +483,8 @@ Route::middleware(['auth', 'checkrole:Admin,1Synergy'])->group(function () {
     Route::get('/one-synergy/referral-topup', [OneSynergyReportController::class, 'referralTopup'])->name('one-synergy.referral-topup');
     Route::get('/one-synergy/referral-topup/data', [OneSynergyReportController::class, 'referralTopupData'])->name('one-synergy.referral-topup.data');
     Route::get('/one-synergy/referral-topup/detail-data', [OneSynergyReportController::class, 'referralTopupDetailData'])->name('one-synergy.referral-topup.detail-data');
+    Route::get('/one-synergy/merchant-summary', [OneSynergyReportController::class, 'merchantSummary'])->name('one-synergy.merchant-summary');
+    Route::get('/one-synergy/merchant-summary/data', [OneSynergyReportController::class, 'merchantSummaryData'])->name('one-synergy.merchant-summary.data');
 });
 
 Route::middleware(['auth', 'checkrole:Admin'])->group(function () {

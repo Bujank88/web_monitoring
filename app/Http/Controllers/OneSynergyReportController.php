@@ -29,6 +29,16 @@ class OneSynergyReportController extends Controller
         logUserLogin();
         $month = $request->get('month', now()->format('Y-m'));
         $history = $this->monitoringSaldoHistory($month);
+        $canViewIncomingBalance = strcasecmp((string) Auth::user()?->role, '1Synergy') !== 0;
+
+        if (!$canViewIncomingBalance) {
+            $history['total_in'] = null;
+            $history['rows'] = collect($history['rows'])->map(function ($row) {
+                $row['amount_in'] = null;
+
+                return $row;
+            })->all();
+        }
 
         return view('one_synergy.monitoring_saldo', [
             'pageTitle' => 'Monitoring Saldo 1Synergy',
@@ -36,6 +46,7 @@ class OneSynergyReportController extends Controller
             'months' => $this->monthOptions($month),
             'monitoringEmail' => self::MONITORING_EMAIL,
             'senderId' => self::REFERRAL_SENDER_ID,
+            'canViewIncomingBalance' => $canViewIncomingBalance,
             'remainingBalance' => $history['remaining_balance'],
             'openingBalance' => $history['opening_balance'],
             'totalIn' => $history['total_in'],
@@ -146,6 +157,26 @@ class OneSynergyReportController extends Controller
         return datatables()->of(collect($this->referralTopupRows($request->get('month', now()->format('Y-m')))))->make(true);
     }
 
+    public function merchantSummary(Request $request)
+    {
+        logUserLogin();
+        $month = $request->get('month', now()->format('Y-m'));
+
+        return view('one_synergy.merchant_summary', [
+            'months' => $this->monthOptions($month),
+            'merchants' => $this->merchantOptions(),
+            'pageTitle' => 'Summary Merchant 1Synergy',
+            'dataUrl' => route('one-synergy.merchant-summary.data'),
+        ]);
+    }
+
+    public function merchantSummaryData(Request $request)
+    {
+        return datatables()
+            ->of(collect($this->merchantSummaryRows($request->get('month', now()->format('Y-m')))))
+            ->make(true);
+    }
+
     public function referralTopupDetailData(Request $request)
     {
         $rows = $this->paymentTransactionsForMonth($request->get('month', now()->format('Y-m')))
@@ -204,6 +235,8 @@ class OneSynergyReportController extends Controller
             ];
         }
 
+        $selectedMerchant = (string) $request->get('merchant', '');
+
         return view('cdsi.report-cdsi', [
             'months' => $months,
             'month' => $month,
@@ -213,23 +246,141 @@ class OneSynergyReportController extends Controller
             'dataUrl' => route('one-synergy.report.data'),
             'exportUrl' => route('one-synergy.report.export'),
             'showMerchantFilter' => true,
-            'merchants' => [],
-            'selectedMerchant' => '',
+            'merchants' => $this->merchantOptions(),
+            'selectedMerchant' => $selectedMerchant,
         ]);
     }
 
-    private function baseQuery(Carbon $startDate, Carbon $endDate)
+    private function merchantOptions(): array
+    {
+        try {
+            return DB::connection('kam_myads')
+                ->table('merchant_campaign_mappings as m')
+                ->leftJoin('users as u', 'u.merchant_id', '=', 'm.merchant_id')
+                ->select('m.merchant_id', DB::raw('MAX(u.name) as merchant_name'))
+                ->groupBy('m.merchant_id')
+                ->orderBy('merchant_name')
+                ->get()
+                ->map(fn ($row) => [
+                    'id' => $row->merchant_id,
+                    'key' => 'merchant_' . md5($row->merchant_id),
+                    'label' => $row->merchant_name
+                        ? $row->merchant_name . ' (' . $row->merchant_id . ')'
+                        : $row->merchant_id,
+                ])
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    private function campaignIdsForMerchant(string $merchantId): array
+    {
+        if ($merchantId === '') {
+            return [];
+        }
+
+        return DB::connection('kam_myads')
+            ->table('merchant_campaign_mappings')
+            ->where('merchant_id', $merchantId)
+            ->pluck('campaign_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    private function merchantSummaryRows(string $month): array
+    {
+        $date = Carbon::createFromFormat('Y-m', $month);
+        $merchants = collect($this->merchantOptions());
+
+        if ($merchants->isEmpty()) {
+            return [];
+        }
+
+        $mappings = DB::connection('kam_myads')
+            ->table('merchant_campaign_mappings')
+            ->get(['merchant_id', 'campaign_id'])
+            ->groupBy(fn ($row) => (string) $row->campaign_id);
+
+        $reports = OneSynergyCampaignReport::query()
+            ->whereBetween('tgl_tayang', [
+                $date->copy()->startOfMonth()->format('Y-m-d'),
+                $date->copy()->endOfMonth()->format('Y-m-d'),
+            ])
+            ->whereIn('id_iklan', $mappings->keys()->all())
+            ->get(['id_iklan', 'tgl_tayang', 'total_harga']);
+
+        $daily = [];
+        $totals = [];
+        foreach ($merchants as $merchant) {
+            $totals[$merchant['id']] = ['campaign' => 0, 'balance' => 0];
+        }
+
+        foreach ($reports as $report) {
+            $day = Carbon::parse($report->tgl_tayang)->format('Y-m-d');
+            foreach ($mappings->get((string) $report->id_iklan, collect()) as $mapping) {
+                $merchantId = (string) $mapping->merchant_id;
+                $daily[$day][$merchantId]['campaign'] = ($daily[$day][$merchantId]['campaign'] ?? 0) + 1;
+                $daily[$day][$merchantId]['balance'] = ($daily[$day][$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+                $totals[$merchantId]['campaign'] = ($totals[$merchantId]['campaign'] ?? 0) + 1;
+                $totals[$merchantId]['balance'] = ($totals[$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+            }
+        }
+
+        $rows = [];
+        $firstDay = $date->copy()->startOfMonth();
+        $lastDay = $date->isSameMonth(now())
+            ? now()->startOfDay()
+            : $date->copy()->endOfMonth()->startOfDay();
+
+        for ($day = $firstDay; $day->lte($lastDay); $day->addDay()) {
+            $merchantValues = $daily[$day->format('Y-m-d')] ?? [];
+            $row = ['date' => $day->format('d-m-Y'), 'total_campaign' => 0, 'total_balance' => 0];
+            foreach ($merchants as $merchant) {
+                $values = $merchantValues[$merchant['id']] ?? ['campaign' => 0, 'balance' => 0];
+                $row[$merchant['key'] . '_campaign'] = $values['campaign'];
+                $row[$merchant['key'] . '_balance'] = number_format($values['balance'], 0, ',', '.');
+                $row['total_campaign'] += $values['campaign'];
+                $row['total_balance'] += $values['balance'];
+            }
+            $row['total_balance'] = number_format($row['total_balance'], 0, ',', '.');
+            $rows[] = $row;
+        }
+
+        $totalRow = ['date' => 'Total Keseluruhan', 'total_campaign' => 0, 'total_balance' => 0];
+        foreach ($merchants as $merchant) {
+            $values = $totals[$merchant['id']] ?? ['campaign' => 0, 'balance' => 0];
+            $totalRow[$merchant['key'] . '_campaign'] = $values['campaign'];
+            $totalRow[$merchant['key'] . '_balance'] = number_format($values['balance'], 0, ',', '.');
+            $totalRow['total_campaign'] += $values['campaign'];
+            $totalRow['total_balance'] += $values['balance'];
+        }
+        $totalRow['total_balance'] = number_format($totalRow['total_balance'], 0, ',', '.');
+        $rows[] = $totalRow;
+
+        return $rows;
+    }
+
+    private function baseQuery(Carbon $startDate, Carbon $endDate, string $merchantId = '')
     {
         if (!Schema::hasTable((new OneSynergyCampaignReport())->getTable())) {
             return null;
         }
 
         // Keep the `cr` alias used by the shared CDSI DataTable column config.
-        return OneSynergyCampaignReport::query()->from((new OneSynergyCampaignReport())->getTable() . ' as cr')
+        $query = OneSynergyCampaignReport::query()->from((new OneSynergyCampaignReport())->getTable() . ' as cr')
             ->whereBetween('cr.tgl_tayang', [
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d'),
             ]);
+
+        if ($merchantId !== '') {
+            $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
+        }
+
+        return $query;
     }
 
     private function period(Request $request): array
@@ -243,7 +394,7 @@ class OneSynergyReportController extends Controller
     public function data(Request $request)
     {
         [, $startDate, $endDate] = $this->period($request);
-        $baseQuery = $this->baseQuery($startDate, $endDate);
+        $baseQuery = $this->baseQuery($startDate, $endDate, (string) $request->get('merchant', ''));
 
         if ($baseQuery === null) {
             return datatables()->of(collect([]))->with('summary', $this->emptySummary())->make(true);
@@ -291,7 +442,7 @@ class OneSynergyReportController extends Controller
     public function export(Request $request)
     {
         [$month, $startDate, $endDate] = $this->period($request);
-        $baseQuery = $this->baseQuery($startDate, $endDate);
+        $baseQuery = $this->baseQuery($startDate, $endDate, (string) $request->get('merchant', ''));
 
         if ($baseQuery === null) {
             return redirect()->back()->with('error', 'Tabel 1Synergy belum tersedia. Jalankan migration terlebih dahulu.');
