@@ -1028,12 +1028,18 @@
             },
             drawCallback: function() {
                 calculatePerformanceTotals();
+                // Run the area aggregation only after this request completes so
+                // the two expensive reports do not compete for database resources.
+                if (areaSummaryTable) {
+                    areaSummaryTable.ajax.reload();
+                }
             }
         });
 
         var areaSummaryTable = $('#powerHouseAreaSummaryTable').DataTable({
             processing: true,
             serverSide: true,
+            deferLoading: 0,
             responsive: true,
             paging: false,
             searching: false,
@@ -1090,7 +1096,6 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
-            areaSummaryTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -1108,7 +1113,6 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
-            areaSummaryTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -1127,8 +1131,6 @@
             if (endDate) {
                 query.append('end_date', endDate);
             }
-            alert(query)
-
             window.location.href = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
         });
 
