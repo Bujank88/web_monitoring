@@ -3084,6 +3084,8 @@ class BackController extends Controller
 
         $startDateFormatted = $startDate->copy()->format('Y-m-d');
         $endDateFormatted = $endDate->copy()->format('Y-m-d');
+        $startDateTime = $startDate->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endDateTime = $endDate->copy()->endOfDay()->format('Y-m-d H:i:s');
         $transactionDateExpr = "DATE(COALESCE(rp.paid_date, rp.tgl_transaksi))";
         $targetMonth = (int) $startDate->copy()->month;
         $targetYear = (int) $startDate->copy()->year;
@@ -3121,30 +3123,98 @@ class BackController extends Controller
             )
             ->whereIn('lm.user_id', $userIds)
             ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->where(function ($query) use ($startDateTime, $endDateTime) {
+                $query->whereBetween('rp.paid_date', [$startDateTime, $endDateTime])
+                    ->orWhere(function ($fallback) use ($startDateTime, $endDateTime) {
+                        $fallback->whereNull('rp.paid_date')
+                            ->whereBetween('rp.tgl_transaksi', [$startDateTime, $endDateTime]);
+                    });
+            })
             ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
             ->groupBy('lm.user_id')
             ->get()
             ->keyBy('user_id');
 
-        $topUpNewAkunByCode = DB::table('data_registarsi_status_approveorreject as dt')
-            ->join('report_balance_top_up as rp', function ($join) {
-                $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                    ->whereRaw("DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-            })
-            ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-            ->where('dt.status', 'APPROVE')
-            ->whereIn('lm.user_id', $userIds)
-            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
-            ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startDateFormatted, $endDateFormatted])
-            ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
-            ->groupBy('lm.user_id')
-            ->select(
-                'lm.user_id',
-                DB::raw('COUNT(DISTINCT rp.id) as top_up_count'),
-                DB::raw('SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp')
-            )
+        // The former three-table LOWER(email) join explodes on high-volume
+        // months. Load only the relevant rows and reproduce the same aggregate
+        // in memory, including duplicate lead/approval matches and DISTINCT rp.id.
+        $leadOwnersByEmail = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereNotNull('email')
+            ->select('user_id', 'email')
             ->get()
-            ->keyBy('user_id');
+            ->groupBy(function ($row) {
+                return strtolower((string) $row->email);
+            });
+
+        $approvalRows = DB::table('data_registarsi_status_approveorreject as dt')
+            ->where('dt.status', 'APPROVE')
+            ->whereIn(DB::raw('LOWER(dt.email)'), $leadOwnersByEmail->keys()->all())
+            ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startDateFormatted, $endDateFormatted])
+            ->select(
+                'dt.email',
+                DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') as approval_date")
+            )
+            ->get();
+
+        $approvalsByEmail = $approvalRows->groupBy(function ($row) {
+            return strtolower((string) $row->email);
+        });
+
+        $newAccountStats = [];
+        $approvalsByEmail->keys()->chunk(500)->each(function ($emailChunk) use (
+            $startDateTime,
+            $endDateTime,
+            $startDateFormatted,
+            $endDateFormatted,
+            $transactionDateExpr,
+            $approvalsByEmail,
+            $leadOwnersByEmail,
+            &$newAccountStats
+        ) {
+            $transactions = DB::table('report_balance_top_up as rp')
+                ->whereIn(DB::raw('LOWER(rp.email_client)'), $emailChunk->all())
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->where(function ($query) use ($startDateTime, $endDateTime) {
+                    $query->whereBetween('rp.paid_date', [$startDateTime, $endDateTime])
+                        ->orWhere(function ($fallback) use ($startDateTime, $endDateTime) {
+                            $fallback->whereNull('rp.paid_date')
+                                ->whereBetween('rp.tgl_transaksi', [$startDateTime, $endDateTime]);
+                        });
+                })
+                ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
+                ->select('rp.id', 'rp.email_client', 'rp.amount', 'rp.paid_date', 'rp.tgl_transaksi')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $emailKey = strtolower((string) $transaction->email_client);
+                $transactionDate = Carbon::parse($transaction->paid_date ?: $transaction->tgl_transaksi)->format('Y-m-d');
+
+                foreach ($approvalsByEmail->get($emailKey, collect()) as $approval) {
+                    if ($transactionDate < $approval->approval_date) {
+                        continue;
+                    }
+
+                    foreach ($leadOwnersByEmail->get($emailKey, collect()) as $owner) {
+                        $userId = (int) $owner->user_id;
+                        $newAccountStats[$userId] = $newAccountStats[$userId] ?? [
+                            'transaction_ids' => [],
+                            'amount' => 0,
+                        ];
+                        $newAccountStats[$userId]['transaction_ids'][(string) $transaction->id] = true;
+                        $newAccountStats[$userId]['amount'] += (float) $transaction->amount;
+                    }
+                }
+            }
+        });
+
+        $topUpNewAkunByCode = collect($newAccountStats)->map(function ($stats, $userId) {
+            return (object) [
+                'user_id' => (int) $userId,
+                'top_up_count' => count($stats['transaction_ids']),
+                'top_up_new_akun_rp' => $stats['amount'],
+            ];
+        });
 
         $momReference = $endDate->copy()->endOfDay();
         $currentMonthStart = $momReference->copy()->startOfMonth()->format('Y-m-d');
@@ -3159,6 +3229,9 @@ class BackController extends Controller
             ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
             ->whereIn('lm.user_id', $userIds)
             ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            // Without this bound MySQL scans and joins the complete transaction
+            // history, even though the CASE expressions only use these two months.
+            ->whereBetween(DB::raw($transactionDateExpr), [$prevMonthStart, $currentMonthUntilRef])
             ->groupBy('lm.user_id')
             ->select(
                 'lm.user_id',
