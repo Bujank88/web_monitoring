@@ -430,6 +430,10 @@
 
         z-index: 20;
 
+        padding: 16px 18px !important;
+
+        overflow: visible;
+
     }
 
     #lokasiKerjaFilterContainer .select2-container {
@@ -441,6 +445,112 @@
     #lokasiKerjaFilterContainer .select2-dropdown {
 
         z-index: 1060;
+
+        border: 1px solid #80bdff;
+
+        border-radius: 0 0 6px 6px;
+
+        overflow: hidden;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-selection--multiple {
+
+        min-height: 42px;
+
+        padding: 4px 8px;
+
+        background-color: #fff;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-selection--multiple .select2-selection__rendered {
+
+        display: flex;
+
+        flex-wrap: wrap;
+
+        align-items: center;
+
+        gap: 4px;
+
+        margin: 0;
+
+        padding: 0;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-selection--multiple .select2-selection__choice {
+
+        margin: 0;
+
+        padding: 3px 8px 3px 26px;
+
+        border: 1px solid #b6d4fe;
+
+        border-radius: 14px;
+
+        background-color: #e7f1ff;
+
+        color: #084298;
+
+        font-size: 13px;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-selection--multiple .select2-search {
+
+        flex: 1 1 180px;
+
+        margin: 0;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-selection--multiple .select2-search__field {
+
+        width: 100% !important;
+
+        height: 30px;
+
+        margin: 0 !important;
+
+        padding: 2px 4px;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-results__options {
+
+        max-height: 180px !important;
+
+        overflow-y: auto;
+
+    }
+
+    #lokasiKerjaFilterContainer .select2-results__option {
+
+        padding: 9px 12px;
+
+        font-size: 14px;
+
+    }
+
+    #locationFilterCard:hover {
+
+        transform: none;
+
+    }
+
+    #locationFilterRow {
+
+        position: relative;
+
+        z-index: 1000;
+
+    }
+
+    #locationFilterCard {
+
+        overflow: visible;
 
     }
 
@@ -818,17 +928,17 @@
 
 <!-- Filter Lokasi Kerja -->
 
-<div class="row mb-4">
+<div class="row mb-4" id="locationFilterRow">
 
-<div class="col-12">
+<div class="col-md-6 col-lg-4">
 
-    <div class="card">
+    <div class="card" id="locationFilterCard">
 
         <div class="card-body filter-section mb-0" id="lokasiKerjaFilterContainer">
 
             <div class="row align-items-end">
 
-                <div class="col-md-6 col-lg-4">
+                <div class="col-12">
 
                     <label for="filterLokasiKerja" class="form-label">
 
@@ -1139,7 +1249,7 @@
 
             allowClear: true,
 
-            closeOnSelect: false,
+            closeOnSelect: true,
 
             placeholder: function(){
 
