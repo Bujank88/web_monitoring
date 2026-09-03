@@ -237,7 +237,7 @@ class OneSynergyReportController extends Controller
 
         $selectedMerchant = (string) $request->get('merchant', '');
 
-        return view('cdsi.report-cdsi', [
+        return view('one_synergy.report-one-synergy', [
             'months' => $months,
             'month' => $month,
             'selectedRemark' => '',
@@ -416,15 +416,19 @@ class OneSynergyReportController extends Controller
 
         $summaryRow = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_campaign')
-            ->selectRaw('SUM(COALESCE(cr.sukses, 0)) as total_success')
-            ->selectRaw('SUM(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as total_failed')
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_waba")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_sms")
+            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_waba")
             ->selectRaw('SUM(COALESCE(cr.total_harga, 0)) as total_harga')
             ->first();
 
         $summary = [
             'total_campaign' => (int) ($summaryRow->total_campaign ?? 0),
-            'total_success' => (int) ($summaryRow->total_success ?? 0),
-            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_success_sms' => (int) ($summaryRow->total_success_sms ?? 0),
+            'total_success_waba' => (int) ($summaryRow->total_success_waba ?? 0),
+            'total_failed_sms' => (int) ($summaryRow->total_failed_sms ?? 0),
+            'total_failed_waba' => (int) ($summaryRow->total_failed_waba ?? 0),
             'total_harga' => (int) ($summaryRow->total_harga ?? 0),
         ];
 
@@ -436,7 +440,14 @@ class OneSynergyReportController extends Controller
 
     private function emptySummary(): array
     {
-        return ['total_campaign' => 0, 'total_success' => 0, 'total_failed' => 0, 'total_harga' => 0];
+        return [
+            'total_campaign' => 0,
+            'total_success_sms' => 0,
+            'total_success_waba' => 0,
+            'total_failed_sms' => 0,
+            'total_failed_waba' => 0,
+            'total_harga' => 0,
+        ];
     }
 
     public function export(Request $request)
