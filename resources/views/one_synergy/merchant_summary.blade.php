@@ -36,24 +36,24 @@
             <table id="merchantSummaryTable" class="table table-sm table-bordered table-hover summary-table">
                 <thead>
                     <tr>
-                        <th rowspan="3">Tanggal</th>
-                        <th colspan="{{ (count($merchants) * 2) + 2 }}" style="background:#f8d7da;">
+                        <th rowspan="3" style="text-align: center;">Tanggal</th>
+                        <th colspan="{{ (count($merchants) * 2) + 2 }}" style="background:#f8d7da; text-align: center;">
                             Summary Merchant 1Synergy | Bulan: <span id="merchantSummaryMonthLabel">{{ collect($months)->firstWhere('selected', true)['label'] ?? now()->translatedFormat('F Y') }}</span>
                         </th>
                     </tr>
                     <tr>
                         @foreach($merchants as $merchant)
-                        <th colspan="2" style="background:#dbeafe;">{{ $merchant['label'] }}</th>
+                        <th colspan="2" style="background:#dbeafe; text-align: center;">{{ $merchant['label'] }}</th>
                         @endforeach
-                        <th colspan="2" style="background:#f62b3c;color:#fff;">Total</th>
+                        <th colspan="2" style="background:#f62b3c;color:#fff; text-align: center;">Total</th>
                     </tr>
                     <tr>
                         @foreach($merchants as $merchant)
-                        <th style="background:#dbeafe;">Jumlah Campaign</th>
-                        <th style="background:#dbeafe;">Total Balance Terpakai</th>
+                        <th style="background:#dbeafe; text-align: center;">Jumlah Campaign</th>
+                        <th style="background:#dbeafe; text-align: center;">Total Balance Terpakai</th>
                         @endforeach
-                        <th style="background:#f62b3c;color:#fff;">Jumlah Campaign</th>
-                        <th style="background:#f62b3c;color:#fff;">Total Balance Terpakai</th>
+                        <th style="background:#f62b3c;color:#fff; text-align: center;">Jumlah Campaign</th>
+                        <th style="background:#f62b3c;color:#fff; text-align: center;">Total Balance Terpakai</th>
                     </tr>
                 </thead>
             </table>
