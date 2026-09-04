@@ -204,7 +204,7 @@ class LeadProgramController extends Controller
 
             foreach ($groupedData as $date => $data) {
                 $row = [
-                    'date' => Carbon::parse($date)->locale('id')->translatedFormat('d F Y'),
+                    'date' => Carbon::parse($date)->locale('id')->translatedFormat('d M Y'),
                     'mitra_sbp_settle' => number_format($data['mitra_sbp']['settlement'], 0, ',', '.'),
                     'mitra_sbp_user' => count(array_unique($data['mitra_sbp']['users'])),
                     'internal_settle' => number_format($data['internal']['settlement'], 0, ',', '.'),
