@@ -153,16 +153,16 @@
     <h5><i class="fas fa-filter"></i> FILTER DATA LEADS</h5>
     
     <div class="filter-row">
-        @if(Auth::user()->role != 'cvsr')
+        @if(Auth::user()->role === 'Admin')
         <div class="filter-group">
-            <label for="filter_canvasser">Canvasser</label>
+            <label for="filter_canvasser">User / Role</label>
             <select id="filter_canvasser" class="form-control select2">
-                <option value="">Semua Canvasser</option>
+                <option value="">Semua User</option>
                 @foreach($canvassers as $c)
-                    <option value="{{ $c->id }}">{{ $c->name }}</option>
+                    <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->role }})</option>
                 @endforeach
             </select>
-            <small>Pilih canvasser untuk memfilter canvasser</small>
+            <small>Pilih user berdasarkan nama dan role</small>
         </div>
         @endif
 
@@ -243,7 +243,8 @@
             <table class="table table-bordered table-sm" id="leadsMasterTable">
                 <thead class="bg-dark text-white">
                     <tr>
-                        <th>Canvasser</th>
+                        <th>User</th>
+                        <th>Role</th>
                         <th>Regional</th>
                         <th>Nama Perusahaan</th>
                         <th>Email</th>
@@ -387,6 +388,7 @@ $(function () {
         },
         columns: [
             { data: 'user_name', name: 'dls.user_name', searchable: true },
+            { data: 'user_role', name: 'filter_user.role', searchable: true },
             { data: 'regional', name: 'dls.regional', searchable: true },
             { data: 'company_name', name: 'dls.company_name', searchable: true },
             { data: 'email', name: 'dls.email', searchable: true },

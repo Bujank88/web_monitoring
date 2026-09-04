@@ -53,6 +53,11 @@ class LeadProgramController extends Controller
                 ->pluck('id')
                 ->toArray();
 
+            $amUserIds = DB::table('users')
+                ->whereRaw('UPPER(role) = ?', ['AM'])
+                ->pluck('id')
+                ->toArray();
+
             // Query data topup dari MySQL untuk bulan berjalan atau bulan yang difilter
             if ($monthFilter) {
                 $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
@@ -118,6 +123,7 @@ class LeadProgramController extends Controller
                         'canvasser' => ['settlement' => 0, 'users' => []],
                         'b2b' => ['settlement' => 0, 'users' => []],
                         'powerhouse' => ['settlement' => 0, 'users' => []],
+                        'am' => ['settlement' => 0, 'users' => []],
                         'advertising' => ['settlement' => 0, 'users' => []],
                     ];
                 }
@@ -143,6 +149,10 @@ class LeadProgramController extends Controller
                 elseif (!empty($leadsUserId) && in_array($leadsUserId, $powerhouseUserIds)) {
                     $groupedData[$date]['powerhouse']['settlement'] += $settlement;
                     $groupedData[$date]['powerhouse']['users'][] = $userId;
+                }
+                elseif (!empty($leadsUserId) && in_array($leadsUserId, $amUserIds)) {
+                    $groupedData[$date]['am']['settlement'] += $settlement;
+                    $groupedData[$date]['am']['users'][] = $userId;
                 }
                 // PRIORITY 4: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
                 // HANYA jika tidak ada di leads_master sebagai cvsr
@@ -195,6 +205,8 @@ class LeadProgramController extends Controller
                 'b2b_user' => [],
                 'powerhouse_settle' => 0,
                 'powerhouse_user' => [],
+                'am_settle' => 0,
+                'am_user' => [],
                 'advertising_settle' => 0,
                 'advertising_user' => [],
             ];
@@ -219,6 +231,8 @@ class LeadProgramController extends Controller
                     'b2b_user' => count(array_unique($data['b2b']['users'])),
                     'powerhouse_settle' => number_format($data['powerhouse']['settlement'], 0, ',', '.'),
                     'powerhouse_user' => count(array_unique($data['powerhouse']['users'])),
+                    'am_settle' => number_format($data['am']['settlement'], 0, ',', '.'),
+                    'am_user' => count(array_unique($data['am']['users'])),
                     'advertising_settle' => number_format($data['advertising']['settlement'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($data['advertising']['users'])),
                     'total' => number_format(
@@ -229,6 +243,7 @@ class LeadProgramController extends Controller
                             $data['canvasser']['settlement'] +
                             $data['b2b']['settlement']+
                             $data['powerhouse']['settlement'] +
+                            $data['am']['settlement'] +
                             $data['advertising']['settlement'],
                         0,
                         ',',
@@ -242,6 +257,7 @@ class LeadProgramController extends Controller
                         $data['canvasser']['users'],
                         $data['b2b']['users'],
                         $data['powerhouse']['users'],
+                        $data['am']['users'],
                         $data['advertising']['users']
                     ))),
                 ];
@@ -263,6 +279,8 @@ class LeadProgramController extends Controller
                 $totals['b2b_user'] = array_merge($totals['b2b_user'], $data['b2b']['users']);
                 $totals['powerhouse_settle'] += $data['powerhouse']['settlement'];
                 $totals['powerhouse_user'] = array_merge($totals['powerhouse_user'], $data['powerhouse']['users']);
+                $totals['am_settle'] += $data['am']['settlement'];
+                $totals['am_user'] = array_merge($totals['am_user'], $data['am']['users']);
                 $totals['advertising_settle'] += $data['advertising']['settlement'];
                 $totals['advertising_user'] = array_merge($totals['advertising_user'], $data['advertising']['users']);
             }
@@ -285,6 +303,8 @@ class LeadProgramController extends Controller
                     'b2b_user' => count(array_unique($totals['b2b_user'])),
                     'powerhouse_settle' => number_format($totals['powerhouse_settle'], 0, ',', '.'),
                     'powerhouse_user' => count(array_unique($totals['powerhouse_user'])),
+                    'am_settle' => number_format($totals['am_settle'], 0, ',', '.'),
+                    'am_user' => count(array_unique($totals['am_user'])),
                     'advertising_settle' => number_format($totals['advertising_settle'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($totals['advertising_user'])),
                     'total' => number_format(
@@ -295,6 +315,7 @@ class LeadProgramController extends Controller
                             $totals['canvasser_settle'] +
                             $totals['b2b_settle'] +
                             $totals['powerhouse_settle'] +
+                            $totals['am_settle'] +
                             $totals['advertising_settle'],
                         0,
                         ',',
@@ -308,6 +329,7 @@ class LeadProgramController extends Controller
                         $totals['canvasser_user'],
                         $totals['b2b_user'],
                         $totals['powerhouse_user'],
+                        $totals['am_user'],
                         $totals['advertising_user']
                     ))),
                 ];

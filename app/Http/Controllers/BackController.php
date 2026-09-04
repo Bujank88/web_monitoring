@@ -377,7 +377,7 @@ class BackController extends Controller
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP,1Synergy',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP,1Synergy,AM',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
@@ -438,6 +438,8 @@ class BackController extends Controller
                     return redirect()->route('presensi.index');
                 case 'MPCC':
                     return redirect()->route('mpcc.report');
+                case 'AM':
+                    return redirect()->route('am.referral.index');
                 case 'Regional':
                     return redirect()->route('daily.topup.channel');
                 case 'Dormant':
@@ -2599,6 +2601,8 @@ class BackController extends Controller
                     'Self Service (User)' => $row['self_service_user'],
                     'Agency (Settlement)' => $row['agency_settle'],
                     'Agency (User)' => $row['agency_user'],
+                    'AM (Settlement)' => $row['am_settle'],
+                    'AM (User)' => $row['am_user'],
                     'Total (Settlement)' => $row['total'],
                     'Total (User)' => $row['total_user'],
                 ];
@@ -2614,7 +2618,7 @@ class BackController extends Controller
                 // Set header
                 $headers = ['Tanggal', 'Mitra SBP (Settlement)', 'Mitra SBP (User)', 'Internal (Settlement)', 'Internal (User)', 
                             'Canvasser (Settlement)', 'Canvasser (User)', 'Self Service (Settlement)', 'Self Service (User)', 
-                            'Agency (Settlement)', 'Agency (User)', 'Total (Settlement)', 'Total (User)'];
+                            'Agency (Settlement)', 'Agency (User)', 'AM (Settlement)', 'AM (User)', 'Total (Settlement)', 'Total (User)'];
                 $sheet->fromArray($headers, null, 'A1');
 
                 // Style header
@@ -2623,7 +2627,7 @@ class BackController extends Controller
                     'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
                     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
                 ];
-                $sheet->getStyle('A1:M1')->applyFromArray($headerStyle);
+                $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
 
                 // Add data
                 $row = 2;

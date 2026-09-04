@@ -14,6 +14,7 @@ use Dflydev\DotAccessData\Data;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -51,11 +52,22 @@ class UserController extends Controller
             'name'  => 'required',
             'nohp'  => 'required',
             'email' => 'required|email|unique:users,email',
-            'role'  => 'required|in:Admin,Tsel,Treg,cvsr,PH,TCD,Internal,b2b,Maxim,Automatech,GOTO,CDSI,KSS,Regional,Area 2,MPCC,SBP,Canvasser SBP,Dormant,1Synergy',
+            'role'  => 'required|in:Admin,Tsel,Treg,cvsr,PH,AM,TCD,Internal,b2b,Maxim,Automatech,GOTO,CDSI,KSS,Regional,Area 2,MPCC,SBP,Canvasser SBP,Dormant,1Synergy',
             'area' => 'nullable|required_if:role,MPCC',
             'branch' => 'nullable|required_if:role,MPCC',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
-            'referral_code' => 'nullable|string|max:255',
+            'referral_code' => [
+                'nullable', 'string', 'max:255',
+                Rule::requiredIf(fn () => $request->role === 'AM'),
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($request->role === 'AM' && !preg_match('/^AM[1-8]$/i', trim((string) $value))) {
+                        $fail('Referral Code untuk role AM harus AM1 sampai AM8.');
+                    }
+                    if ($value && DB::table('users')->whereRaw('UPPER(referral_code) = ?', [strtoupper(trim($value))])->exists()) {
+                        $fail('Referral Code sudah digunakan user lain.');
+                    }
+                },
+            ],
             // 'treg_id' => 'nullable'
         ]);
 
@@ -67,7 +79,7 @@ class UserController extends Controller
             'area' => $request->role === 'MPCC' ? $request->area : null,
             'branch' => $request->role === 'MPCC' ? $request->branch : null,
             'regional' => $request->role === 'Regional' ? $request->regional : null,
-            'referral_code' => $request->role === 'MPCC' ? strtoupper(trim((string) $request->referral_code)) : null,
+            'referral_code' => in_array($request->role, ['MPCC', 'AM'], true) ? strtoupper(trim((string) $request->referral_code)) : null,
             // 'treg_id' => $request->role == 'Treg' ? $request->treg_id : null,
             'password' => bcrypt('123456'), // default
             'status' => 'Aktif',
@@ -94,11 +106,22 @@ class UserController extends Controller
             'name'  => 'required',
             'nohp'  => 'required',
             'email' => 'required|email|unique:users,email,' . $id,
-            'role'  => 'required|in:Admin,Tsel,Treg,cvsr,PH,TCD,Internal,b2b,Maxim,Automatech,GOTO,CDSI,KSS,Regional,Area 2,MPCC,SBP,Canvasser SBP,Dormant,1Synergy',
+            'role'  => 'required|in:Admin,Tsel,Treg,cvsr,PH,AM,TCD,Internal,b2b,Maxim,Automatech,GOTO,CDSI,KSS,Regional,Area 2,MPCC,SBP,Canvasser SBP,Dormant,1Synergy',
             'area' => 'nullable|required_if:role,MPCC',
             'branch' => 'nullable|required_if:role,MPCC',
             'regional' => 'nullable|required_if:role,Regional|string|max:255',
-            'referral_code' => 'nullable|string|max:255',
+            'referral_code' => [
+                'nullable', 'string', 'max:255',
+                Rule::requiredIf(fn () => $request->role === 'AM'),
+                function ($attribute, $value, $fail) use ($request, $id) {
+                    if ($request->role === 'AM' && !preg_match('/^AM[1-8]$/i', trim((string) $value))) {
+                        $fail('Referral Code untuk role AM harus AM1 sampai AM8.');
+                    }
+                    if ($value && DB::table('users')->where('id', '!=', $id)->whereRaw('UPPER(referral_code) = ?', [strtoupper(trim($value))])->exists()) {
+                        $fail('Referral Code sudah digunakan user lain.');
+                    }
+                },
+            ],
             // 'treg_id' => 'nullable'
         ]);
 
@@ -110,7 +133,7 @@ class UserController extends Controller
             'area' => $request->role === 'MPCC' ? $request->area : null,
             'branch' => $request->role === 'MPCC' ? $request->branch : null,
             'regional' => $request->role === 'Regional' ? $request->regional : null,
-            'referral_code' => $request->role === 'MPCC' ? strtoupper(trim((string) $request->referral_code)) : null,
+            'referral_code' => in_array($request->role, ['MPCC', 'AM'], true) ? strtoupper(trim((string) $request->referral_code)) : null,
             // 'treg_id' => $request->role == 'Treg' ? $request->treg_id : null,
             'updated_at' => now()
         ];
