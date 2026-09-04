@@ -180,6 +180,38 @@
         @endif
 
         <div class="filter-group">
+            <label for="filter_flag_event">Flag Event</label>
+            <select id="filter_flag_event" class="form-control select2">
+                <option value="">Semua Flag Event</option>
+                @foreach($flagEvents as $flagEvent)
+                    <option value="{{ $flagEvent }}">{{ $flagEvent }}</option>
+                @endforeach
+            </select>
+            <small>Pilih flag event untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter_data_type">Tipe Data</label>
+            <select id="filter_data_type" class="form-control select2">
+                <option value="">Semua Tipe Data</option>
+                @foreach($dataTypes as $dataType)
+                    <option value="{{ $dataType }}">{{ $dataType }}</option>
+                @endforeach
+            </select>
+            <small>Pilih tipe data untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter_rekomendasi">Rekomendasi</label>
+            <select id="filter_rekomendasi" class="form-control select2">
+                <option value="">Semua Rekomendasi</option>
+                <option value="Push Campaign">Push Campaign</option>
+                <option value="Push Topup">Push Topup</option>
+            </select>
+            <small>Pilih rekomendasi untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
             <label for="start_date">Tanggal Mulai</label>
             <input type="date" id="start_date" class="form-control">
             <small>Pilih tanggal awal periode</small>
@@ -217,6 +249,7 @@
                         <th>Email</th>
                         <th>No HP</th>
                         <th>Tipe Data</th>
+                        <th>Flag Event</th>
                         <th>Tanggal</th>
                         <th>Total Settlement ({{now()->translatedFormat('F Y')}})</th>
                         <th>Saldo Utama</th>
@@ -341,6 +374,9 @@ $(function () {
                 d.start_date = $('#start_date').val();
                 d.end_date   = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
+                d.flag_event = $('#filter_flag_event').val();
+                d.data_type = $('#filter_data_type').val();
+                d.rekomendasi = $('#filter_rekomendasi').val();
             },
             beforeSend: function() {
                 showLoading();
@@ -350,16 +386,17 @@ $(function () {
             }
         },
         columns: [
-            { data: 'user_name', searchable: true },
-            { data: 'regional', searchable: true },
-            { data: 'company_name', searchable: true },
-            { data: 'email', searchable: true },
-            { data: 'mobile_phone', searchable: true },
-            { data: 'data_type', searchable: false },
-            { data: 'created_at', searchable: false },
-            { data: 'total_settlement_klien', searchable: false },
-            { data: 'saldo_utama', searchable: false },
-            { data: 'rekomendasi', searchable: false },
+            { data: 'user_name', name: 'dls.user_name', searchable: true },
+            { data: 'regional', name: 'dls.regional', searchable: true },
+            { data: 'company_name', name: 'dls.company_name', searchable: true },
+            { data: 'email', name: 'dls.email', searchable: true },
+            { data: 'mobile_phone', name: 'dls.mobile_phone', searchable: true },
+            { data: 'data_type', name: 'dls.data_type', searchable: false },
+            { data: 'flag_event', name: 'dls.flag_event', searchable: true },
+            { data: 'created_at', name: 'dls.created_at', searchable: false },
+            { data: 'total_settlement_klien', name: 'dls.total_settlement_klien', searchable: false },
+            { data: 'saldo_utama', name: 'dls.saldo_utama', searchable: false },
+            { data: 'rekomendasi', name: 'rekomendasi', searchable: false },
             { data: 'aksi', orderable: false, searchable: false }
         ]
     });
@@ -370,6 +407,18 @@ $(function () {
     });
 
     $('#filter_regional').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_flag_event').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_data_type').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_rekomendasi').on('change', function () {
         table.ajax.reload();
     });
 
@@ -407,7 +456,10 @@ $(function () {
             start_date: $('#start_date').val(),
             end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val(),
-            regional: $('#filter_regional').val()
+            regional: $('#filter_regional').val(),
+            flag_event: $('#filter_flag_event').val(),
+            data_type: $('#filter_data_type').val(),
+            rekomendasi: $('#filter_rekomendasi').val()
         };
 
         let query = $.param(params);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Topup;
 use App\Models\LeadsMaster;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -14,6 +15,47 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class ReportController extends Controller
 {
+    private const AREA_2_REGIONALS = ['JABODETABEK', 'JABAR', 'DKI Jakarta', 'BANDUNG'];
+
+    protected function authorizeTransactionDetailEmailAccess(string $email): void
+    {
+        $normalizedEmail = strtolower(trim($email));
+
+        if (auth()->user()->role === 'Admin') {
+            return;
+        }
+
+        if (auth()->user()->role === 'Area 2') {
+            $hasArea2Access = DB::table('leads_master')
+                ->whereIn('regional', self::AREA_2_REGIONALS)
+                ->where(function ($query) use ($normalizedEmail) {
+                    $query->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+                        ->orWhereRaw('LOWER(TRIM(myads_account)) = ?', [$normalizedEmail]);
+                })
+                ->exists();
+
+            abort_unless($hasArea2Access, 403, 'Anda tidak punya akses untuk melihat transaksi email ini.');
+            return;
+        }
+
+        $hasAccess = DB::table('leads_master')
+            ->where('user_id', auth()->id())
+            ->where(function ($query) use ($normalizedEmail) {
+                $query->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+                    ->orWhereRaw('LOWER(TRIM(myads_account)) = ?', [$normalizedEmail]);
+            })
+            ->exists();
+
+        if (!$hasAccess && Schema::hasTable('akun_am_level_up')) {
+            $hasAccess = DB::table('akun_am_level_up')
+                ->where('user_id', auth()->id())
+                ->whereRaw('LOWER(TRIM(email_client)) = ?', [$normalizedEmail])
+                ->exists();
+        }
+
+        abort_unless($hasAccess, 403, 'Anda tidak punya akses untuk melihat transaksi email ini.');
+    }
+
      /* ================= PAGE LOAD ================= */
     public function topupCanvasser(Request $request)
     {
@@ -31,8 +73,211 @@ class ReportController extends Controller
         ]);
     }
 
+    public function topupCanvasserDetail(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $canvasser = DB::table('users')
+            ->where('id', $validated['user_id'])
+            ->where('role', 'cvsr')
+            ->select('id', 'name', 'email', 'regional')
+            ->first();
+
+        abort_if(!$canvasser, 404, 'User canvasser tidak ditemukan.');
+
+        $period = Carbon::createFromFormat('Y-m-d', $validated['month'] . '-01');
+        $regionalRequest = Request::create('/get-regional-data', 'GET', [
+            'month' => $validated['month'],
+        ]);
+        $regionalRows = collect(
+            app(LeadProgramController::class)->getRegionalData($regionalRequest)
+        );
+
+        $row = $regionalRows->first(
+            fn ($item) => empty($item['is_total'])
+                && ($item['canvaser_name'] ?? null) === $canvasser->name
+        );
+
+        abort_if(!$row, 404, 'Data report canvasser tidak ditemukan.');
+
+        $toNumber = static function ($value): float {
+            if (is_int($value) || is_float($value)) {
+                return (float) $value;
+            }
+
+            return (float) str_replace(',', '.', str_replace('.', '', (string) $value));
+        };
+
+        $leads = (int) ($row['leads'] ?? 0);
+        $existingProspect = (int) ($row['existing_akun'] ?? 0);
+        $dealNew = (int) ($row['top_up_new_akun_count'] ?? 0);
+        $dealExisting = (int) ($row['top_up_existing_akun_count'] ?? 0);
+        $revenueNew = $toNumber($row['top_up_new_akun_rp'] ?? 0);
+        $revenueExisting = $toNumber($row['top_up_existing_akun_rp'] ?? 0);
+        $totalTopup = $toNumber($row['total_top_up_rp'] ?? 0);
+        $target = $toNumber($row['target'] ?? 0);
+        $achievement = $target > 0 ? ($totalTopup / $target) * 100 : 0;
+
+        $transactionEnd = $period->isSameMonth(Carbon::today())
+            ? Carbon::today()
+            : $period->copy()->endOfMonth();
+        $currentStart = $period->copy()->startOfMonth();
+        $previousStart = $period->copy()->subMonthNoOverflow()->startOfMonth();
+        $previousEnd = $period->copy()->subMonthNoOverflow()->day(
+            min($transactionEnd->day, $period->copy()->subMonthNoOverflow()->daysInMonth)
+        );
+        $previousMonthEnd = $previousStart->copy()->endOfMonth();
+        $previousRemainingStart = $previousEnd->copy()->addDay();
+
+        $momTotals = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+            ->where('lm.user_id', $canvasser->id)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->whereBetween('rp.tgl_transaksi', [
+                $previousStart->copy()->startOfDay(),
+                $transactionEnd->copy()->endOfDay(),
+            ])
+            ->selectRaw(
+                'SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as previous_total,
+                 SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as current_total,
+                 SUM(CASE WHEN rp.tgl_transaksi BETWEEN ? AND ? THEN CAST(rp.total_settlement_klien AS DECIMAL(15,2)) ELSE 0 END) as previous_remaining',
+                [
+                    $previousStart->copy()->startOfDay(),
+                    $previousEnd->copy()->endOfDay(),
+                    $currentStart->copy()->startOfDay(),
+                    $transactionEnd->copy()->endOfDay(),
+                    $previousRemainingStart->copy()->startOfDay(),
+                    $previousMonthEnd->copy()->endOfDay(),
+                ]
+            )
+            ->first();
+
+        $monthlyTopup = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
+            ->where('lm.user_id', $canvasser->id)
+            ->whereYear('rp.tgl_transaksi', $period->year)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->groupByRaw('MONTH(rp.tgl_transaksi)')
+            ->selectRaw(
+                'MONTH(rp.tgl_transaksi) as month_number,
+                 SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total'
+            )
+            ->pluck('total', 'month_number');
+
+        $today = Carbon::today();
+        $lastTrendMonth = $period->year === $today->year
+            ? $today->month
+            : ($period->year < $today->year ? 12 : 0);
+
+        $annualTrend = collect($lastTrendMonth > 0 ? range(1, $lastTrendMonth) : [])
+            ->map(fn ($monthNumber) => [
+            'label' => Carbon::create($period->year, $monthNumber, 1)->translatedFormat('M'),
+            'total' => (float) ($monthlyTopup[$monthNumber] ?? 0),
+            ]);
+
+        $leadByEmail = DB::table('leads_master')
+            ->where('user_id', $canvasser->id)
+            ->whereNotNull('email')
+            ->groupBy(DB::raw('LOWER(TRIM(email))'))
+            ->selectRaw('LOWER(TRIM(email)) as normalized_email');
+
+        $approvalByEmail = DB::table('data_registarsi_status_approveorreject')
+            ->where('status', 'APPROVE')
+            ->whereNotNull('email')
+            ->groupBy(DB::raw('LOWER(TRIM(email))'))
+            ->selectRaw(
+                "LOWER(TRIM(email)) as normalized_email,
+                 MIN(STR_TO_DATE(tanggal_approval_aktivasi, '%Y-%m-%d')) as approval_date"
+            );
+
+        $transactions = DB::table('report_balance_top_up as rp')
+            ->joinSub($leadByEmail, 'lm', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+            })
+            ->leftJoinSub($approvalByEmail, 'dt', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'dt.normalized_email');
+            })
+            ->whereBetween('rp.tgl_transaksi', [
+                $period->copy()->startOfMonth()->startOfDay(),
+                $period->copy()->endOfMonth()->endOfDay(),
+            ])
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->select(
+                'rp.tgl_transaksi',
+                'rp.no_invoice',
+                'rp.company_name',
+                'rp.total_settlement_klien',
+                'rp.payment_method_name',
+                'rp.payment_history_status',
+                'rp.voucher_code',
+                DB::raw(
+                    "CASE
+                        WHEN rp.email_client IS NULL OR TRIM(rp.email_client) = '' THEN '-'
+                        ELSE CONCAT(
+                            LEFT(TRIM(rp.email_client), 5),
+                            REPEAT('*', GREATEST(CHAR_LENGTH(TRIM(rp.email_client)) - 5, 0))
+                        )
+                    END as masked_email"
+                ),
+                DB::raw(
+                    "CASE
+                        WHEN dt.approval_date BETWEEN '{$currentStart->format('Y-m-d')}' AND '{$period->copy()->endOfMonth()->format('Y-m-d')}'
+                         AND DATE(rp.tgl_transaksi) >= dt.approval_date
+                        THEN 'New Account'
+                        ELSE 'Existing Account'
+                    END as account_status"
+                )
+            )
+            ->orderByDesc('rp.tgl_transaksi')
+            ->get();
+
+        return view('report.topup-canvasser-detail', [
+            'canvasser' => $canvasser,
+            'month' => $validated['month'],
+            'periodLabel' => $period->translatedFormat('F Y'),
+            'dashboard' => [
+                'prospect' => [$leads, $existingProspect],
+                'deal' => [$dealNew, $dealExisting],
+                'revenue' => [$revenueNew, $revenueExisting],
+                'target' => [
+                    'target' => $target,
+                    'total' => $totalTopup,
+                    'achieved' => min($totalTopup, $target),
+                    'remaining' => max($target - $totalTopup, 0),
+                    'achievement' => $achievement,
+                    'over_target' => max($totalTopup - $target, 0),
+                ],
+                'mom' => [
+                    'labels' => [
+                        $previousStart->translatedFormat('d M') . ' - ' . $previousEnd->translatedFormat('d M Y'),
+                        $currentStart->translatedFormat('d M') . ' - ' . $transactionEnd->translatedFormat('d M Y'),
+                        'Sisa untuk menyamai ' . $previousEnd->translatedFormat('d M Y'),
+                    ],
+                    'values' => [
+                        (float) ($momTotals->previous_total ?? 0),
+                        (float) ($momTotals->current_total ?? 0),
+                        max(
+                            (float) ($momTotals->previous_total ?? 0)
+                                - (float) ($momTotals->current_total ?? 0),
+                            0
+                        ),
+                    ],
+                ],
+                'annual_trend' => [
+                    'year' => $period->year,
+                    'rows' => $annualTrend,
+                ],
+            ],
+            'transactions' => $transactions,
+        ]);
+    }
+
     
-public function topupCanvasserData(Request $request)
+
+    public function topupCanvasserData(Request $request)
 {
     /* ================= DATE RANGE ================= */
     if ($request->month) {
@@ -50,10 +295,11 @@ public function topupCanvasserData(Request $request)
     }
 
     /* ================= TOPUP ================= */
-    $topups = DB::connection('pgsql')
-        ->table('em_myads_topup')
-        ->whereBetween('tgl_transaksi', [$start, $end])
-        ->select('tgl_transaksi', 'email_client', 'total_settlement_klien')
+    $topups = DB::connection('mysql')
+        ->table('report_balance_top_up as rb')
+        ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+        ->whereBetween('rb.tgl_transaksi', [$start, $end])
+        ->select('rb.tgl_transaksi', 'rb.email_client', 'rb.total_settlement_klien')
         ->get()
         ->map(fn($t) => [
             'date'   => Carbon::parse($t->tgl_transaksi)->format('Y-m-d'),
@@ -67,20 +313,11 @@ public function topupCanvasserData(Request $request)
 
     $emails = $topups->pluck('email')->unique()->values();
 
-    /* ================= FIX DUPLICATE EMAIL ================= */
-    $sub = DB::connection('mysql')
-        ->table('leads_master')
-        ->selectRaw('LOWER(TRIM(email)) as email, MAX(id) as last_id')
-        ->whereIn(DB::raw('LOWER(TRIM(email))'), $emails)
-        ->groupBy(DB::raw('LOWER(TRIM(email))'));
-
     $master = DB::connection('mysql')
         ->table('leads_master as lm')
-        ->joinSub($sub, 'x', function ($j) {
-            $j->on('lm.id', '=', 'x.last_id');
-        })
         ->join('users', 'users.id', '=', 'lm.user_id')
-        ->where('users.role', 'cvsr');
+        ->where('users.role', 'cvsr')
+        ->whereIn(DB::raw('LOWER(TRIM(lm.email))'), $emails);
 
     if ($request->canvassers) {
         $master->whereIn('users.name', $request->canvassers);
@@ -88,6 +325,7 @@ public function topupCanvasserData(Request $request)
 
     $master = $master
         ->selectRaw('LOWER(TRIM(lm.email)) as email, users.name as canvasser')
+        ->distinct()
         ->get();
 
     if ($master->isEmpty()) {
@@ -133,18 +371,20 @@ public function topupCanvasserData(Request $request)
         $end2   = $now->copy()->subMonth()->endOfMonth()->endOfDay();
 
         // Query topup bulan ini
-        $topupThisMonth = DB::connection('pgsql')->table('em_myads_topup')
+        $topupThisMonth = DB::connection('mysql')->table('report_balance_top_up as rb')
             ->whereBetween('tgl_transaksi', [$start1, $end1])
-            ->select('email_client', DB::raw('SUM(total_settlement_klien) as total'))
-            ->groupBy('email_client')
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->select('rb.email_client', DB::raw('SUM(rb.total_settlement_klien) as total'))
+            ->groupBy('rb.email_client')
             ->get()
             ->mapWithKeys(fn($row) => [strtolower(trim($row->email_client)) => (float) $row->total]);
 
         // Query topup bulan lalu
-        $topupLastMonth = DB::connection('pgsql')->table('em_myads_topup')
+        $topupLastMonth = DB::connection('mysql')->table('report_balance_top_up as rb')
             ->whereBetween('tgl_transaksi', [$start2, $end2])
-            ->select('email_client', DB::raw('SUM(total_settlement_klien) as total'))
-            ->groupBy('email_client')
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->select('rb.email_client', DB::raw('SUM(rb.total_settlement_klien) as total'))
+            ->groupBy('rb.email_client')
             ->get()
             ->mapWithKeys(fn($row) => [strtolower(trim($row->email_client)) => (float) $row->total]);
 
@@ -227,32 +467,38 @@ public function topupCanvasserData(Request $request)
         /* ================= FILTER BULAN ================= */
         $month = $request->get('month', now()->format('Y-m'));
 
-        $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $end   = Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+        // Tambahkan tanggal 01 secara eksplisit. createFromFormat('Y-m', ...)
+        // mempertahankan tanggal hari ini dan dapat overflow, misalnya
+        // 2026-02 pada tanggal 29 akan berubah menjadi 2026-03-01.
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $start  = $period->copy()->startOfMonth();
+        $end    = $period->copy()->endOfMonth();
 
         /* ================= TOPUP PER REGION ================= */
         $topupPerRegion = DB::connection('mysql')
-            ->table('report_balance_top_up as emt')
+            ->table('report_balance_top_up as rp')
             ->selectRaw("
                 CASE
-                    WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung', 'Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
-                    WHEN data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
-                    WHEN data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
-                    WHEN data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
-                    WHEN data_province_name = 'Jawa Barat' THEN 'JABAR'
-                    WHEN data_province_name IN ('Jawa Tengah','Yogyakarta', 'DI Yogyakarta') THEN 'JATENG DIY'
-                    WHEN data_province_name = 'Jawa Timur' THEN 'JATIM'
-                    WHEN data_province_name IN ('Bali','NTB','NTT') THEN 'BALI NUSRA'
-                    WHEN data_province_name IN ('Kalimantan Tengah','Kalimantan Barat','Kalimantan Utara','Kalimantan Timur','Kalimantan Selatan') THEN 'KALIMANTAN'
-                    WHEN data_province_name IN ('Sulawesi Utara','Sulawesi Tengah','Gorontalo','Sulawesi Tenggara','Sulawesi Selatan','Maluku Utara') THEN 'SULAWESI'
-                    WHEN data_province_name IN ('Maluku','Papua Barat','Papua') THEN 'PAPUA MALUKU'
+                    WHEN rp.data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung', 'Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
+                    WHEN rp.data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
+                    WHEN rp.data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
+                    WHEN rp.data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
+                    WHEN rp.data_province_name = 'Jawa Barat' THEN 'JABAR'
+                    WHEN rp.data_province_name IN ('Jawa Tengah','Yogyakarta', 'DI Yogyakarta') THEN 'JATENG DIY'
+                    WHEN rp.data_province_name = 'Jawa Timur' THEN 'JATIM'
+                    WHEN rp.data_province_name IN ('Bali','NTB','NTT') THEN 'BALI NUSRA'
+                    WHEN rp.data_province_name IN ('Kalimantan Tengah','Kalimantan Barat','Kalimantan Utara','Kalimantan Timur','Kalimantan Selatan') THEN 'KALIMANTAN'
+                    WHEN rp.data_province_name IN ('Sulawesi Utara','Sulawesi Tengah','Gorontalo','Sulawesi Tenggara','Sulawesi Selatan','Maluku Utara') THEN 'SULAWESI'
+                    WHEN rp.data_province_name IN ('Maluku','Papua Barat','Papua') THEN 'PAPUA MALUKU'
                     ELSE 'UNKNOWN'
                 END AS region,
-                SUM(emt.total_settlement_klien) AS topup
+                SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) AS topup
             ")
-            ->whereBetween('emt.tgl_transaksi', [$start, $end])
-            ->whereNotNull('emt.tgl_transaksi')
-            // ->where('emt.payment_history_status', 'PAID')
+            ->whereDate('rp.tgl_transaksi', '>=', $start->format('Y-m-d'))
+            ->whereDate('rp.tgl_transaksi', '<=', $end->format('Y-m-d'))
+            ->whereNotNull('rp.email_client')
+            ->whereNotNull('rp.total_settlement_klien')
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
             ->groupBy('region')
             ->get()
             ->mapWithKeys(fn ($item) => [strtoupper($item->region) => $item]);
@@ -270,22 +516,48 @@ public function topupCanvasserData(Request $request)
             ->table('report_balance_top_up')
             ->whereBetween('tgl_transaksi', [$start, $end])
             ->whereNotNull('tgl_transaksi')
+            ->where('payment_method_name', '!=', 'Voucher Bonus')
             ->where('payment_history_status', 'PAID')
             ->max('tgl_transaksi');
 
         /* ================= MERGE DATA ================= */
         $data = [];
 
+        $regionOrder = [
+            'SUMBAGUT',
+            'SUMBAGTENG',
+            'SUMBAGSEL',
+            'JABODETABEK',
+            'JABAR',
+            'JATENG',
+            'JATENG DIY',
+            'JATIM',
+            'BALNUS',
+            'BALI NUSRA',
+            'KALIMANTAN',
+            'SULAWESI',
+            'PUMA',
+            'PAPUA MALUKU',
+            'UNKNOWN',
+        ];
+
         $regions = $targets->keys()
             ->merge($topupPerRegion->keys())
-            ->unique();
+            ->unique()
+            ->sortBy(function ($region) use ($regionOrder) {
+                $index = array_search(strtoupper($region), $regionOrder, true);
+
+                return $index === false ? PHP_INT_MAX : $index;
+            })
+            ->values();
             // ->filter(fn ($r) => $r !== 'UNKNOWN');
 
-        // Hitung sisa hari di bulan berjalan
-            $today = Carbon::now();
-            $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth(); // Untuk hitung sisa hari kerja
+        // Hitung hari kerja berdasarkan bulan yang sedang dipilih.
+        $today = Carbon::today();
+        $currentDate = $period->isSameMonth($today)
+            ? $today->copy()
+            : $start->copy();
+        $endOfMonth = $end->copy();
         // Daftar tanggal merah Indonesia 2026 (bisa disesuaikan atau query dari database)
         $holidays = [
             '2026-01-01', // Tahun Baru
@@ -307,8 +579,6 @@ public function topupCanvasserData(Request $request)
 
         // Hitung hanya hari kerja (Senin-Jumat) yang tersisa, exclude weekend dan tanggal merah
         $remainingWorkingDays = 0;
-        $currentDate = $today->copy();
-        
         while ($currentDate->lte($endOfMonth)) {
             // Cek apakah hari ini adalah weekday (Senin-Jumat)
             $isWeekday = $currentDate->isWeekday(); // true jika Senin-Jumat
@@ -378,13 +648,17 @@ public function topupCanvasserData(Request $request)
         
         /* ================= GENERATE MONTHS DROPDOWN ================= */
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
-        
         /* ================= GET CVSR EMAILS TO EXCLUDE ================= */
         // Get all CVSR emails to exclude from Mitra SBP, Agency, Internal counts
         // REASON: CVSR takes PRIORITY over remark classification (align with Daily TopUp logic)
@@ -496,14 +770,15 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
+            $date = $baseDate->copy()->subMonths($i);
+
             $months[] = [
-                'value' => $value,
-                'label' => $label,
-                'selected' => $value === $month
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
             ];
         }
 
@@ -530,6 +805,267 @@ public function topupCanvasserData(Request $request)
         ));
     }
 
+    public function reportCampaignRegional(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Regional';
+
+        return view('mitra-sbp.report-campaign-regional', compact(
+            'months',
+            'month',
+            'pageTitle'
+        ));
+    }
+
+    protected function campaignRegionalRegistrationSubQuery()
+    {
+        return DB::table('data_registarsi_status_approveorreject as dt')
+            ->selectRaw('LOWER(TRIM(dt.email)) as email_key')
+            ->selectRaw('MAX(dt.provinsi) as provinsi')
+            ->whereNotNull('dt.email')
+            ->where('dt.email', '!=', '')
+            ->groupBy(DB::raw('LOWER(TRIM(dt.email))'));
+    }
+
+    protected function reportCampaignRegionalBaseQuery(string $month)
+    {
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $mitraQuery = DB::table('mitra_sbp as a')
+            ->join('myads_request_soadb as b', 'a.reg_id', '=', 'b.user_id')
+            ->whereBetween('b.created_at', [$startDate, $endDate])
+            ->whereRaw('UPPER(TRIM(a.regional)) = ?', ['KALIMANTAN'])
+            ->select(
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
+                'a.email_myads as email',
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_brand as nama_instansi',
+                'b.area_provinsi',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
+                'b.total',
+                'b.sukses as success',
+                'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                'b.pesan as pesan',
+                'b.status as campaign_status',
+                DB::raw("'Mitra SBP' as source_label")
+            );
+
+        $registrationSubQuery = $this->campaignRegionalRegistrationSubQuery();
+
+        $leadsQuery = DB::table('leads_master as lm')
+            ->joinSub($registrationSubQuery, 'dt', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(lm.email))'),
+                    '=',
+                    'dt.email_key'
+                );
+            })
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->join('myads_request_soadb as b', 'lm.reg_id', '=', 'b.user_id')
+            ->whereBetween('b.created_at', [$startDate, $endDate])
+            ->whereNotNull('lm.reg_id')
+            ->where('lm.reg_id', '!=', '')
+            ->whereRaw('LOWER(TRIM(dt.provinsi)) LIKE ?', ['kalimantan%'])
+            ->whereIn('u.role', ['PH', 'MPCC'])
+            ->select(
+                DB::raw('DATE(COALESCE(b.broadcast_date, b.created_at)) as tanggal_iklan'),
+                'b.broadcast_date',
+                DB::raw('COALESCE(NULLIF(lm.myads_account, \'\'), lm.email) as email'),
+                'b.id_iklan',
+                'b.nama_iklan',
+                'b.nama_brand as nama_instansi',
+                'b.area_provinsi',
+                'b.tipe_iklan as campaign_type',
+                'b.tipe_inventori as inventory_type',
+                'b.total',
+                'b.sukses as success',
+                'b.gagal as failed',
+                'b.delivered',
+                'b.read',
+                'b.click',
+                DB::raw('CAST(b.balance_terpakai AS UNSIGNED) as balance_terpakai'),
+                'b.pesan as pesan',
+                'b.status as campaign_status',
+                DB::raw("CASE WHEN u.role = 'PH' THEN 'Powerhouse' ELSE 'MPCC' END as source_label")
+            );
+
+        return $mitraQuery->unionAll($leadsQuery);
+    }
+
+    public function reportCampaignRegionalData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        $source = $request->get('source');
+
+        $unionQuery = $this->reportCampaignRegionalBaseQuery($month);
+
+        $baseQuery = DB::query()->fromSub($unionQuery, 'campaign_regional');
+
+        if (!empty($source)) {
+            $baseQuery->where('campaign_regional.source_label', $source);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('campaign_regional.source_label', DB::raw('COUNT(*) as total'))
+            ->groupBy('campaign_regional.source_label')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Powerhouse' => 0,
+            'MPCC' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->source_label] = (int) $row->total;
+        }
+
+        return datatables()->of(
+            (clone $baseQuery)->select('campaign_regional.*')
+        )
+            ->with('summary', $summary)
+            ->editColumn('balance_terpakai', function ($row) {
+                return 'Rp ' . number_format((float) $row->balance_terpakai, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function exportCampaignRegional(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $source = $request->get('source');
+
+            $query = DB::query()
+                ->fromSub($this->reportCampaignRegionalBaseQuery($month), 'campaign_regional')
+                ->select('campaign_regional.*');
+
+            if (!empty($source)) {
+                $query->where('campaign_regional.source_label', $source);
+            }
+
+            $data = $query
+                ->orderByRaw('COALESCE(campaign_regional.broadcast_date, campaign_regional.tanggal_iklan) DESC')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $titleSource = $source ?: 'Semua Source';
+            $sheet->setCellValue(
+                'A1',
+                'REPORT CAMPAIGN REGIONAL KALIMANTAN - ' . strtoupper($titleSource) . ' - ' . $month
+            );
+
+            $sheet->mergeCells('A1:S1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Iklan',
+                'Broadcast Date',
+                'Email',
+                'ID Iklan',
+                'Nama Iklan',
+                'Nama Instansi',
+                'Area Provinsi',
+                'Campaign Type',
+                'Inventory Type',
+                'Total',
+                'Success',
+                'Failed',
+                'Delivered',
+                'Read',
+                'Click',
+                'Balance Terpakai',
+                'Pesan',
+                'Campaign Status',
+                'Source',
+            ];
+
+            $headerRow = 3;
+            foreach ($headers as $index => $header) {
+                $cell = chr(65 + $index) . $headerRow;
+                $sheet->setCellValue($cell, $header);
+            }
+
+            $sheet->getStyle('A3:S3')->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle('A3:S3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('DC3545');
+            $sheet->getStyle('A3:S3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $rowNumber = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->broadcast_date,
+                    $row->email,
+                    $row->id_iklan,
+                    $row->nama_iklan,
+                    $row->nama_instansi,
+                    $row->area_provinsi,
+                    $row->campaign_type,
+                    $row->inventory_type,
+                    $row->total,
+                    $row->success,
+                    $row->failed,
+                    $row->delivered,
+                    $row->read,
+                    $row->click,
+                    $row->balance_terpakai,
+                    $row->pesan,
+                    $row->campaign_status,
+                    $row->source_label,
+                ], null, 'A' . $rowNumber++);
+            }
+
+            foreach (range('A', 'S') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Campaign_Regional_Kalimantan_' . ($source ?: 'Semua') . '_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Export Campaign Regional Error: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal export data campaign regional.');
+        }
+    }
+
 
     public function reportSaldoSbp(Request $request)
     {
@@ -539,11 +1075,16 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
         
         $lastUpdated = DB::table('saldo_users')->max('updated_at');
@@ -581,6 +1122,47 @@ public function topupCanvasserData(Request $request)
         logUserLogin();
 
         return view('report.report-balance-top-up');
+    }
+
+    public function transactionDetailByEmail(Request $request)
+    {
+        logUserLogin();
+
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'month' => ['nullable', 'date_format:Y-m'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $this->authorizeTransactionDetailEmailAccess($email);
+        $month = $validated['month'] ?? now()->format('Y-m');
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+
+        return view('report.transaction-detail-by-email', [
+            'email' => $email,
+            'month' => $month,
+            'periodLabel' => $period->translatedFormat('F Y'),
+        ]);
+    }
+
+    public function transactionDetailByEmailData(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $this->authorizeTransactionDetailEmailAccess($email);
+        $period = Carbon::createFromFormat('Y-m-d', $validated['month'] . '-01');
+        $request->merge([
+            'email' => $email,
+            'start_date' => $period->copy()->startOfMonth()->format('Y-m-d'),
+            'end_date' => $period->copy()->endOfMonth()->format('Y-m-d'),
+            'name' => null,
+        ]);
+
+        return $this->reportBalanceTopUpData($request);
     }
 
     public function reportBalanceTopUpData(Request $request)
@@ -726,17 +1308,125 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Saldo Agency Advertising';
 
         return view('mitra-sbp.report-saldo-advertising', compact('months', 'month', 'selectedRemark', 'pageTitle'));
     }
+
+    public function reportSaldoMaxim(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo Maxim';
+
+        return view('mitra-sbp.report-saldo-maxim', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportSaldoAutomatech(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo Automatech';
+
+        return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportSaldoGoto(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo GOTO';
+        $dataRoute = 'report-saldo-goto.data';
+
+        return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute'));
+    }
+
+    public function reportSaldoAvalonKemangBogor(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Saldo Avalon Kemang Bogor';
+        $dataRoute = 'report-saldo-avalon-kemang-bogor.data';
+
+        return view('mitra-sbp.report-saldo-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute'));
+    }
+
     public function reportAgencyAdvertising(Request $request)
     {
         logUserLogin();
@@ -745,16 +1435,153 @@ public function topupCanvasserData(Request $request)
         $selectedRemark = $request->get('remark', '');
 
         $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
-            $value = $date->format('Y-m');
-            $label = $date->translatedFormat('F Y');
-            $months[] = ['value' => $value, 'label' => $label, 'selected' => $value === $month];
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
         }
 
         $pageTitle = 'Report Campaign Agency Advertising';
 
         return view('mitra-sbp.report-agency-advertising', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportMaxim(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Maxim';
+
+        return view('mitra-sbp.report-maxim', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+
+    public function reportAutomatech(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth(); // 🔥 ini kunci
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Automatech';
+
+        return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    public function reportGoto(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign GOTO';
+        $dataRoute = 'report-goto.data';
+        $exportRoute = 'report-goto.export';
+        $filterTitle = 'GOTO REPORT FILTER';
+
+        return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute', 'exportRoute', 'filterTitle'));
+    }
+
+    public function reportAvalonKemangBogor(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month
+            ];
+        }
+
+        $pageTitle = 'Report Campaign Avalon Kemang Bogor';
+        $dataRoute = 'report-avalon-kemang-bogor.data';
+        $exportRoute = 'report-avalon-kemang-bogor.export';
+        $filterTitle = 'AVALON KEMANG BOGOR REPORT FILTER';
+
+        return view('mitra-sbp.report-automatech', compact('months', 'month', 'selectedRemark', 'pageTitle', 'dataRoute', 'exportRoute', 'filterTitle'));
+    }
+    protected function automatechUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
+    {
+        return DB::table('automatech_reports as ar')
+            ->whereBetween('ar.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
+    }
+
+    protected function gotoUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
+    {
+        return DB::table('goto_reports as gr')
+            ->whereBetween('gr.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
+    }
+    protected function maximUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
+    {
+        return DB::table('maxim_reports as mr')
+            ->whereBetween('mr.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
     }
 
     public function reportSaldoSbpData(Request $request)
@@ -1020,6 +1847,183 @@ public function topupCanvasserData(Request $request)
             })
             ->make(true);
     }
+
+    public function reportSaldoMaximData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+        $baseQuery = DB::table('maxim as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportSaldoAutomatechData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+        $baseQuery = DB::table('automatech as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportSaldoGotoData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $saldoQuery = DB::table('saldo_users')
+            ->select(
+                'id_user',
+                DB::raw('COALESCE(saldo_utama,0) as saldo_utama'),
+                DB::raw('COALESCE(saldo_monet,0) as saldo_monet'),
+                DB::raw('saldo_exp_utama as saldo_exp_utama'),
+                DB::raw('saldo_exp_monet as saldo_exp_monet')
+            );
+
+        $baseQuery = DB::table('goto as a')
+            ->leftJoinSub($saldoQuery, 'b', function ($join) {
+                $join->on('a.reg_id', '=', 'b.id_user');
+            })
+            ->select(
+                'a.email_myads',
+                'a.remark',
+                'b.saldo_utama',
+                'b.saldo_monet',
+                'b.saldo_exp_utama',
+                'b.saldo_exp_monet'
+            );
+
+        if ($request->filled('remark')) {
+            $baseQuery->where('a.remark', $request->remark);
+        }
+
+        $summaryRows = (clone $baseQuery)
+            ->select('a.remark', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.remark')
+            ->get();
+
+        $summary = [
+            'Mitra SBP' => 0,
+            'Agency' => 0,
+            'Internal' => 0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $summary[$row->remark] = (int) $row->total;
+        }
+
+        return datatables()->of($baseQuery)
+            ->with('summary', $summary)
+            ->editColumn('saldo_utama', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_utama, 0, ',', '.');
+            })
+            ->editColumn('saldo_monet', function ($row) {
+                return 'Rp ' . number_format((float) $row->saldo_monet, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportSaldoAvalonKemangBogorData(Request $request)
+    {
+        return $this->reportSaldoAutomatechData($request);
+    }
+
     public function reportCampaignSbpData(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -1141,6 +2145,189 @@ public function topupCanvasserData(Request $request)
                 return 'Rp ' . number_format($row->balance_terpakai, 0, ',', '.');
             })
             ->make(true);
+    }
+
+    public function reportMaximData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = $this->maximUploadedReportBaseQuery($startDate, $endDate);
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(mr.tgl_tayang) as tanggal_iklan'),
+                'mr.id_iklan',
+                'mr.judul_pesan_iklan',
+                'mr.operator_seluler',
+                'mr.kategori_iklan',
+                'mr.tipe_kanal',
+                'mr.sukses as success',
+                DB::raw('(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as failed'),
+                'mr.refunded',
+                'mr.read',
+                'mr.click',
+                DB::raw('CASE WHEN COALESCE(mr.sukses, 0) > 0 THEN (COALESCE(mr.read, 0) / mr.sukses) * 100 ELSE 0 END as percentage_read'),
+                DB::raw('CASE WHEN COALESCE(mr.read, 0) > 0 THEN (COALESCE(mr.click, 0) / mr.read) * 100 ELSE 0 END as percentage_click'),
+                'mr.total_harga',
+                'mr.detil_status'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(COALESCE(mr.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(mr.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(mr.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(mr.click, 0)) as total_click')
+            ->selectRaw('SUM(COALESCE(mr.total_harga, 0)) as total_harga')
+            ->first();
+
+        $summary = [
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+
+    public function reportAutomatechData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = $this->automatechUploadedReportBaseQuery($startDate, $endDate);
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                'ar.id_iklan',
+                'ar.judul_pesan_iklan',
+                'ar.operator_seluler',
+                'ar.kategori_iklan',
+                'ar.tipe_kanal',
+                'ar.sukses as success',
+                DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                'ar.refunded',
+                'ar.read',
+                'ar.click',
+                DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
+                DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
+                'ar.total_harga',
+                'ar.detil_status'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(COALESCE(ar.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(ar.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(ar.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(ar.click, 0)) as total_click')
+            ->selectRaw('SUM(COALESCE(ar.total_harga, 0)) as total_harga')
+            ->first();
+
+        $summary = [
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportGotoData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = $this->gotoUploadedReportBaseQuery($startDate, $endDate);
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(gr.tgl_tayang) as tanggal_iklan'),
+                'gr.id_iklan',
+                'gr.judul_pesan_iklan',
+                'gr.operator_seluler',
+                'gr.kategori_iklan',
+                'gr.tipe_kanal',
+                'gr.sukses as success',
+                DB::raw('(COALESCE(gr.gagal, 0) + COALESCE(gr.refunded, 0)) as failed'),
+                'gr.refunded',
+                'gr.read',
+                'gr.click',
+                DB::raw('CASE WHEN (COALESCE(gr.sukses, 0) + COALESCE(gr.gagal, 0)) > 0 THEN (COALESCE(gr.sukses, 0) / (COALESCE(gr.sukses, 0) + COALESCE(gr.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
+                DB::raw('CASE WHEN COALESCE(gr.read, 0) > 0 THEN (COALESCE(gr.click, 0) / gr.read) * 100 ELSE 0 END as percentage_click'),
+                'gr.total_harga',
+                'gr.detil_status'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(COALESCE(gr.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(gr.gagal, 0) + COALESCE(gr.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(gr.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(gr.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(gr.click, 0)) as total_click')
+            ->selectRaw('SUM(COALESCE(gr.total_harga, 0)) as total_harga')
+            ->first();
+
+        $summary = [
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportAvalonKemangBogorData(Request $request)
+    {
+        return $this->reportAutomatechData($request);
     }
 
     public function exportCampaignSbp(Request $request)
@@ -1453,6 +2640,469 @@ public function topupCanvasserData(Request $request)
         }
     }
 
+    public function exportMaxim(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $data = $this->maximUploadedReportBaseQuery($startDate, $endDate)
+                ->select(
+                    DB::raw('DATE(mr.tgl_tayang) as tanggal_iklan'),
+                    'mr.id_iklan',
+                    'mr.judul_pesan_iklan',
+                    'mr.operator_seluler',
+                    'mr.kategori_iklan',
+                    'mr.tipe_kanal',
+                    'mr.sukses as success',
+                    DB::raw('(COALESCE(mr.gagal, 0) + COALESCE(mr.refunded, 0)) as failed'),
+                    'mr.refunded',
+                    'mr.read',
+                    'mr.click',
+                    DB::raw('CASE WHEN COALESCE(mr.sukses, 0) > 0 THEN (COALESCE(mr.read, 0) / mr.sukses) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN COALESCE(mr.read, 0) > 0 THEN (COALESCE(mr.click, 0) / mr.read) * 100 ELSE 0 END as percentage_click'),
+                    'mr.total_harga',
+                    'mr.detil_status'
+                )
+                ->orderByDesc('mr.tgl_tayang')
+                ->orderByDesc('mr.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT MAXIM - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Maxim_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Maxim Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+
+    public function exportAutomatech(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $data = $this->automatechUploadedReportBaseQuery($startDate, $endDate)
+                ->select(
+                    DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                    'ar.id_iklan',
+                    'ar.judul_pesan_iklan',
+                    'ar.operator_seluler',
+                    'ar.kategori_iklan',
+                    'ar.tipe_kanal',
+                    'ar.sukses as success',
+                    DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                    'ar.refunded',
+                    'ar.read',
+                    'ar.click',
+                    DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
+                    'ar.total_harga',
+                    'ar.detil_status'
+                )
+                ->orderByDesc('ar.tgl_tayang')
+                ->orderByDesc('ar.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT AUTOMATECH - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Automatech_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Automatech Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+    public function exportGoto(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $data = $this->gotoUploadedReportBaseQuery($startDate, $endDate)
+                ->select(
+                    DB::raw('DATE(gr.tgl_tayang) as tanggal_iklan'),
+                    'gr.id_iklan',
+                    'gr.judul_pesan_iklan',
+                    'gr.operator_seluler',
+                    'gr.kategori_iklan',
+                    'gr.tipe_kanal',
+                    'gr.sukses as success',
+                    DB::raw('(COALESCE(gr.gagal, 0) + COALESCE(gr.refunded, 0)) as failed'),
+                    'gr.refunded',
+                    'gr.read',
+                    'gr.click',
+                    DB::raw('CASE WHEN (COALESCE(gr.sukses, 0) + COALESCE(gr.gagal, 0)) > 0 THEN (COALESCE(gr.sukses, 0) / (COALESCE(gr.sukses, 0) + COALESCE(gr.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN COALESCE(gr.read, 0) > 0 THEN (COALESCE(gr.click, 0) / gr.read) * 100 ELSE 0 END as percentage_click'),
+                    'gr.total_harga',
+                    'gr.detil_status'
+                )
+                ->orderByDesc('gr.tgl_tayang')
+                ->orderByDesc('gr.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT GOTO - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_GOTO_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export GOTO Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+    public function exportAvalonKemangBogor(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $data = $this->automatechUploadedReportBaseQuery($startDate, $endDate)
+                ->select(
+                    DB::raw('DATE(ar.tgl_tayang) as tanggal_iklan'),
+                    'ar.id_iklan',
+                    'ar.judul_pesan_iklan',
+                    'ar.operator_seluler',
+                    'ar.kategori_iklan',
+                    'ar.tipe_kanal',
+                    'ar.sukses as success',
+                    DB::raw('(COALESCE(ar.gagal, 0) + COALESCE(ar.refunded, 0)) as failed'),
+                    'ar.refunded',
+                    'ar.read',
+                    'ar.click',
+                    DB::raw('CASE WHEN (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0)) > 0 THEN (COALESCE(ar.sukses, 0) / (COALESCE(ar.sukses, 0) + COALESCE(ar.gagal, 0))) * 100 ELSE 0 END as percentage_read'),
+                    DB::raw('CASE WHEN COALESCE(ar.read, 0) > 0 THEN (COALESCE(ar.click, 0) / ar.read) * 100 ELSE 0 END as percentage_click'),
+                    'ar.total_harga',
+                    'ar.detil_status'
+                )
+                ->orderByDesc('ar.tgl_tayang')
+                ->orderByDesc('ar.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT AVALON KEMANG BOGOR - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER
+                ]
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    number_format((float) $row->percentage_read, 2, ',', '.') . '%',
+                    number_format((float) $row->percentage_click, 2, ',', '.') . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_Avalon_Kemang_Bogor_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export Avalon Kemang Bogor Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+
+    private function getPerformanceExportPeriod(string $month): array
+    {
+        $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+
+        return [
+            $period->copy()->startOfMonth(),
+            $period->copy()->endOfMonth(),
+        ];
+    }
+
     public function exportMitraSBP()
     {
         try {
@@ -1465,8 +3115,7 @@ public function topupCanvasserData(Request $request)
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
@@ -1582,8 +3231,7 @@ public function topupCanvasserData(Request $request)
 
     private function getPerformanceExportDataByRemark(string $month, string $remark)
     {
-        $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-        $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+        [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
         return DB::table('mitra_sbp as a')
             ->leftJoin('report_balance_top_up as b', function ($join) use ($startDate, $endDate) {
@@ -1714,8 +3362,7 @@ public function topupCanvasserData(Request $request)
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
@@ -1840,8 +3487,7 @@ public function topupCanvasserData(Request $request)
                 return redirect()->back()->with('error', 'Filter bulan wajib diisi');
             }
 
-            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->toDateString();
-            $endDate   = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
+            [$startDate, $endDate] = $this->getPerformanceExportPeriod($month);
 
             // =========================
             // QUERY DATA
@@ -1954,5 +3600,453 @@ public function topupCanvasserData(Request $request)
             return redirect()->back()->with('error', 'Gagal export Internal');
         }
     }
-}
+    public function reportCdsi(Request $request)
+    {
+        logUserLogin();
 
+        $month = $request->get('month', now()->format('Y-m'));
+        $selectedRemark = $request->get('remark', '');
+
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Report Campaign CDSI';
+
+        return view('mitra-sbp.report-cdsi', compact('months', 'month', 'selectedRemark', 'pageTitle'));
+    }
+
+    protected function cdsiUploadedReportBaseQuery(Carbon $startDate, Carbon $endDate)
+    {
+        if (!Schema::hasTable('cdsi_reports')) {
+            return null;
+        }
+
+        return DB::table('cdsi_reports as cr')
+            ->whereBetween('cr.tgl_tayang', [
+                $startDate->copy()->format('Y-m-d'),
+                $endDate->copy()->format('Y-m-d'),
+            ]);
+    }
+
+    public function reportCdsiData(Request $request)
+    {
+        $month = $request->get('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+        $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+        $baseQuery = $this->cdsiUploadedReportBaseQuery($startDate, $endDate);
+
+        if ($baseQuery === null) {
+            return datatables()->of(collect([]))
+                ->with('summary', [
+                    'total_success' => 0,
+                    'total_failed' => 0,
+                    'total_refunded' => 0,
+                    'total_click' => 0,
+                    'total_harga' => 0,
+                ])
+                ->make(true);
+        }
+
+        $query = (clone $baseQuery)
+            ->select(
+                DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
+                'cr.id_iklan',
+                'cr.judul_pesan_iklan',
+                'cr.operator_seluler',
+                'cr.kategori_iklan',
+                'cr.tipe_kanal',
+                'cr.sukses as success',
+                DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
+                'cr.refunded',
+                'cr.read',
+                'cr.click',
+                'cr.total_harga',
+                'cr.detil_status'
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('SUM(COALESCE(cr.sukses, 0)) as total_success')
+            ->selectRaw('SUM(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as total_failed')
+            ->selectRaw('SUM(COALESCE(cr.refunded, 0)) as total_refunded')
+            ->selectRaw('SUM(COALESCE(cr.read, 0)) as total_read')
+            ->selectRaw('SUM(COALESCE(cr.click, 0)) as total_click')
+            ->selectRaw('SUM(COALESCE(cr.total_harga, 0)) as total_harga')
+            ->first();
+
+        $summary = [
+            'total_success' => (int) ($summaryRow->total_success ?? 0),
+            'total_failed' => (int) ($summaryRow->total_failed ?? 0),
+            'total_refunded' => (int) ($summaryRow->total_refunded ?? 0),
+            'total_click' => (int) ($summaryRow->total_click ?? 0),
+            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('percentage_read', function ($row) {
+                return number_format((float) $row->percentage_read, 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_click', function ($row) {
+                return number_format((float) $row->percentage_click, 2, ',', '.') . '%';
+            })
+            ->editColumn('total_harga', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_harga, 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function reportCdsiDormant(Request $request)
+    {
+        logUserLogin();
+
+        $pageTitle = 'Data Dormant CDSI';
+
+        return view('mitra-sbp.report-cdsi-dormant', compact('pageTitle'));
+    }
+
+    protected function cdsiDormantBaseQuery()
+    {
+        $dormantQuery = DB::table('cdsi_data_dorman as cdd')
+            ->selectRaw('cdd.email as email')
+            ->selectRaw('cdd.nomor as nomor')
+            ->selectRaw('cdd.nama_instansi as nama_instansi')
+            ->selectRaw('DATE(cdd.last_tgl_transaksi) as last_tgl_transaksi')
+            ->selectRaw('COALESCE(cdd.total_settlement, 0) as total_settlement');
+
+        $nonTopupQuery = DB::table('cdsi_data_non_topup as cdnt')
+            ->selectRaw('cdnt.email as email')
+            ->selectRaw('cdnt.nomor as nomor')
+            ->selectRaw('cdnt.nama_instansi as nama_instansi')
+            ->selectRaw('NULL as last_tgl_transaksi')
+            ->selectRaw('0 as total_settlement');
+
+        return DB::query()->fromSub(
+            $dormantQuery->unionAll($nonTopupQuery),
+            'cd'
+        );
+    }
+
+    public function reportCdsiDormantData(Request $request)
+    {
+        $baseQuery = $this->cdsiDormantBaseQuery();
+
+        $query = (clone $baseQuery)
+            ->select(
+                'cd.email',
+                'cd.nomor',
+                'cd.nama_instansi',
+                'cd.last_tgl_transaksi',
+                DB::raw('COALESCE(cd.total_settlement, 0) as total_settlement')
+            );
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('COUNT(*) as total_data')
+            ->selectRaw('SUM(COALESCE(cd.total_settlement, 0)) as total_settlement')
+            ->first();
+
+        $summary = [
+            'total_data' => (int) ($summaryRow->total_data ?? 0),
+            'total_settlement' => (int) ($summaryRow->total_settlement ?? 0),
+        ];
+
+        return datatables()->of($query)
+            ->with('summary', $summary)
+            ->editColumn('total_settlement', function ($row) {
+                return 'Rp ' . number_format((float) $row->total_settlement, 0, ',', '.');
+            })
+            ->orderColumn('email', 'cd.email $1')
+            ->orderColumn('nomor', 'cd.nomor $1')
+            ->orderColumn('nama_instansi', 'cd.nama_instansi $1')
+            ->orderColumn('last_tgl_transaksi', 'cd.last_tgl_transaksi $1')
+            ->orderColumn('total_settlement', 'cd.total_settlement $1')
+            ->make(true);
+    }
+
+    public function exportCdsi(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            [$year, $monthNum] = explode('-', $month);
+            $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
+            $endDate = Carbon::create($year, $monthNum, 1)->endOfMonth();
+
+            $baseQuery = $this->cdsiUploadedReportBaseQuery($startDate, $endDate);
+
+            if ($baseQuery === null) {
+                return redirect()->back()->with('error', 'Tabel cdsi_reports belum tersedia. Jalankan migration atau upload report CDSI terlebih dahulu.');
+            }
+
+            $data = $baseQuery
+                ->select(
+                    DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
+                    'cr.id_iklan',
+                    'cr.judul_pesan_iklan',
+                    'cr.operator_seluler',
+                    'cr.kategori_iklan',
+                    'cr.tipe_kanal',
+                    'cr.sukses as success',
+                    DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
+                    'cr.refunded',
+                    'cr.read',
+                    'cr.click',
+                    'cr.total_harga',
+                    'cr.detil_status'
+                )
+                ->orderByDesc('cr.tgl_tayang')
+                ->orderByDesc('cr.id_iklan')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk di-export');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $sheet->setCellValue('A1', 'REPORT CDSI - ' . $month);
+            $sheet->mergeCells('A1:O1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $headers = [
+                'Tanggal Tayang',
+                'ID Iklan',
+                'Judul Pesan Iklan',
+                'Operator Seluler',
+                'Kategori Iklan',
+                'Tipe Kanal',
+                'Success',
+                'Failed',
+                'Refunded',
+                'Read',
+                'Click',
+                'Percentage Read',
+                'Percentage Click',
+                'Total Harga',
+                'Detil Status',
+            ];
+            $sheet->fromArray($headers, null, 'A3');
+
+            $sheet->getStyle('A3:O3')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'DC3545'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+            ]);
+
+            $rowNum = 4;
+            foreach ($data as $row) {
+                $sheet->fromArray([
+                    $row->tanggal_iklan,
+                    $row->id_iklan,
+                    $row->judul_pesan_iklan,
+                    $row->operator_seluler,
+                    $row->kategori_iklan,
+                    $row->tipe_kanal,
+                    $row->success,
+                    $row->failed,
+                    $row->refunded,
+                    $row->read,
+                    $row->click,
+                    round((float) $row->percentage_read, 2) . '%',
+                    round((float) $row->percentage_click, 2) . '%',
+                    $row->total_harga,
+                    $row->detil_status,
+                ], null, 'A' . $rowNum);
+                $rowNum++;
+            }
+
+            foreach (range('A', 'O') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $fileName = 'Report_CDSI_' . $month . '.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet) {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Export CDSI Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal export data');
+        }
+    }
+    public function reportCdsiProvince(Request $request)
+    {
+        logUserLogin();
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $months = [];
+        $baseDate = now()->startOfMonth();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $baseDate->copy()->subMonths($i);
+
+            $months[] = [
+                'value' => $date->format('Y-m'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m') === $month,
+            ];
+        }
+
+        $pageTitle = 'Top Up Active';
+
+        return view('mitra-sbp.report-cdsi-province', compact('months', 'month', 'pageTitle'));
+    }
+
+    protected function cdsiProvinceTopupBaseQuery(string $month)
+    {
+        $monthDate = Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+
+        return DB::table('report_balance_top_up as rp')
+            ->select(
+                'rp.data_province_name',
+                'rp.user_id',
+                'rp.email_client',
+                DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement_klien'),
+                DB::raw('COUNT(*) as transaction_count'),
+                DB::raw('MAX(rp.tgl_transaksi) as tgl_transaksi')
+            )
+            ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+            ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+            ->whereNotNull('rp.data_province_name')
+            ->whereNotNull('rp.email_client')
+            ->whereNotNull('rp.total_settlement_klien')
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client');
+    }
+
+    public function reportCdsiProvinceData(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $search = $request->input('search.value');
+
+            $baseQuery = $this->cdsiProvinceTopupBaseQuery($month)
+                ->orderBy('total_settlement_klien', 'desc');
+
+            if ($search) {
+                $baseQuery->where(function ($q) use ($search) {
+                    $q->where('rp.data_province_name', 'like', "%$search%")
+                        ->orWhere('rp.email_client', 'like', "%$search%")
+                        ->orWhere('rp.user_id', 'like', "%$search%");
+                });
+            }
+
+            $allData = (clone $baseQuery)->get();
+            $totals = [
+                'total_provinces' => $allData->unique('data_province_name')->count(),
+                'total_user_ids' => $allData->unique('user_id')->count(),
+                'total_emails' => $allData->unique('email_client')->count(),
+                'total_settlement' => $allData->sum('total_settlement_klien'),
+                'total_settlement_format' => 'Rp ' . number_format($allData->sum('total_settlement_klien'), 0, ',', '.'),
+            ];
+
+            return datatables()->of($baseQuery)
+                ->addColumn('tanggal_format', function ($row) {
+                    return Carbon::parse($row->tgl_transaksi)->translatedFormat('F Y');
+                })
+                ->addColumn('total_settlement_format', function ($row) {
+                    return 'Rp ' . number_format($row->total_settlement_klien, 0, ',', '.');
+                })
+                ->with('totals', $totals)
+                ->make(true);
+        } catch (\Exception $e) {
+            \Log::error('Error in reportCdsiProvinceData: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function exportCdsiProvince(Request $request)
+    {
+        try {
+            $month = $request->get('month', now()->format('Y-m'));
+            $monthDate = Carbon::createFromFormat('Y-m-d', $month . '-01');
+            $displayMonth = $monthDate->translatedFormat('F Y');
+
+            $data = $this->cdsiProvinceTopupBaseQuery($month)
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderBy('total_settlement_klien', 'desc')
+                ->get();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Provinsi' => $row->data_province_name,
+                    'User ID' => $row->user_id,
+                    'Email' => $row->email_client,
+                    'Bulan' => Carbon::parse($row->tgl_transaksi)->translatedFormat('F Y'),
+                    'Total Settlement' => ' ' . number_format((float) $row->total_settlement_klien, 0, ',', '.'),
+                ];
+            }
+
+            $fileName = 'CDSI_Daily_TopUp_Per_Province_' . str_replace(' ', '_', $displayMonth) . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = ['Provinsi', 'User ID', 'Email', 'Bulan', 'Total Settlement'];
+                $sheet->fromArray($headers, null, 'A1');
+                $sheet->getStyle('A1:E1')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'DC3545'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    ],
+                ]);
+
+                $rowNumber = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray(array_values($item), null, 'A' . $rowNumber);
+                    $rowNumber++;
+                }
+
+                $sheet->getColumnDimension('A')->setWidth(25);
+                $sheet->getColumnDimension('B')->setWidth(15);
+                $sheet->getColumnDimension('C')->setWidth(35);
+                $sheet->getColumnDimension('D')->setWidth(18);
+                $sheet->getColumnDimension('E')->setWidth(20);
+
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error('Error in exportCdsiProvince: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
+}

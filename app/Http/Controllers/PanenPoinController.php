@@ -172,19 +172,8 @@ class PanenPoinController extends Controller
     public function report()
     {
         logUserLogin();
-        $months = [];
+        $months = $this->getPanenPoinReportMonths();
 
-        $currentYear = Carbon::now()->year;
-        $currentMonth = Carbon::now()->format('Y-m-01'); // bulan sekarang, tanggal 01
-
-        for ($i = 1; $i <= 12; ++$i) {
-            $date = Carbon::create($currentYear, $i, 1);
-            $months[] = [
-                'value' => $date->format('Y-m-d'), // e.g., 2025-05-01
-                'label' => $date->translatedFormat('F Y'), // e.g., Mei 2025
-                'selected' => $date->format('Y-m-d') === $currentMonth,
-            ];
-        }
         return view('panenpoin.reportpoin', compact('months'));
     }
 
@@ -192,19 +181,7 @@ class PanenPoinController extends Controller
     public function reportCanvasser()
     {
         logUserLogin();
-        $months = [];
-
-        $currentYear = Carbon::now()->year;
-        $currentMonth = Carbon::now()->format('Y-m-01');
-
-        for ($i = 1; $i <= 12; ++$i) {
-            $date = Carbon::create($currentYear, $i, 1);
-            $months[] = [
-                'value' => $date->format('Y-m-d'),
-                'label' => $date->translatedFormat('F Y'),
-                'selected' => $date->format('Y-m-d') === $currentMonth,
-            ];
-        }
+        $months = $this->getPanenPoinReportMonths();
 
         return view('panenpoin.report-canvasser-panenpoin', compact('months'));
     }
@@ -255,21 +232,34 @@ class PanenPoinController extends Controller
     public function reportPowerhouse()
     {
         logUserLogin();
-        $months = [];
-
-        $currentYear = Carbon::now()->year;
-        $currentMonth = Carbon::now()->format('Y-m-01');
-
-        for ($i = 1; $i <= 12; ++$i) {
-            $date = Carbon::create($currentYear, $i, 1);
-            $months[] = [
-                'value' => $date->format('Y-m-d'),
-                'label' => $date->translatedFormat('F Y'),
-                'selected' => $date->format('Y-m-d') === $currentMonth,
-            ];
-        }
+        $months = $this->getPanenPoinReportMonths();
 
         return view('panenpoin.report-ph-panenpoin', compact('months'));
+    }
+
+    private function getPanenPoinReportMonths()
+    {
+        $startMonth = Carbon::create(2026, 1, 1);
+        $endMonth = Carbon::create(2026, 3, 1);
+        $currentMonth = Carbon::now()->startOfMonth();
+        $selectedMonth = $currentMonth->betweenIncluded($startMonth, $endMonth)
+            ? $currentMonth->format('Y-m-d')
+            : $endMonth->format('Y-m-d');
+
+        $months = [];
+        $monthCursor = $startMonth->copy();
+
+        while ($monthCursor->lte($endMonth)) {
+            $months[] = [
+                'value' => $monthCursor->format('Y-m-d'),
+                'label' => $monthCursor->translatedFormat('F Y'),
+                'selected' => $monthCursor->format('Y-m-d') === $selectedMonth,
+            ];
+
+            $monthCursor->addMonth();
+        }
+
+        return $months;
     }
 
     // Get data ringkasan per powerhouse
@@ -497,8 +487,10 @@ class PanenPoinController extends Controller
             \Log::info('=== REFRESH SUMMARY PANEN POIN STARTED ===');
             
             // Tentukan range tanggal bulan berjalan
-            $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $startDate = Carbon::now()->subMonth()->endOfMonth()->format('Y-m-d');
             $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+            // $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+            // $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             
             // Ambil semua canvasser
             $canvassers = User::whereIn('role', ['cvsr', 'PH'])->get();

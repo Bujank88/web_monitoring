@@ -20,24 +20,372 @@ use Carbon\Carbon;
 use Dflydev\DotAccessData\Data;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 
 class BackController extends Controller
 {
+    private function resolveSemesterPeriod(?string $semesterValue): array
+    {
+        $now = Carbon::now();
+        $defaultSemester = $now->month <= 6 ? 1 : 2;
+
+        if (!preg_match('/^(\d{4})-(1|2)$/', (string) $semesterValue, $matches)) {
+            $year = (int) $now->year;
+            $semester = (int) $defaultSemester;
+        } else {
+            $year = (int) $matches[1];
+            $semester = (int) $matches[2];
+        }
+
+        $startMonth = $semester === 1 ? 1 : 7;
+        $endMonth = $semester === 1 ? 6 : 12;
+        $startDate = Carbon::create($year, $startMonth, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $endMonth, 1)->endOfMonth();
+
+        return [
+            'year' => $year,
+            'semester' => $semester,
+            'value' => $year . '-' . $semester,
+            'label' => sprintf(
+                'Semester %d %d (%s - %s)',
+                $semester,
+                $year,
+                $startDate->translatedFormat('F'),
+                $endDate->translatedFormat('F')
+            ),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ];
+    }
+
+    private function buildPowerHouseDealTopupMomResult(
+        Carbon $startDate,
+        Carbon $endDate,
+        callable $targetResolver,
+        ?Carbon $momReferenceDate = null
+    ): array {
+        $startDateFormatted = $startDate->copy()->startOfDay()->format('Y-m-d');
+        $endDateFormatted = $endDate->copy()->endOfDay()->format('Y-m-d');
+
+        $phUsers = DB::table('users')
+            ->where('role', 'PH')
+            ->where('name', '!=', 'self service')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        if ($phUsers->isEmpty()) {
+            return [];
+        }
+
+        $allTeamUserIds = $phUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        $topUpStatsByUser = collect();
+        $topUpNewAkunByUser = collect();
+        $topUpExistingAkunByUser = collect();
+        $momByUser = collect();
+        $topUpAggByUser = collect();
+        $saldoTransferStatsByUser = collect();
+        $saldoTransferNewAkunByUser = collect();
+        $saldoTransferExistingAkunByUser = collect();
+        $saldoTransferMomByUser = collect();
+        $saldoTransferAggByUser = collect();
+        $leadAggByUser = collect();
+        $visitAggByName = collect();
+        $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
+        
+        if (!empty($allTeamUserIds)) {
+            $topUpStatsByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpAggByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
+                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->whereBetween(
+                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                    [$startDateFormatted, $endDateFormatted]
+                )
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('dt.status', 'APPROVE')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
+                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_existing_akun_rp")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            $momReference = ($momReferenceDate ?: Carbon::today())->copy()->endOfDay();
+            $currentMonthStart = $momReference->copy()->startOfMonth()->format('Y-m-d');
+            $currentMonthUntilRef = $momReference->copy()->format('Y-m-d');
+            $prevMonthRef = $momReference->copy()->subMonthNoOverflow();
+            $prevMonthStart = $prevMonthRef->copy()->startOfMonth()->format('Y-m-d');
+            $prevMonthSameDay = $prevMonthRef->copy()->format('Y-m-d');
+            $prevMonthEnd = $prevMonthRef->copy()->endOfMonth()->format('Y-m-d');
+            $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
+
+            $momByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->whereIn('lm.user_id', $allTeamUserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->groupBy('lm.user_id')
+                ->select(
+                    'lm.user_id',
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
+                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
+                )
+                ->get()
+                ->keyBy('user_id');
+
+            if (Schema::hasTable('saldo_transfer')) {
+                $saldoTransferStatsByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(st.id) as top_up_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as total_top_up_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferAggByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(DISTINCT LOWER(st.email_client)) as jumlah_akun'),
+                        DB::raw('MAX(st.tgl_transaksi) as tgl_transaksi_terakhir')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('saldo_transfer as st', function ($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                            ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->where('dt.status', 'APPROVE')
+                    ->whereBetween(
+                        DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
+                        [$startDateFormatted, $endDateFormatted]
+                    )
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(DISTINCT st.id) as top_up_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as top_up_new_akun_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
+                    ->join('saldo_transfer as st', function ($join) {
+                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                            ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                    })
+                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->where('dt.status', 'APPROVE')
+                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
+                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw('COUNT(st.id) as top_up_existing_akun_count'),
+                        DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as top_up_existing_akun_rp')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                $saldoTransferMomByUser = DB::table('saldo_transfer as st')
+                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->groupBy('lm.user_id')
+                    ->select(
+                        'lm.user_id',
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_prev_partial"),
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_current_partial"),
+                        DB::raw("SUM(CASE WHEN DATE(st.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(st.amount AS DECIMAL(18,2)) ELSE 0 END) as mom_prev_remaining")
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+            }
+        }
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $allTeamUserIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $phUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
+        $result = [];
+        foreach ($phUsers as $phUser) {
+            $userId = (int) $phUser->id;
+
+            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0)
+                + (int) ($saldoTransferNewAkunByUser[$userId]->top_up_count ?? 0);
+            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0)
+                + (int) ($saldoTransferExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
+            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
+            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
+            $totalTransferSaldoRp = (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $reportTopUpTotalFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0)
+                + (float) ($saldoTransferStatsByUser[$userId]->total_top_up_rp ?? 0);
+            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0)
+                + (float) ($saldoTransferMomByUser[$userId]->mom_prev_remaining ?? 0);
+
+            $splitTopUpOnly = $topUpNewAkunRp + $topUpExistingAkunRp;
+            if ($reportTopUpTotalFromStats > 0 && $splitTopUpOnly < $reportTopUpTotalFromStats) {
+                $difference = $reportTopUpTotalFromStats - $splitTopUpOnly;
+                $topUpExistingAkunRp += $difference;
+            }
+            $totalTopup = $topUpNewAkunRp + $topUpExistingAkunRp + $totalTransferSaldoRp;
+            if ($totalTopUpFromStats > 0 && $totalTopup <= 0) {
+                $totalTopup = $totalTopUpFromStats;
+            }
+
+            $momGap = $momCurrentPartial - $momPrevPartial;
+            $poin = floor($totalTopup / 1000000);
+
+            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0)
+                + (int) ($saldoTransferAggByUser[$userId]->jumlah_akun ?? 0);
+            $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
+            $target = (float) ($targetByTeam[$userId]->target ?? 0);
+            $lastTransactionDates = array_filter([
+                $topUpAggByUser[$userId]->tgl_transaksi_terakhir ?? null,
+                $saldoTransferAggByUser[$userId]->tgl_transaksi_terakhir ?? null,
+            ]);
+            $tglFormatted = !empty($lastTransactionDates)
+                ? Carbon::parse(max($lastTransactionDates))->format('d M Y')
+                : '-';
+            
+            $result[] = [
+                'team_powerhouse' => $phUser->name,
+                'jumlah_akun' => $jumlahAkun,
+                'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => $jumlahVisit,
+                'deal_topup_new_akun' => $topUpNewAkunCount,
+                'deal_topup_existing_akun' => $topUpExistingAkunCount,
+                'top_up_new_akun_rp' => $topUpNewAkunRp,
+                'top_up_existing_akun_rp' => $topUpExistingAkunRp,
+                'total_transfer_saldo_rp' => $totalTransferSaldoRp,
+                'total_topup' => $totalTopup,
+                'target' => $target,
+                'mom_prev_partial' => $momPrevPartial,
+                'mom_current_partial' => $momCurrentPartial,
+                'mom_prev_remaining' => $momPrevRemaining,
+                'mom_gap' => $momGap,
+                'poin' => $poin,
+                'tgl_transaksi_terakhir' => $tglFormatted,
+            ];
+        }
+
+        return collect($result)
+            ->sort(function ($a, $b) {
+                if ($a['total_topup'] === $b['total_topup']) {
+                    return strcmp($a['team_powerhouse'], $b['team_powerhouse']);
+                }
+                return $b['total_topup'] <=> $a['total_topup'];
+            })
+            ->values()
+            ->all();
+    }
+
     public function registerStore(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required',
             'nope' => 'required',
             'email' => ['required', 'email', 'regex:/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
-            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b',
+            'role' => 'required|in:Admin,Tsel,TCD,Internal,b2b,CDSI,KSS,MPCC,Regional,Dormant,SBP,Canvasser SBP,1Synergy',
+            'regional' => 'nullable|required_if:role,Regional|string|max:255',
         ]);
         $data = [
             'name' => $request->name,
             'nohp' => $request->nope,
             'email' => $request->email,
             'role' => $request->role,
+            'regional' => $request->role === 'Regional' ? $request->regional : null,
             'password' => Hash::make('123456'),
             'status' => 'Aktif'
         ];
@@ -88,10 +436,31 @@ class BackController extends Controller
                     return redirect()->route('race_summary_treg');
                 case 'cvsr':
                     return redirect()->route('presensi.index');
+                case 'MPCC':
+                    return redirect()->route('mpcc.report');
+                case 'Regional':
+                    return redirect()->route('daily.topup.channel');
+                case 'Dormant':
+                    return redirect()->route('data-dormant');
                 case 'TCD':
                     return redirect()->route('report-agency-advertising');
+                case 'Maxim':
+                    return redirect()->route('report-maxim');
+                case 'Automatech':
+                    return redirect()->route('report-automatech');
+                case 'GOTO':
+                    return redirect()->route('report-goto');
                 case 'Internal':
                     return redirect()->route('mitra-sbp');
+                case 'SBP':
+                case 'Canvasser SBP':
+                    return redirect()->route('pilot-sbp-sme');
+                case 'CDSI':
+                case 'KSS':
+                case 'kss':
+                    return redirect()->route('report-cdsi');
+                case '1Synergy':
+                    return redirect()->route('one-synergy.report');
                 case 'b2b':
                     return redirect()->route('amlevelup.index');
                 default:
@@ -103,6 +472,516 @@ class BackController extends Controller
         return back()->withErrors([
             'email' => 'Email atau Password Anda salah.',
         ])->withInput();
+    }
+
+    public function storeUploadAutomatechReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-automatech';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('automatech-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.automatech-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.automatech-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('automatech_reports')->delete();
+            DB::table('automatech_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.automatech-report')
+            ->with('success', count($payload) . ' baris report Automatech berhasil diimport dari ' . $storedPath . '.');
+    }
+
+    public function storeUploadGotoReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-goto';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('goto-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.goto-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.goto-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('goto_reports')->delete();
+            DB::table('goto_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.goto-report')
+            ->with('success', count($payload) . ' baris report GOTO berhasil diimport dari ' . $storedPath . '.');
+    }
+
+    public function storeUploadAvalonKemangBogorReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-avalon-kemang-bogor';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('avalon-kemang-bogor-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.avalon-kemang-bogor-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.avalon-kemang-bogor-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('automatech_reports')->delete();
+            DB::table('automatech_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.avalon-kemang-bogor-report')
+            ->with('success', count($payload) . ' baris report Avalon Kemang Bogor berhasil diimport dari ' . $storedPath . '.');
+    }
+
+
+    public function storeUploadCdsiReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-cdsi';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('cdsi-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.cdsi-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.cdsi-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('cdsi_reports')->delete();
+            DB::table('cdsi_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.cdsi-report')
+            ->with('success', count($payload) . ' baris report CDSI berhasil diimport dari ' . $storedPath . '.');
+    }
+    private function parseAutomatechReportDate($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            if (is_numeric($value)) {
+                return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('Y-m-d');
+            }
+
+            $dateString = trim((string) $value);
+
+            foreach (['m/d/Y', 'n/j/Y', 'd/m/Y', 'j/n/Y'] as $format) {
+                try {
+                    return Carbon::createFromFormat($format, $dateString)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                }
+            }
+
+            return Carbon::parse($dateString)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function parseAutomatechReportInteger($value): int
+    {
+        $normalized = preg_replace('/[^\d]/', '', (string) $value);
+
+        return $normalized === '' ? 0 : (int) $normalized;
+    }
+
+    private function parseAutomatechReportStatus(?string $detailStatus): array
+    {
+        $success = 0;
+        $failed = 0;
+        $detailStatus = (string) $detailStatus;
+
+        if (preg_match('/Sukses\s*:\s*([\d\.,]+)/i', $detailStatus, $matches)) {
+            $success = $this->parseAutomatechReportInteger($matches[1]);
+        }
+
+        if (preg_match('/Gagal\s*:\s*([\d\.,]+)/i', $detailStatus, $matches)) {
+            $failed = $this->parseAutomatechReportInteger($matches[1]);
+        }
+
+        return [$success, $failed];
+    }
+
+    public function storeUploadMaximReport(Request $request)
+    {
+        $validated = $request->validate([
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'report_file.required' => 'File report wajib dipilih.',
+            'report_file.mimes' => 'File harus berformat Excel (.xlsx atau .xls).',
+            'report_file.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $file = $validated['report_file'];
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = Str::slug($originalName);
+
+        if (empty($safeName)) {
+            $safeName = 'report-maxim';
+        }
+
+        $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+        $storedPath = $file->storeAs('maxim-report-uploads', $fileName);
+        $uploadBatch = now()->format('YmdHis');
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+        if (count($rows) <= 1) {
+            return redirect()
+                ->route('admin.upload.maxim-report')
+                ->with('error', 'File Excel tidak memiliki data yang bisa diproses.');
+        }
+
+        $payload = [];
+        foreach (array_slice($rows, 1) as $row) {
+            $idIklan = trim((string) ($row['A'] ?? ''));
+            $tglTayang = $this->parseAutomatechReportDate($row['B'] ?? null);
+            $judulPesanIklan = trim((string) ($row['C'] ?? ''));
+            $operatorSeluler = trim((string) ($row['D'] ?? ''));
+            $kategoriIklan = trim((string) ($row['E'] ?? ''));
+            $tipeKanal = trim((string) ($row['F'] ?? ''));
+            $detilStatus = trim((string) ($row['G'] ?? ''));
+            $refunded = $this->parseAutomatechReportInteger($row['H'] ?? 0);
+            $read = $this->parseAutomatechReportInteger($row['I'] ?? 0);
+            $click = $this->parseAutomatechReportInteger($row['J'] ?? 0);
+            $totalHarga = $this->parseAutomatechReportInteger($row['K'] ?? 0);
+
+            if ($idIklan === '' && $judulPesanIklan === '' && $detilStatus === '') {
+                continue;
+            }
+
+            if ($idIklan === '') {
+                continue;
+            }
+
+            [$sukses, $gagal] = $this->parseAutomatechReportStatus($detilStatus);
+
+            $payload[] = [
+                'id_iklan' => $idIklan,
+                'tgl_tayang' => $tglTayang,
+                'judul_pesan_iklan' => $judulPesanIklan !== '' ? $judulPesanIklan : null,
+                'operator_seluler' => $operatorSeluler !== '' ? $operatorSeluler : null,
+                'kategori_iklan' => $kategoriIklan !== '' ? $kategoriIklan : null,
+                'tipe_kanal' => $tipeKanal !== '' ? $tipeKanal : null,
+                'detil_status' => $detilStatus !== '' ? $detilStatus : null,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'refunded' => $refunded,
+                'read' => $read,
+                'click' => $click,
+                'total_harga' => $totalHarga,
+                'source_file_name' => $file->getClientOriginalName(),
+                'upload_batch' => $uploadBatch,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if (empty($payload)) {
+            return redirect()
+                ->route('admin.upload.maxim-report')
+                ->with('error', 'Tidak ada baris valid yang bisa diimport dari file Excel.');
+        }
+
+        DB::transaction(function () use ($payload) {
+            DB::table('maxim_reports')->delete();
+            DB::table('maxim_reports')->insert($payload);
+        });
+
+        return redirect()
+            ->route('admin.upload.maxim-report')
+            ->with('success', count($payload) . ' baris report Maxim berhasil diimport dari ' . $storedPath . '.');
     }
 
     public function getPadiUmkmData(Request $request)
@@ -789,13 +1668,13 @@ class BackController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
-        \Log::info($startDate);
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -893,11 +1772,18 @@ class BackController extends Controller
      */
     public function exportCanvasserVoucher()
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $monthParam = request()->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
+        $currentMonth = $monthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
-        
+        $canvasserCodes = [
+            'EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5',
+            'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
+            'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+        ];
         // Query dengan JOIN (per akun, bukan aggregate)
         $data = DB::table('report_balance_top_up as rb')
             ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
@@ -916,51 +1802,47 @@ class BackController extends Controller
             ->get();
         
         // Mapping untuk Canvasser names
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman'
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
         
         // Transform data untuk Excel (per akun dengan insentif per akun)
-        $exportData = $data->map(function ($item) use ($canvasserMapping) {
+        $showInsentif = $this->isCanvasserInsentifVisible($monthStart);
+        $exportData = $data->map(function ($item) use ($canvasserMapping, $showInsentif) {
             $totalAmount = (float)$item->amount;
             // Insentif per akun: jika total > 500K, dapat 100K
             $insentif = $totalAmount > 500000 ? 100000 : 0;
+            $canvasserName = $canvasserMapping[$item->voucher_code] ?? '';
             
-            return [
+            $row = [
                 'Email' => $item->email_client,
                 'Perusahaan' => $item->company_name,
                 'Voucher Code' => $item->voucher_code,
-                'Canvasser' => $canvasserMapping[$item->voucher_code] ?? '-',
+                'Canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'Total Top Up' => $totalAmount,
-                'Insentif' => $insentif,
                 'Payment Method' => $item->payment_method_name,
                 'Tanggal Pembayaran' => Carbon::parse($item->paid_date)->format('d-m-Y H:i:s')
             ];
+
+            if ($showInsentif) {
+                $row['Insentif'] = $insentif;
+            }
+
+            return $row;
         });
         
         // Create Excel file
         $fileName = 'Canvasser_Referral_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
         
-        return response()->streamDownload(function () use ($exportData) {
+        return response()->streamDownload(function () use ($exportData, $showInsentif) {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header
-            $headers = ['Email', 'Perusahaan', 'Voucher Code', 'Canvasser', 'Total Top Up', 'Insentif', 'Payment Method', 'Tanggal Pembayaran'];
+            $headers = ['Email', 'Perusahaan', 'Voucher Code', 'Canvasser', 'Total Top Up'];
+            if ($showInsentif) {
+                $headers[] = 'Insentif';
+            }
+            $headers[] = 'Payment Method';
+            $headers[] = 'Tanggal Pembayaran';
             $sheet->fromArray($headers, null, 'A1');
             
             // Style header
@@ -969,7 +1851,8 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
                 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
             ];
-            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
+            $lastColumn = $showInsentif ? 'H' : 'G';
+            $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray($headerStyle);
             
             // Add data
             $row = 2;
@@ -984,9 +1867,14 @@ class BackController extends Controller
             $sheet->getColumnDimension('C')->setWidth(15);
             $sheet->getColumnDimension('D')->setWidth(15);
             $sheet->getColumnDimension('E')->setWidth(18);
-            $sheet->getColumnDimension('F')->setWidth(15);
-            $sheet->getColumnDimension('G')->setWidth(20);
-            $sheet->getColumnDimension('H')->setWidth(20);
+            if ($showInsentif) {
+                $sheet->getColumnDimension('F')->setWidth(15);
+                $sheet->getColumnDimension('G')->setWidth(20);
+                $sheet->getColumnDimension('H')->setWidth(20);
+            } else {
+                $sheet->getColumnDimension('F')->setWidth(20);
+                $sheet->getColumnDimension('G')->setWidth(20);
+            }
             
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -1001,13 +1889,14 @@ class BackController extends Controller
      */
     public function getPowerHouseVoucher(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : $defaultReferenceDate->copy()->endOfDay();
         
         // Voucher codes untuk PowerHouse
         $powerHouseCodes = ['SUPER1', 'SUPER2', 'SUPER3', 'SUPER4', 'SUPER5', 'SUPER6', 'SUPER7', 'SUPER8'];
@@ -1023,9 +1912,10 @@ class BackController extends Controller
             'SUPER7' => 'Naqsyabandi',
             'SUPER8' => 'Ikrar Dharmawan',
         ];
+        $powerHouseMapping = $this->getPowerHouseOwnerMapForMonth($powerHouseMapping, $startDate->copy()->startOfMonth());
 
         // Get users associated with PowerHouse teams
-        $powerHouseUserMap = [
+        $powerHouseUserAliases = [
             'Angga Satria Gusti' => ['Angga Satria Gusti', 'Angga S. Gusti'],
             'Abdul Halim' => ['Abdul Halim'],
             'Raden Agie S. Akbar' => ['Raden Agie Satria Akbar', 'Raden Agie S. Akbar'],
@@ -1046,6 +1936,7 @@ class BackController extends Controller
                 DB::raw('MAX(rb.tgl_transaksi) as tgl_transaksi_terakhir')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $powerHouseCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereBetween('rb.paid_date', [$startDate, $endDate])
             ->groupBy('dv.voucher_code')
             ->get()
@@ -1057,7 +1948,8 @@ class BackController extends Controller
             $voucherInfo = $voucherData->get($voucherCode);
             
             // Count leads for this PowerHouse team (from leads_master table)
-            $userNames = $powerHouseUserMap[$powerHouseName] ?? [];
+            $userNames = $powerHouseUserAliases[$powerHouseName] ?? [$powerHouseName];
+            $userNames = array_values(array_filter($userNames));
             
             // Get user IDs for this PowerHouse
             $userIds = DB::table('users')
@@ -1087,6 +1979,9 @@ class BackController extends Controller
                 $totalTopup = (float)($voucherInfo->total_topup ?? 0);
                 // Hitung POIN: 1 Poin = 1 juta rupiah
                 $poin = floor($totalTopup / 1000000);
+                $jumlahAkun = (int)($voucherInfo->jumlah_akun ?? 0);
+                $percentageLeadToVisit = $jumlahVisit > 0 ? ($jumlahLeads / $jumlahVisit) * 100 : 0;
+                $percentageNewAkunToLead = $jumlahLeads > 0 ? ($jumlahAkun / $jumlahLeads) * 100 : 0;
 
                 $tglFormatted = $voucherInfo->tgl_transaksi_terakhir ? 
                     Carbon::parse($voucherInfo->tgl_transaksi_terakhir)->format('d M Y') : '-';
@@ -1094,9 +1989,11 @@ class BackController extends Controller
                 $result[] = [
                     'referral_code' => $voucherCode,
                     'team_powerhouse' => $powerHouseName,
-                    'jumlah_akun' => (int)($voucherInfo->jumlah_akun ?? 0),
+                    'jumlah_akun' => $jumlahAkun,
                     'jumlah_leads' => $jumlahLeads,
                     'jumlah_visit' => $jumlahVisit,
+                    'percentage_lead_to_visit' => $percentageLeadToVisit,
+                    'percentage_new_akun_to_lead' => $percentageNewAkunToLead,
                     'total_topup' => $totalTopup,
                     'poin' => $poin,
                     'tgl_transaksi_terakhir' => $tglFormatted,
@@ -1109,6 +2006,8 @@ class BackController extends Controller
                     'jumlah_akun' => 0,
                     'jumlah_leads' => $jumlahLeads,
                     'jumlah_visit' => $jumlahVisit,
+                    'percentage_lead_to_visit' => $jumlahVisit > 0 ? ($jumlahLeads / $jumlahVisit) * 100 : 0,
+                    'percentage_new_akun_to_lead' => 0,
                     'total_topup' => 0,
                     'poin' => 0,
                     'tgl_transaksi_terakhir' => '-',
@@ -1118,6 +2017,12 @@ class BackController extends Controller
 
         return DataTables::of($result)
             ->addIndexColumn()
+            ->editColumn('percentage_lead_to_visit', function ($row) {
+                return number_format($row['percentage_lead_to_visit'], 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_new_akun_to_lead', function ($row) {
+                return number_format($row['percentage_new_akun_to_lead'], 2, ',', '.') . '%';
+            })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
             })
@@ -1129,205 +2034,59 @@ class BackController extends Controller
 
     public function getPowerHouseDealTopupMom(Request $request)
     {
+        $defaultReferenceDate = Carbon::yesterday();
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->start_date)->startOfDay()
-            : Carbon::now()->startOfMonth();
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
 
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->end_date)->endOfDay()
-            : Carbon::now()->endOfDay();
-        $startDateFormatted = $startDate->format('Y-m-d');
-        $endDateFormatted = $endDate->format('Y-m-d');
+            : $defaultReferenceDate->copy()->endOfDay();
 
-        $phUsers = DB::table('users')
-            ->where('role', 'PH')
-            ->where('name', '!=', 'self service')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
+        $targetMonth = $request->get('month')
+            ? Carbon::parse($request->get('month'))->format('Y-m')
+            : $startDate->format('Y-m');
 
-        if ($phUsers->isEmpty()) {
-            return DataTables::of([])->make(true);
-        }
-
-        $allTeamUserIds = $phUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-
-        $topUpStatsByUser = collect();
-        $topUpNewAkunByUser = collect();
-        $topUpExistingAkunByUser = collect();
-        $momByUser = collect();
-        $topUpAggByUser = collect();
-        $leadAggByUser = collect();
-        $visitAggByName = collect();
-
-        if (!empty($allTeamUserIds)) {
-            $topUpStatsByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpAggByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
-                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereBetween(
-                    DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                    [$startDateFormatted, $endDateFormatted]
-                )
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_new_akun_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
-                    DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as top_up_existing_akun_rp")
-                )
-                ->get()
-                ->keyBy('user_id');
-
-            // MOM selalu dibandingkan pada tanggal aktual hari ini, tidak mengikuti filter end_date.
-            $momToday = Carbon::today();
-            $currentMonthStart = $momToday->copy()->startOfMonth()->format('Y-m-d');
-            $currentMonthUntilToday = $momToday->copy()->format('Y-m-d');
-            $prevMonthStart = $momToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d');
-            $prevMonthSameDay = $momToday->copy()->subMonthNoOverflow()->format('Y-m-d');
-            $prevMonthEnd = $momToday->copy()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d');
-            $prevMonthRemainingStart = $momToday->copy()->subMonthNoOverflow()->addDay()->format('Y-m-d');
-
-            $momByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilToday}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
-                    DB::raw("SUM(CASE WHEN DATE(rp.tgl_transaksi) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
-                )
-                ->get()
-                ->keyBy('user_id');
-        }
-
-        $leadAggByUser = DB::table('leads_master')
-            ->whereIn('user_id', $allTeamUserIds)
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('user_id')
-            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
-            ->get()
-            ->keyBy('user_id');
-
-        $visitAggByName = DB::table('bookings')
-            ->whereIn('nama', $phUsers->pluck('name')->values()->all())
-            ->whereBetween('tanggal', [$startDate, $endDate])
-            ->groupBy('nama')
-            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
-            ->get()
-            ->keyBy('nama');
-
-        // Build result per user PH (tanpa referral code)
-        $result = [];
-        foreach ($phUsers as $phUser) {
-            $userId = (int) $phUser->id;
-
-            $topUpNewAkunCount = (int) ($topUpNewAkunByUser[$userId]->top_up_count ?? 0);
-            $topUpExistingAkunCount = (int) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_count ?? 0);
-            $topUpNewAkunRp = (float) ($topUpNewAkunByUser[$userId]->top_up_new_akun_rp ?? 0);
-            $topUpExistingAkunRp = (float) ($topUpExistingAkunByUser[$userId]->top_up_existing_akun_rp ?? 0);
-            $totalTopUpFromStats = (float) ($topUpStatsByUser[$userId]->total_top_up_rp ?? 0);
-            $momPrevPartial = (float) ($momByUser[$userId]->mom_prev_partial ?? 0);
-            $momCurrentPartial = (float) ($momByUser[$userId]->mom_current_partial ?? 0);
-            $momPrevRemaining = (float) ($momByUser[$userId]->mom_prev_remaining ?? 0);
-
-            $splitTotal = $topUpNewAkunRp + $topUpExistingAkunRp;
-            $totalTopup = $splitTotal > 0 ? $splitTotal : $totalTopUpFromStats;
-            if ($totalTopUpFromStats > 0 && $splitTotal < $totalTopUpFromStats) {
-                $difference = $totalTopUpFromStats - $splitTotal;
-                $topUpExistingAkunRp += $difference;
-                $totalTopup = $totalTopUpFromStats;
+        $result = $this->buildPowerHouseDealTopupMomResult(
+            $startDate,
+            $endDate,
+            function ($phUsers) use ($targetMonth) {
+                return DB::table('target_ph')
+                    ->whereIn('user_id', $phUsers->pluck('id')->all())
+                    ->where('bulan', $targetMonth)
+                    ->select('user_id', 'target')
+                    ->get()
+                    ->keyBy('user_id');
             }
-
-            $momGap = $momCurrentPartial - $momPrevPartial;
-            $poin = floor($totalTopup / 1000000);
-
-            $jumlahAkun = (int) ($topUpAggByUser[$userId]->jumlah_akun ?? 0);
-            $jumlahLeads = (int) ($leadAggByUser[$userId]->jumlah_leads ?? 0);
-            $jumlahVisit = (int) ($visitAggByName[$phUser->name]->jumlah_visit ?? 0);
-            $tglFormatted = !empty($topUpAggByUser[$userId]->tgl_transaksi_terakhir)
-                ? Carbon::parse($topUpAggByUser[$userId]->tgl_transaksi_terakhir)->format('d M Y')
-                : '-';
-
-            $result[] = [
-                'team_powerhouse' => $phUser->name,
-                'jumlah_akun' => $jumlahAkun,
-                'jumlah_leads' => $jumlahLeads,
-                'jumlah_visit' => $jumlahVisit,
-                'deal_topup_new_akun' => $topUpNewAkunCount,
-                'deal_topup_existing_akun' => $topUpExistingAkunCount,
-                'top_up_new_akun_rp' => $topUpNewAkunRp,
-                'top_up_existing_akun_rp' => $topUpExistingAkunRp,
-                'total_topup' => $totalTopup,
-                'mom_prev_partial' => $momPrevPartial,
-                'mom_current_partial' => $momCurrentPartial,
-                'mom_prev_remaining' => $momPrevRemaining,
-                'mom_gap' => $momGap,
-                'poin' => $poin,
-                'tgl_transaksi_terakhir' => $tglFormatted,
-            ];
-        }
+        );
 
         return DataTables::of($result)
             ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->addColumn('gap_to_target', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                return 'Rp ' . number_format($target - $total, 0, ',', '.');
+            })
             ->editColumn('top_up_new_akun_rp', function ($row) {
                 return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
             })
             ->editColumn('top_up_existing_akun_rp', function ($row) {
                 return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
             })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
+            })
             ->editColumn('total_topup', function ($row) {
                 return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
             })
             ->editColumn('mom_prev_partial', function ($row) {
                 return number_format($row['mom_prev_partial'], 0, ',', '.');
@@ -1344,6 +2103,193 @@ class BackController extends Controller
             ->make(true);
     }
 
+    public function getPowerHouseSaldoTransferDetail(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        if (!Schema::hasTable('saldo_transfer')) {
+            return DataTables::of(collect())->make(true);
+        }
+
+        $powerHouseLeadByEmail = DB::table('leads_master as lm')
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->where('u.role', 'PH')
+            ->where('u.name', '!=', 'self service')
+            ->whereNotNull('lm.email')
+            ->groupBy(DB::raw('LOWER(TRIM(lm.email))'))
+            ->select(
+                DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                DB::raw('MIN(lm.user_id) as user_id'),
+                DB::raw('MIN(lm.company_name) as company_name'),
+                DB::raw('MIN(lm.email) as email_client')
+            );
+
+        $data = DB::table('saldo_transfer as st')
+            ->joinSub($powerHouseLeadByEmail, 'phl', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(st.email_client))'), '=', 'phl.normalized_email');
+            })
+            ->join('users as u', 'u.id', '=', 'phl.user_id')
+            ->whereBetween('st.tgl_transaksi', [$startDate, $endDate])
+            ->select(
+                'u.name as team_powerhouse',
+                'phl.company_name',
+                'phl.email_client',
+                'st.parent_email',
+                DB::raw('CAST(st.amount AS DECIMAL(18,2)) as amount'),
+                'st.tgl_transaksi'
+            )
+            ->orderBy('st.tgl_transaksi', 'desc')
+            ->get();
+
+        return DataTables::of($data)
+            ->addIndexColumn()
+            ->editColumn('amount', function ($row) {
+                return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
+            })
+            ->editColumn('tgl_transaksi', function ($row) {
+                return $row->tgl_transaksi
+                    ? Carbon::parse($row->tgl_transaksi)->format('d M Y H:i')
+                    : '-';
+            })
+            ->make(true);
+    }
+
+    public function getPowerHouseSemesterDealTopupMom(Request $request)
+    {
+        $semesterPeriod = $this->resolveSemesterPeriod($request->get('semester'));
+        $year = $semesterPeriod['year'];
+        $semester = $semesterPeriod['semester'];
+        $startDate = $semesterPeriod['start_date'];
+        $endDate = $semesterPeriod['end_date'];
+
+        $result = $this->buildPowerHouseDealTopupMomResult(
+            $startDate,
+            $endDate,
+            function ($phUsers) use ($year, $semester) {
+                if (!Schema::hasTable('target_ph_semesters')) {
+                    return collect();
+                }
+
+                return DB::table('target_ph_semesters')
+                    ->where('year', $year)
+                    ->where('semester', $semester)
+                    ->whereIn('team_powerhouse', $phUsers->pluck('name')->all())
+                    ->select('team_powerhouse', 'target')
+                    ->get()
+                    ->keyBy('team_powerhouse');
+            },
+            $endDate
+        );
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->addColumn('gap_to_target', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                return 'Rp ' . number_format($target - $total, 0, ',', '.');
+            })
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_transfer_saldo_rp', function ($row) {
+                return number_format($row['total_transfer_saldo_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_partial', function ($row) {
+                return number_format($row['mom_prev_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_current_partial', function ($row) {
+                return number_format($row['mom_current_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_remaining', function ($row) {
+                return number_format($row['mom_prev_remaining'], 0, ',', '.');
+            })
+            ->editColumn('mom_gap', function ($row) {
+                return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getPowerHouseSemesterTargets(Request $request)
+    {
+        $semesterPeriod = $this->resolveSemesterPeriod($request->get('semester'));
+        $year = $semesterPeriod['year'];
+        $semester = $semesterPeriod['semester'];
+        $periodLabel = $semesterPeriod['start_date']->format('d M Y') . ' s/d ' . $semesterPeriod['end_date']->format('d M Y');
+        $semesterLabel = 'Semester ' . $semester . ' ' . $year;
+
+        if (!Schema::hasTable('target_ph_semesters')) {
+            $rows = DB::table('users as u')
+                ->where('u.role', 'PH')
+                ->where('u.name', '!=', 'self service')
+                ->orderBy('u.name')
+                ->select('u.name as team_powerhouse')
+                ->get()
+                ->map(function ($row) use ($semesterLabel, $periodLabel) {
+                    return [
+                        'team_powerhouse' => $row->team_powerhouse,
+                        'semester_label' => $semesterLabel,
+                        'period_label' => $periodLabel,
+                        'target' => 'Rp 0',
+                    ];
+                });
+
+            return DataTables::of($rows)
+                ->addIndexColumn()
+                ->make(true);
+        }
+
+        $rows = DB::table('users as u')
+            ->leftJoin('target_ph_semesters as tps', function ($join) use ($year, $semester) {
+                $join->on('u.name', '=', 'tps.team_powerhouse')
+                    ->where('tps.year', '=', $year)
+                    ->where('tps.semester', '=', $semester);
+            })
+            ->where('u.role', 'PH')
+            ->where('u.name', '!=', 'self service')
+            ->orderBy('u.name')
+            ->select(
+                'u.name as team_powerhouse',
+                DB::raw("'" . $semesterLabel . "' as semester_label"),
+                DB::raw("'" . $periodLabel . "' as period_label"),
+                DB::raw('COALESCE(tps.target, 0) as target')
+            )
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'team_powerhouse' => $row->team_powerhouse,
+                    'semester_label' => $row->semester_label,
+                    'period_label' => $row->period_label,
+                    'target' => 'Rp ' . number_format((float) $row->target, 0, ',', '.'),
+                ];
+            });
+
+        return DataTables::of($rows)
+            ->addIndexColumn()
+            ->make(true);
+    }
+
     /**
      * Get Canvasser Voucher Report
      * Data dari JOIN report_balance_top_up + data_voucher
@@ -1352,30 +2298,20 @@ class BackController extends Controller
     {
         // Get month from request (format Y-m-d) or use current month
         $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
         // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        $month = $monthStart->format('Y-m');
 
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
-        
-        // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
+        $canvasserCodes = [
+            'EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5',
+            'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
+            'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
         ];
+        // Mapping voucher code ke nama canvasser
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher (PER AKUN, bukan di-aggregate)
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1389,6 +2325,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -1404,9 +2341,10 @@ class BackController extends Controller
             $tglFormatted = $data->paid_date ? 
                 Carbon::parse($data->paid_date)->format('d M Y') : '-';
                 
+            $canvasserName = $canvasserMapping[$data->voucher_code] ?? '';
             $result[] = [
                 'referral_code' => $data->voucher_code,
-                'canvasser' => $canvasserMapping[$data->voucher_code] ?? $data->voucher_code,
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'email_client' => $data->email_client,
                 'company_name' => $data->company_name,
                 'total_topup' => $totalTopup,
@@ -1435,30 +2373,21 @@ class BackController extends Controller
     {
         // Get month from request (format Y-m-d) or use current month
         $monthParam = $request->get('month', Carbon::now()->format('Y-m-d'));
+        $monthStart = Carbon::parse($monthParam)->startOfMonth();
         // Extract only Y-m from the date parameter
-        $month = Carbon::parse($monthParam)->format('Y-m');
+        $month = $monthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
+        $canvasserCodes = [
+            'EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5',
+            'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
+            'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+        ];
         
         // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1470,6 +2399,7 @@ class BackController extends Controller
                 'rb.paid_date'
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$month])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
@@ -1497,9 +2427,10 @@ class BackController extends Controller
                 }
             }
 
+            $canvasserName = $canvasserMapping[$voucherCode] ?? '';
             $summaryData[] = [
                 'referral_code' => $voucherCode,
-                'canvasser' => $canvasserMapping[$voucherCode] ?? $voucherCode,
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
                 'total_client' => $totalClient,
                 'total_topup' => $totalTopup,
                 'total_insentif' => $totalInsentif,
@@ -1522,29 +2453,21 @@ class BackController extends Controller
      */
     public function exportCanvasserVoucherSummary()
     {
-        $currentMonth = Carbon::now()->format('Y-m');
+        $monthParam = request()->get('month', Carbon::now()->format('Y-m-d'));
+        $currentMonthStart = Carbon::parse($monthParam)->startOfMonth();
+        $currentMonth = $currentMonthStart->format('Y-m');
         
         // Voucher codes untuk Canvasser
-        $canvasserCodes = ['EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5', 'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10', 'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15'];
+        $canvasserCodes = [
+            'EXTRA1', 'EXTRA2', 'EXTRA3', 'EXTRA4', 'EXTRA5',
+            'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
+            'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+        ];
         
         // Mapping voucher code ke nama canvasser
-        $canvasserMapping = [
-            'EXTRA1' => 'Amanah',
-            'EXTRA2' => 'Indah',
-            'EXTRA3' => 'Maria',
-            'EXTRA4' => 'Meisya',
-            'EXTRA5' => 'Hardi',
-            'EXTRA6' => 'Bustomi',
-            'EXTRA7' => 'Intan',
-            'EXTRA8' => 'Hika Rochmah',
-            'EXTRA9' => 'Akbar Zikron',
-            'EXTRA10' => 'Riva',
-            'EXTRA11' => 'Fanni',
-            'EXTRA12' => 'Maiph',
-            'EXTRA13' => 'Rizky',
-            'EXTRA14' => 'Afan',
-            'EXTRA15' => 'Herman',
-        ];
+        $canvasserMapping = $this->getCanvasserOwnerMapForMonth($currentMonthStart);
 
         // Ambil data dari JOIN report_balance_top_up + data_voucher
         $voucherData = DB::table('report_balance_top_up as rb')
@@ -1555,53 +2478,59 @@ class BackController extends Controller
                 DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as total_topup')
             )
             ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $canvasserCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
             ->whereRaw('DATE_FORMAT(rb.paid_date, "%Y-%m") = ?', [$currentMonth])
             ->orderBy('dv.voucher_code')
             ->orderBy('rb.email_client')
             ->get();
 
         // Group by voucher code and calculate summary
+        $showInsentif = $this->isCanvasserInsentifVisible($currentMonthStart);
         $summaryData = [];
         $grouped = $voucherData->groupBy('voucher_code');
         
-        foreach ($grouped as $voucherCode => $items) {
+        foreach ($canvasserCodes as $voucherCode) {
+            $items = $grouped[$voucherCode] ?? collect();
             $totalTopup = 0;
             $totalInsentif = 0;
-            $emailClients = [];
+            $totalClient = 0;
             
             foreach ($items as $item) {
                 $amount = (float)$item->total_topup;
                 $totalTopup += $amount;
+                $totalClient++;
                 
                 // Insentif per akun: jika total top-up >= 500K, dapat 100K
                 if ($amount >= 500000) {
                     $totalInsentif += 100000;
                 }
-                
-                // Collect unique email clients
-                if (!in_array($item->email_client, $emailClients)) {
-                    $emailClients[] = $item->email_client;
-                }
             }
             
-            $summaryData[] = [
+            $canvasserName = $canvasserMapping[$voucherCode] ?? '';
+            $row = [
                 'referral_code' => $voucherCode,
-                'canvasser' => $canvasserMapping[$voucherCode] ?? $voucherCode,
-                'total_client' => count($emailClients),
+                'canvasser' => $canvasserName !== '' ? $canvasserName : '-',
+                'total_client' => $totalClient,
                 'total_topup' => $totalTopup,
-                'total_insentif' => $totalInsentif,
             ];
+            if ($showInsentif) {
+                $row['total_insentif'] = $totalInsentif;
+            }
+            $summaryData[] = $row;
         }
 
         // Create Excel file
         $fileName = 'Canvasser_Summary_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
         
-        return response()->streamDownload(function () use ($summaryData) {
+        return response()->streamDownload(function () use ($summaryData, $showInsentif) {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header
-            $headers = ['Referral Code', 'Nama Canvasser', 'Total Client', 'Total Top Up', 'Total Insentif'];
+            $headers = ['Referral Code', 'Nama Canvasser', 'Total Client', 'Total Top Up'];
+            if ($showInsentif) {
+                $headers[] = 'Total Insentif';
+            }
             $sheet->fromArray($headers, null, 'A1');
             
             // Style header
@@ -1610,7 +2539,8 @@ class BackController extends Controller
                 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '36B9CC']],
                 'alignment' => ['horizontal' => 'center', 'vertical' => 'center']
             ];
-            $sheet->getStyle('A1:E1')->applyFromArray($headerStyle);
+            $lastColumn = $showInsentif ? 'E' : 'D';
+            $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray($headerStyle);
             
             // Add data
             $row = 2;
@@ -1619,7 +2549,9 @@ class BackController extends Controller
                 $sheet->setCellValue('B' . $row, $item['canvasser']);
                 $sheet->setCellValue('C' . $row, $item['total_client']);
                 $sheet->setCellValue('D' . $row, $item['total_topup']);
-                $sheet->setCellValue('E' . $row, $item['total_insentif']);
+                if ($showInsentif) {
+                    $sheet->setCellValue('E' . $row, $item['total_insentif'] ?? 0);
+                }
                 $row++;
             }
             
@@ -1628,7 +2560,9 @@ class BackController extends Controller
             $sheet->getColumnDimension('B')->setWidth(25);
             $sheet->getColumnDimension('C')->setWidth(15);
             $sheet->getColumnDimension('D')->setWidth(20);
-            $sheet->getColumnDimension('E')->setWidth(20);
+            if ($showInsentif) {
+                $sheet->getColumnDimension('E')->setWidth(20);
+            }
             
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save('php://output');
@@ -1722,6 +2656,92 @@ class BackController extends Controller
         }
     }
 
+    public function exportDailyTopupRegional()
+    {
+        try {
+            $monthFilter = request()->get('month');
+            $leadProgramController = new LeadProgramController();
+            $data = $leadProgramController->getDailyTopupRegionalData($monthFilter);
+
+            if (empty($data)) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $regionalName = auth()->user()->regional ?? 'Regional';
+            $safeRegionalName = preg_replace('/[^A-Za-z0-9_-]/', '_', $regionalName);
+
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Tanggal' => $row['date'],
+                    'Mitra SBP (User)' => $row['mitra_sbp_user'],
+                    'Mitra SBP (Settlement)' => $row['mitra_sbp_settle'],
+                    'Agency Indihome (User)' => $row['agency_user'],
+                    'Agency Indihome (Settlement)' => $row['agency_settle'],
+                    'Internal (User)' => $row['internal_user'],
+                    'Internal (Settlement)' => $row['internal_settle'],
+                    'Powerhouse (User)' => $row['powerhouse_user'],
+                    'Powerhouse (Settlement)' => $row['powerhouse_settle'],
+                    'Self Service (User)' => $row['self_service_user'],
+                    'Self Service (Settlement)' => $row['self_service_settle'],
+                    'MPCC (User)' => $row['mpcc_user'],
+                    'MPCC (Settlement)' => $row['mpcc_settle'],
+                    'Total (User)' => $row['total_user'],
+                    'Total (Settlement)' => $row['total'],
+                ];
+            }
+
+            $fileName = 'Daily_TopUp_Regional_' . $safeRegionalName . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = [
+                    'Tanggal',
+                    'Mitra SBP (User)',
+                    'Mitra SBP (Settlement)',
+                    'Agency Indihome (User)',
+                    'Agency Indihome (Settlement)',
+                    'Internal (User)',
+                    'Internal (Settlement)',
+                    'Powerhouse (User)',
+                    'Powerhouse (Settlement)',
+                    'Self Service (User)',
+                    'Self Service (Settlement)',
+                    'MPCC (User)',
+                    'MPCC (Settlement)',
+                    'Total (User)',
+                    'Total (Settlement)',
+                ];
+                $sheet->fromArray($headers, null, 'A1');
+
+                $headerStyle = [
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
+                    'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+                ];
+                $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
+
+                $row = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray((array) $item, null, 'A' . $row);
+                    $row++;
+                }
+
+                foreach (range('A', 'O') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error("Error in exportDailyTopupRegional: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
+
     public function exportRegional()
     {
         try {
@@ -1741,9 +2761,9 @@ class BackController extends Controller
 
                 // Set header
                 $headers = [
-                    'No', 'Canvaser Name', 'Leads', 'Existing Akun', 'New Akun', 
-                    'Top Up Existing Akun Count', 'Top Up New Akun (Rp)', 'Top Up Existing Akun (Rp)', 
-                    'Total Top Up (Rp)', 'Target (Rp)', 'Achievement (%)', 'Gap (Rp)', 
+                    'No', 'Canvaser Name', 'Lokasi Kerja', 'Leads', 'Existing Akun', 'New Akun',
+                    'Top Up Existing Akun Count', 'Top Up New Akun (Rp)', 'Top Up Existing Akun (Rp)',
+                    'Total Top Up (Rp)', 'Target (Rp)', 'Achievement (%)', 'Gap (Rp)',
                     'Gap Daily (Rp)', 'MOM (1-Current Date Prev)', 'MOM (1-Current Date Current)',
                     'MOM (Remaining Prev)', 'MOM Gap (Rp)'
                 ];
@@ -1756,7 +2776,7 @@ class BackController extends Controller
                     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
                     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]
                 ];
-                $sheet->getStyle('A1:Q1')->applyFromArray($headerStyle);
+                $sheet->getStyle('A1:R1')->applyFromArray($headerStyle);
 
                 // Add data
                 $row = 2;
@@ -1764,21 +2784,22 @@ class BackController extends Controller
                 foreach ($data as $item) {
                     $sheet->setCellValue('A' . $row, $no);
                     $sheet->setCellValue('B' . $row, $item['canvaser_name']);
-                    $sheet->setCellValue('C' . $row, $item['leads']);
-                    $sheet->setCellValue('D' . $row, $item['existing_akun']);
-                    $sheet->setCellValue('E' . $row, $item['new_akun']);
-                    $sheet->setCellValue('F' . $row, $item['top_up_existing_akun_count']);
-                    $sheet->setCellValue('G' . $row, $item['top_up_new_akun_rp']);
-                    $sheet->setCellValue('H' . $row, $item['top_up_existing_akun_rp']);
-                    $sheet->setCellValue('I' . $row, $item['total_top_up_rp']);
-                    $sheet->setCellValue('J' . $row, $item['target']);
-                    $sheet->setCellValue('K' . $row, $item['achievement_percent']);
-                    $sheet->setCellValue('L' . $row, $item['gap']);
-                    $sheet->setCellValue('M' . $row, $item['gap_daily']);
-                    $sheet->setCellValue('N' . $row, $item['mom_prev_partial']);
-                    $sheet->setCellValue('O' . $row, $item['mom_current_partial']);
-                    $sheet->setCellValue('P' . $row, $item['mom_prev_remaining']);
-                    $sheet->setCellValue('Q' . $row, $item['mom_gap']);
+                    $sheet->setCellValue('C' . $row, $item['lokasi_kerja'] ?? '-');
+                    $sheet->setCellValue('D' . $row, $item['leads']);
+                    $sheet->setCellValue('E' . $row, $item['existing_akun']);
+                    $sheet->setCellValue('F' . $row, $item['new_akun']);
+                    $sheet->setCellValue('G' . $row, $item['top_up_existing_akun_count']);
+                    $sheet->setCellValue('H' . $row, $item['top_up_new_akun_rp']);
+                    $sheet->setCellValue('I' . $row, $item['top_up_existing_akun_rp']);
+                    $sheet->setCellValue('J' . $row, $item['total_top_up_rp']);
+                    $sheet->setCellValue('K' . $row, $item['target']);
+                    $sheet->setCellValue('L' . $row, $item['achievement_percent']);
+                    $sheet->setCellValue('M' . $row, $item['gap']);
+                    $sheet->setCellValue('N' . $row, $item['gap_daily']);
+                    $sheet->setCellValue('O' . $row, $item['mom_prev_partial']);
+                    $sheet->setCellValue('P' . $row, $item['mom_current_partial']);
+                    $sheet->setCellValue('Q' . $row, $item['mom_prev_remaining']);
+                    $sheet->setCellValue('R' . $row, $item['mom_gap']);
                     
                     // Add color for total rows
                     if ($item['is_total']) {
@@ -1786,7 +2807,7 @@ class BackController extends Controller
                             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFC107']],
                             'font' => ['bold' => true],
                         ];
-                        $sheet->getStyle('A' . $row . ':Q' . $row)->applyFromArray($styleTotal);
+                        $sheet->getStyle('A' . $row . ':R' . $row)->applyFromArray($styleTotal);
                     }
 
                     $row++;
@@ -1796,21 +2817,22 @@ class BackController extends Controller
                 // Set column widths
                 $sheet->getColumnDimension('A')->setWidth(5);
                 $sheet->getColumnDimension('B')->setWidth(20);
-                $sheet->getColumnDimension('C')->setWidth(12);
-                $sheet->getColumnDimension('D')->setWidth(15);
-                $sheet->getColumnDimension('E')->setWidth(12);
-                $sheet->getColumnDimension('F')->setWidth(18);
+                $sheet->getColumnDimension('C')->setWidth(24);
+                $sheet->getColumnDimension('D')->setWidth(12);
+                $sheet->getColumnDimension('E')->setWidth(15);
+                $sheet->getColumnDimension('F')->setWidth(12);
                 $sheet->getColumnDimension('G')->setWidth(18);
                 $sheet->getColumnDimension('H')->setWidth(18);
                 $sheet->getColumnDimension('I')->setWidth(18);
-                $sheet->getColumnDimension('J')->setWidth(15);
+                $sheet->getColumnDimension('J')->setWidth(18);
                 $sheet->getColumnDimension('K')->setWidth(15);
                 $sheet->getColumnDimension('L')->setWidth(15);
                 $sheet->getColumnDimension('M')->setWidth(15);
-                $sheet->getColumnDimension('N')->setWidth(18);
+                $sheet->getColumnDimension('N')->setWidth(15);
                 $sheet->getColumnDimension('O')->setWidth(18);
                 $sheet->getColumnDimension('P')->setWidth(18);
-                $sheet->getColumnDimension('Q')->setWidth(15);
+                $sheet->getColumnDimension('Q')->setWidth(18);
+                $sheet->getColumnDimension('R')->setWidth(15);
 
                 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
                 $writer->save('php://output');
@@ -1819,5 +2841,1514 @@ class BackController extends Controller
             \Log::error("Error in exportRegional: " . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
         }
+    }
+
+    private function getMpccUsersWithVoucherCodes(?Carbon $monthStart = null)
+    {
+        $mpccUsers = DB::table('users')
+            ->where('role', 'MPCC')
+            ->whereNotNull('referral_code')
+            ->where('referral_code', '!=', '')
+            ->where(DB::raw('UPPER(referral_code)'), 'like', 'HEBAT%')
+            ->select('id', 'name', 'area', 'branch', 'referral_code')
+            ->orderBy('id')
+            ->get()
+            ->values()
+            ->map(function ($user) {
+                $user->voucher_code = strtoupper(trim((string) $user->referral_code));
+                return $user;
+            })
+            ->filter(function ($user) {
+                return !empty($user->voucher_code);
+            })
+            ->values();
+
+        if (!$monthStart) {
+            return $mpccUsers;
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $allHebatHistoryCodes = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'))
+            ->distinct()
+            ->pluck('voucher_code')
+            ->filter()
+            ->values();
+
+        $historyRows = DB::table('voucher_owner_history')
+            ->where(DB::raw('UPPER(voucher_code)'), 'like', 'HEBAT%')
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $historyByVoucherCode = $historyRows
+            ->keyBy('voucher_code');
+
+        $voucherCodes = $mpccUsers->pluck('voucher_code')
+            ->merge($allHebatHistoryCodes)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $usersByVoucherCode = DB::table('users')
+            ->whereNotNull('referral_code')
+            ->where('referral_code', '!=', '')
+            ->whereIn(DB::raw('UPPER(referral_code)'), $voucherCodes)
+            ->select('id', 'name', 'area', 'branch', 'referral_code')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtoupper(trim((string) $user->referral_code));
+            });
+
+        $ownerNames = $historyRows->pluck('owner_name')->filter()->unique()->values()->all();
+        $ownerUsersByName = DB::table('users')
+            ->whereIn('name', $ownerNames)
+            ->select('id', 'name', 'area', 'branch')
+            ->get()
+            ->keyBy(function ($user) {
+                return strtolower(trim((string) $user->name));
+            });
+
+        return collect($voucherCodes)
+            ->map(function ($voucherCode) use ($mpccUsers, $historyByVoucherCode, $usersByVoucherCode, $ownerUsersByName) {
+                $baseUser = $mpccUsers->first(function ($user) use ($voucherCode) {
+                    return strtoupper(trim((string) $user->voucher_code)) === $voucherCode;
+                });
+
+                $user = $baseUser ?: (object) [
+                    'id' => 0,
+                    'name' => '-',
+                    'area' => '-',
+                    'branch' => '-',
+                    'referral_code' => $voucherCode,
+                    'voucher_code' => $voucherCode,
+                ];
+
+                $historyRow = $historyByVoucherCode->get($voucherCode);
+                $ownerName = trim((string) ($historyRow->owner_name ?? ''));
+                $voucherUser = $usersByVoucherCode->get($voucherCode);
+
+                if ($voucherUser) {
+                    $user->id = $voucherUser->id;
+                    $user->area = $voucherUser->area ?: $user->area;
+                    $user->branch = $voucherUser->branch ?: $user->branch;
+                }
+
+                if ($ownerName !== '') {
+                    $ownerUser = $ownerUsersByName->get(strtolower($ownerName));
+                    if ($ownerUser) {
+                        $user->id = $ownerUser->id;
+                        $user->area = $ownerUser->area ?: $user->area;
+                        $user->branch = $ownerUser->branch ?: $user->branch;
+                    }
+
+                    $user->name = $ownerName;
+                }
+
+                $user->voucher_code = $voucherCode;
+                $user->referral_code = $voucherCode;
+                $user->area = $user->area ?: '-';
+                $user->branch = $user->branch ?: '-';
+                $user->name = trim((string) ($user->name ?: '-'));
+
+                return $user;
+            })
+            ->values();
+    }
+
+    public function getMpccVoucherReport(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
+        if ($mpccUsers->isEmpty()) {
+            return DataTables::of([])->addIndexColumn()->make(true);
+        }
+
+        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
+            return strtoupper($code);
+        })->values()->all();
+
+        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->values()->all();
+
+        $startDateFormatted = $startDate->copy()->format('Y-m-d');
+        $endDateFormatted = $endDate->copy()->format('Y-m-d');
+        $transactionDateExpr = "DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))";
+
+        $voucherData = DB::table('report_balance_top_up as rb')
+            ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+            ->select(
+                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                DB::raw('COUNT(DISTINCT LOWER(rb.email_client)) as jumlah_akun'),
+                DB::raw('SUM(CAST(rb.amount AS DECIMAL(15,2))) as total_topup'),
+                DB::raw('MAX(COALESCE(rb.paid_date, rb.tgl_transaksi)) as tgl_transaksi_terakhir')
+            )
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
+            ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+            ->get()
+            ->keyBy('voucher_code');
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $result = [];
+        foreach ($mpccUsers as $mpccUser) {
+            $voucherCode = strtoupper($mpccUser->voucher_code);
+            $voucherInfo = $voucherData->get($voucherCode);
+            $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
+            $jumlahAkun = (int) ($voucherInfo->jumlah_akun ?? 0);
+            $totalTopup = (float) ($voucherInfo->total_topup ?? 0);
+            $poin = floor($totalTopup / 1000000);
+            $percentageNewAkunToLead = $jumlahLeads > 0 ? ($jumlahAkun / $jumlahLeads) * 100 : 0;
+            $tglFormatted = !empty($voucherInfo->tgl_transaksi_terakhir)
+                ? Carbon::parse($voucherInfo->tgl_transaksi_terakhir)->format('d M Y')
+                : '-';
+
+            $result[] = [
+                'area' => $mpccUser->area ?: '-',
+                'branch' => $mpccUser->branch ?: '-',
+                'referral_code' => $voucherCode,
+                'team_powerhouse' => $mpccUser->name,
+                'jumlah_akun' => $jumlahAkun,
+                'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => 0,
+                'percentage_lead_to_visit' => 0,
+                'percentage_new_akun_to_lead' => $percentageNewAkunToLead,
+                'total_topup' => $totalTopup,
+                'poin' => $poin,
+                'tgl_transaksi_terakhir' => $tglFormatted,
+            ];
+        }
+
+        usort($result, function ($left, $right) {
+            $areaComparison = strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+            if ($areaComparison !== 0) {
+                return $areaComparison;
+            }
+
+            $branchComparison = strcasecmp((string) ($left['branch'] ?? ''), (string) ($right['branch'] ?? ''));
+            if ($branchComparison !== 0) {
+                return $branchComparison;
+            }
+
+            return strcasecmp((string) ($left['team_powerhouse'] ?? ''), (string) ($right['team_powerhouse'] ?? ''));
+        });
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->editColumn('percentage_lead_to_visit', function ($row) {
+                return number_format($row['percentage_lead_to_visit'], 2, ',', '.') . '%';
+            })
+            ->editColumn('percentage_new_akun_to_lead', function ($row) {
+                return number_format($row['percentage_new_akun_to_lead'], 2, ',', '.') . '%';
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('poin', function ($row) {
+                return (int) $row['poin'];
+            })
+            ->make(true);
+    }
+
+    private function buildMpccPerformanceRows(Carbon $startDate, Carbon $endDate): array
+    {
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
+        if ($mpccUsers->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->values()->all();
+
+        $startDateFormatted = $startDate->copy()->format('Y-m-d');
+        $endDateFormatted = $endDate->copy()->format('Y-m-d');
+        $startDateTime = $startDate->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endDateTime = $endDate->copy()->endOfDay()->format('Y-m-d H:i:s');
+        $transactionDateExpr = "DATE(COALESCE(rp.paid_date, rp.tgl_transaksi))";
+        $targetMonth = (int) $startDate->copy()->month;
+        $targetYear = (int) $startDate->copy()->year;
+
+        $targetByUser = DB::table('mpcc_targets')
+            ->whereIn('user_id', $userIds)
+            ->where('year', $targetYear)
+            ->where('month', $targetMonth)
+            ->select('user_id', 'target_amount')
+            ->get()
+            ->keyBy('user_id');
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
+        $topUpStatsByCode = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+            ->select(
+                'lm.user_id',
+                DB::raw('COUNT(rp.id) as top_up_count'),
+                DB::raw('SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp')
+            )
+            ->whereIn('lm.user_id', $userIds)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->where(function ($query) use ($startDateTime, $endDateTime) {
+                $query->whereBetween('rp.paid_date', [$startDateTime, $endDateTime])
+                    ->orWhere(function ($fallback) use ($startDateTime, $endDateTime) {
+                        $fallback->whereNull('rp.paid_date')
+                            ->whereBetween('rp.tgl_transaksi', [$startDateTime, $endDateTime]);
+                    });
+            })
+            ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
+            ->groupBy('lm.user_id')
+            ->get()
+            ->keyBy('user_id');
+
+        // The former three-table LOWER(email) join explodes on high-volume
+        // months. Load only the relevant rows and reproduce the same aggregate
+        // in memory, including duplicate lead/approval matches and DISTINCT rp.id.
+        $leadOwnersByEmail = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereNotNull('email')
+            ->select('user_id', 'email')
+            ->get()
+            ->groupBy(function ($row) {
+                return strtolower((string) $row->email);
+            });
+
+        $approvalRows = DB::table('data_registarsi_status_approveorreject as dt')
+            ->where('dt.status', 'APPROVE')
+            ->whereIn(DB::raw('LOWER(dt.email)'), $leadOwnersByEmail->keys()->all())
+            ->whereBetween(DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"), [$startDateFormatted, $endDateFormatted])
+            ->select(
+                'dt.email',
+                DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') as approval_date")
+            )
+            ->get();
+
+        $approvalsByEmail = $approvalRows->groupBy(function ($row) {
+            return strtolower((string) $row->email);
+        });
+
+        $newAccountStats = [];
+        $approvalsByEmail->keys()->chunk(500)->each(function ($emailChunk) use (
+            $startDateTime,
+            $endDateTime,
+            $startDateFormatted,
+            $endDateFormatted,
+            $transactionDateExpr,
+            $approvalsByEmail,
+            $leadOwnersByEmail,
+            &$newAccountStats
+        ) {
+            $transactions = DB::table('report_balance_top_up as rp')
+                ->whereIn(DB::raw('LOWER(rp.email_client)'), $emailChunk->all())
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->where(function ($query) use ($startDateTime, $endDateTime) {
+                    $query->whereBetween('rp.paid_date', [$startDateTime, $endDateTime])
+                        ->orWhere(function ($fallback) use ($startDateTime, $endDateTime) {
+                            $fallback->whereNull('rp.paid_date')
+                                ->whereBetween('rp.tgl_transaksi', [$startDateTime, $endDateTime]);
+                        });
+                })
+                ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
+                ->select('rp.id', 'rp.email_client', 'rp.amount', 'rp.paid_date', 'rp.tgl_transaksi')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $emailKey = strtolower((string) $transaction->email_client);
+                $transactionDate = Carbon::parse($transaction->paid_date ?: $transaction->tgl_transaksi)->format('Y-m-d');
+
+                foreach ($approvalsByEmail->get($emailKey, collect()) as $approval) {
+                    if ($transactionDate < $approval->approval_date) {
+                        continue;
+                    }
+
+                    foreach ($leadOwnersByEmail->get($emailKey, collect()) as $owner) {
+                        $userId = (int) $owner->user_id;
+                        $newAccountStats[$userId] = $newAccountStats[$userId] ?? [
+                            'transaction_ids' => [],
+                            'amount' => 0,
+                        ];
+                        $newAccountStats[$userId]['transaction_ids'][(string) $transaction->id] = true;
+                        $newAccountStats[$userId]['amount'] += (float) $transaction->amount;
+                    }
+                }
+            }
+        });
+
+        $topUpNewAkunByCode = collect($newAccountStats)->map(function ($stats, $userId) {
+            return (object) [
+                'user_id' => (int) $userId,
+                'top_up_count' => count($stats['transaction_ids']),
+                'top_up_new_akun_rp' => $stats['amount'],
+            ];
+        });
+
+        $momReference = $endDate->copy()->endOfDay();
+        $currentMonthStart = $momReference->copy()->startOfMonth()->format('Y-m-d');
+        $currentMonthUntilRef = $momReference->copy()->format('Y-m-d');
+        $prevMonthRef = $momReference->copy()->subMonthNoOverflow();
+        $prevMonthStart = $prevMonthRef->copy()->startOfMonth()->format('Y-m-d');
+        $prevMonthSameDay = $prevMonthRef->copy()->format('Y-m-d');
+        $prevMonthEnd = $prevMonthRef->copy()->endOfMonth()->format('Y-m-d');
+        $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
+
+        $momByCode = DB::table('report_balance_top_up as rp')
+            ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+            ->whereIn('lm.user_id', $userIds)
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            // Without this bound MySQL scans and joins the complete transaction
+            // history, even though the CASE expressions only use these two months.
+            ->whereBetween(DB::raw($transactionDateExpr), [$prevMonthStart, $currentMonthUntilRef])
+            ->groupBy('lm.user_id')
+            ->select(
+                'lm.user_id',
+                DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$prevMonthStart}' AND '{$prevMonthSameDay}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_partial"),
+                DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$currentMonthStart}' AND '{$currentMonthUntilRef}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_current_partial"),
+                DB::raw("SUM(CASE WHEN DATE(COALESCE(rp.paid_date, rp.tgl_transaksi)) BETWEEN '{$prevMonthRemainingStart}' AND '{$prevMonthEnd}' THEN CAST(rp.amount AS DECIMAL(15,2)) ELSE 0 END) as mom_prev_remaining")
+            )
+            ->get()
+            ->keyBy('user_id');
+
+        $result = [];
+        foreach ($mpccUsers as $mpccUser) {
+            $topUpCount = (int) ($topUpStatsByCode[$mpccUser->id]->top_up_count ?? 0);
+            $newAkunCount = (int) ($topUpNewAkunByCode[$mpccUser->id]->top_up_count ?? 0);
+            $newAkunRp = (float) ($topUpNewAkunByCode[$mpccUser->id]->top_up_new_akun_rp ?? 0);
+            $totalTopup = (float) ($topUpStatsByCode[$mpccUser->id]->total_top_up_rp ?? 0);
+            $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
+            $existingAkunCount = max($topUpCount - $newAkunCount, 0);
+            $existingAkunRp = max($totalTopup - $newAkunRp, 0);
+            $momPrevPartial = (float) ($momByCode[$mpccUser->id]->mom_prev_partial ?? 0);
+            $momCurrentPartial = (float) ($momByCode[$mpccUser->id]->mom_current_partial ?? 0);
+            $momPrevRemaining = (float) ($momByCode[$mpccUser->id]->mom_prev_remaining ?? 0);
+            $momGap = $momCurrentPartial - $momPrevPartial;
+            $target = (float) ($targetByUser[$mpccUser->id]->target_amount ?? 0);
+
+            $result[] = [
+                'user_id' => (int) $mpccUser->id,
+                'area' => $mpccUser->area ?: '-',
+                'branch' => $mpccUser->branch ?: '-',
+                'team_powerhouse' => $mpccUser->name,
+                'jumlah_leads' => $jumlahLeads,
+                'jumlah_visit' => $jumlahVisit,
+                'target' => $target,
+                'deal_topup_new_akun' => $newAkunCount,
+                'deal_topup_existing_akun' => $existingAkunCount,
+                'deal_topup_total_akun' => $topUpCount,
+                'top_up_new_akun_rp' => $newAkunRp,
+                'top_up_existing_akun_rp' => $existingAkunRp,
+                'total_topup' => $totalTopup,
+                'mom_prev_partial' => $momPrevPartial,
+                'mom_current_partial' => $momCurrentPartial,
+                'mom_prev_remaining' => $momPrevRemaining,
+                'mom_gap' => $momGap,
+            ];
+        }
+
+        usort($result, function ($left, $right) {
+            $areaComparison = strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+            if ($areaComparison !== 0) {
+                return $areaComparison;
+            }
+
+            $branchComparison = strcasecmp((string) ($left['branch'] ?? ''), (string) ($right['branch'] ?? ''));
+            if ($branchComparison !== 0) {
+                return $branchComparison;
+            }
+
+            return strcasecmp((string) ($left['team_powerhouse'] ?? ''), (string) ($right['team_powerhouse'] ?? ''));
+        });
+
+        return $result;
+    }
+
+    public function getMpccDealTopupMom(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        $result = $this->buildMpccPerformanceRows($startDate, $endDate);
+        if (empty($result)) {
+            return DataTables::of([])->addIndexColumn()->make(true);
+        }
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_partial', function ($row) {
+                return number_format($row['mom_prev_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_current_partial', function ($row) {
+                return number_format($row['mom_current_partial'], 0, ',', '.');
+            })
+            ->editColumn('mom_prev_remaining', function ($row) {
+                return number_format($row['mom_prev_remaining'], 0, ',', '.');
+            })
+            ->editColumn('mom_gap', function ($row) {
+                return number_format($row['mom_gap'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function getMpccDealTopupAreaSummary(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        $rows = $this->buildMpccPerformanceRows($startDate, $endDate);
+        if (empty($rows)) {
+            return DataTables::of([])->addIndexColumn()->make(true);
+        }
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $area = $row['area'] ?: '-';
+            if (!isset($grouped[$area])) {
+                $grouped[$area] = [
+                    'area' => $area,
+                    'jumlah_visit' => 0,
+                    'jumlah_leads' => 0,
+                    'target' => 0,
+                    'deal_topup_new_akun' => 0,
+                    'deal_topup_existing_akun' => 0,
+                    'deal_topup_total_akun' => 0,
+                    'top_up_new_akun_rp' => 0,
+                    'top_up_existing_akun_rp' => 0,
+                    'total_topup' => 0,
+                ];
+            }
+
+            $grouped[$area]['jumlah_visit'] += (int) $row['jumlah_visit'];
+            $grouped[$area]['jumlah_leads'] += (int) $row['jumlah_leads'];
+            $grouped[$area]['target'] += (float) $row['target'];
+            $grouped[$area]['deal_topup_new_akun'] += (int) $row['deal_topup_new_akun'];
+            $grouped[$area]['deal_topup_existing_akun'] += (int) $row['deal_topup_existing_akun'];
+            $grouped[$area]['deal_topup_total_akun'] += (int) $row['deal_topup_total_akun'];
+            $grouped[$area]['top_up_new_akun_rp'] += (float) $row['top_up_new_akun_rp'];
+            $grouped[$area]['top_up_existing_akun_rp'] += (float) $row['top_up_existing_akun_rp'];
+            $grouped[$area]['total_topup'] += (float) $row['total_topup'];
+        }
+
+        $result = array_values($grouped);
+        usort($result, function ($left, $right) {
+            return strcasecmp((string) ($left['area'] ?? ''), (string) ($right['area'] ?? ''));
+        });
+
+        return DataTables::of($result)
+            ->addIndexColumn()
+            ->addColumn('acv', function ($row) {
+                $target = (float) ($row['target'] ?? 0);
+                $total = (float) ($row['total_topup'] ?? 0);
+                $acv = $target > 0 ? ($total / $target) * 100 : 0;
+                return number_format($acv, 2, ',', '.') . '%';
+            })
+            ->editColumn('target', function ($row) {
+                return 'Rp ' . number_format($row['target'], 0, ',', '.');
+            })
+            ->editColumn('top_up_new_akun_rp', function ($row) {
+                return number_format($row['top_up_new_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('top_up_existing_akun_rp', function ($row) {
+                return number_format($row['top_up_existing_akun_rp'], 0, ',', '.');
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function exportMpccVoucher(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
+        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
+            return strtoupper($code);
+        })->values()->all();
+
+        $userMapByCode = [];
+        foreach ($mpccUsers as $mpccUser) {
+            $userMapByCode[strtoupper($mpccUser->voucher_code)] = $mpccUser;
+        }
+
+        $data = DB::table('report_balance_top_up as rb')
+            ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+            ->select(
+                'rb.email_client',
+                'rb.company_name',
+                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                DB::raw('CAST(rb.amount AS DECIMAL(15,2)) as amount'),
+                DB::raw('CAST(rb.discount_voucer AS DECIMAL(15,2)) as discount'),
+                DB::raw('CAST(rb.total_settlement_klien AS DECIMAL(15,2)) as total'),
+                'rb.payment_method_name',
+                'rb.paid_date'
+            )
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->whereBetween(DB::raw("DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))"), [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('dv.voucher_code')
+            ->orderBy('rb.paid_date')
+            ->get();
+
+        $exportData = $data->map(function ($item) use ($userMapByCode) {
+            $user = $userMapByCode[$item->voucher_code] ?? null;
+
+            return [
+                'Email' => $item->email_client,
+                'Perusahaan' => $item->company_name,
+                'Voucher Code' => $item->voucher_code,
+                'MPCC' => $user->name ?? '-',
+                'Area' => $user->area ?? '-',
+                'Branch' => $user->branch ?? '-',
+                'Amount' => $item->amount,
+                'Discount' => $item->discount,
+                'Total Settlement' => $item->total,
+                'Payment Method' => $item->payment_method_name,
+                'Tanggal Pembayaran' => $item->paid_date ? Carbon::parse($item->paid_date)->format('d-m-Y H:i:s') : '-',
+            ];
+        });
+
+        $fileName = 'MPCC_Report_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($exportData) {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $headers = ['Email', 'Perusahaan', 'Voucher Code', 'MPCC', 'Area', 'Branch', 'Amount', 'Discount', 'Total Settlement', 'Payment Method', 'Tanggal Pembayaran'];
+            $sheet->fromArray($headers, null, 'A1');
+
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+            ];
+            $sheet->getStyle('A1:K1')->applyFromArray($headerStyle);
+
+            $row = 2;
+            foreach ($exportData as $item) {
+                $sheet->fromArray((array) $item, null, 'A' . $row);
+                $row++;
+            }
+
+            foreach (range('A', 'K') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $fileName);
+    }
+    public function getMpccAreaBranchReport(Request $request)
+    {
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        $rows = $this->buildMpccAreaBranchRows($startDate, $endDate);
+
+        return DataTables::of($rows)
+            ->addIndexColumn()
+            ->editColumn('target_revenue_cluster_billion', function ($row) {
+                return number_format($row['target_revenue_cluster_billion'], 2, ',', '.');
+            })
+            ->editColumn('target_revenue_branch_billion', function ($row) {
+                return number_format($row['target_revenue_branch_billion'], 2, ',', '.');
+            })
+            ->editColumn('achievement', function ($row) {
+                return number_format($row['achievement'], 2, ',', '.') . '%';
+            })
+            ->editColumn('total_topup', function ($row) {
+                return 'Rp ' . number_format($row['total_topup'], 0, ',', '.');
+            })
+            ->make(true);
+    }
+
+    public function exportMpccAreaBranchReport(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : Carbon::now()->startOfMonth();
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        $rows = collect($this->buildMpccAreaBranchRows($startDate, $endDate));
+        $fileName = 'MPCC_Area_Branch_Report_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($rows) {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $headers = [
+                'Area',
+                'Branch',
+                'Cluster',
+                'Jumlah MPCC',
+                'Target Revenue Cluster (B)',
+                'Target Revenue Branch (B)',
+                'Target Visit',
+                'Target Leads',
+                'Target Registrasi',
+                'Actual Visit',
+                'Jumlah Leads',
+                'Jumlah Akun',
+                'Total Top Up',
+                'Achievement (%)',
+                'Tgl Transaksi Terakhir'
+            ];
+            $sheet->fromArray($headers, null, 'A1');
+
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '667EEA']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+            ];
+            $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
+
+            $rowNumber = 2;
+            foreach ($rows as $row) {
+                $sheet->fromArray([
+                    $row['area'],
+                    $row['branch'],
+                    $row['cluster'],
+                    $row['jumlah_mpcc'],
+                    $row['target_revenue_cluster_billion'],
+                    $row['target_revenue_branch_billion'],
+                    $row['target_visit'],
+                    $row['target_leads'],
+                    $row['target_registrasi'],
+                    $row['actual_visit'],
+                    $row['jumlah_leads'],
+                    $row['jumlah_akun'],
+                    $row['total_topup'],
+                    number_format($row['achievement'], 2, ',', '.') . '%',
+                    $row['tgl_transaksi_terakhir'],
+                ], null, 'A' . $rowNumber);
+                $rowNumber++;
+            }
+
+            foreach (range('A', 'O') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $fileName);
+    }
+
+    public function showMpccPilotCityReport(Request $request)
+    {
+        $availableYears = DB::table('mpcc_branch_targets')
+            ->select('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->merge(
+                DB::table('mpcc_targets')
+                    ->select('year')
+                    ->distinct()
+                    ->pluck('year')
+            )
+            ->push(Carbon::now()->year)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $availableMonths = $availableYears
+            ->flatMap(function ($year) {
+                return collect(range(1, 12))->map(function ($month) use ($year) {
+                    $value = sprintf('%04d-%02d', $year, $month);
+
+                    return [
+                        'value' => $value,
+                        'label' => Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y'),
+                    ];
+                })->reverse()->values();
+            })
+            ->values();
+
+        $defaultMonth = Carbon::now()->format('Y-m');
+        if (!$availableMonths->contains(fn($month) => $month['value'] === $defaultMonth)) {
+            $defaultMonth = $availableMonths->first()['value'] ?? $defaultMonth;
+        }
+        $selectedMonth = $request->get('month', $defaultMonth);
+
+        if (!preg_match('/^\d{4}-\d{2}$/', (string) $selectedMonth)) {
+            $selectedMonth = $defaultMonth;
+        }
+
+        $monthDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        $report = $this->buildMpccPilotCityReport($monthDate);
+
+        return view('admin.mpcc_pilot_city_report', [
+            'availableMonths' => $availableMonths,
+            'selectedMonth' => $selectedMonth,
+            'reportConfig' => $report['config'],
+            'reportRows' => $report['rows'],
+            'missingDataNotes' => $report['missing_data_notes'],
+            'sourceNotes' => $report['source_notes'],
+            'periodLabel' => $monthDate->translatedFormat('F Y'),
+        ]);
+    }
+
+    private function buildMpccAreaBranchRows(Carbon $startDate, Carbon $endDate): array
+    {
+        $mpccUsers = $this->getMpccUsersWithVoucherCodes($startDate->copy()->startOfMonth());
+        if ($mpccUsers->isEmpty()) {
+            return [];
+        }
+
+        $voucherCodes = $mpccUsers->pluck('voucher_code')->map(function ($code) {
+            return strtoupper($code);
+        })->values()->all();
+
+        $userIds = $mpccUsers->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->values()->all();
+
+        $targetMonth = (int) $startDate->copy()->month;
+        $targetYear = (int) $startDate->copy()->year;
+        $startDateFormatted = $startDate->copy()->format('Y-m-d');
+        $endDateFormatted = $endDate->copy()->format('Y-m-d');
+        $transactionDateExpr = "DATE(COALESCE(rb.paid_date, rb.tgl_transaksi))";
+
+        $voucherData = DB::table('report_balance_top_up as rb')
+            ->join('data_voucher as dv', 'rb.no_invoice', '=', 'dv.id_transaksi')
+            ->select(
+                DB::raw('UPPER(dv.voucher_code) as voucher_code'),
+                DB::raw('COUNT(DISTINCT LOWER(rb.email_client)) as jumlah_akun'),
+                DB::raw('SUM(CAST(rb.amount AS DECIMAL(15,2))) as total_topup'),
+                DB::raw('MAX(COALESCE(rb.paid_date, rb.tgl_transaksi)) as tgl_transaksi_terakhir')
+            )
+            ->whereIn(DB::raw('UPPER(dv.voucher_code)'), $voucherCodes)
+            ->where('rb.payment_method_name', '!=', 'Voucher Bonus')
+            ->whereBetween(DB::raw($transactionDateExpr), [$startDateFormatted, $endDateFormatted])
+            ->groupBy(DB::raw('UPPER(dv.voucher_code)'))
+            ->get()
+            ->keyBy('voucher_code');
+
+        $leadAggByUser = DB::table('leads_master')
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('created_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('COUNT(*) as jumlah_leads'))
+            ->get()
+            ->keyBy('user_id');
+
+        $visitAggByName = DB::table('bookings')
+            ->whereIn('nama', $mpccUsers->pluck('name')->values()->all())
+            ->whereBetween('tanggal', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->groupBy('nama')
+            ->select('nama', DB::raw('COUNT(*) as jumlah_visit'))
+            ->get()
+            ->keyBy('nama');
+
+        $targetRows = DB::table('mpcc_branch_targets')
+            ->where('year', $targetYear)
+            ->where('month', $targetMonth)
+            ->get()
+            ->mapWithKeys(function ($row) {
+                return [$this->normalizeMpccBranchKey($row->branch) => $row];
+            });
+
+        $branchClusterCounts = $mpccUsers
+            ->map(function ($user) {
+                $rawBranch = trim((string) ($user->branch ?: '-'));
+
+                return [
+                    'branch' => $this->resolveMpccBranchName($rawBranch),
+                    'cluster' => $this->resolveMpccClusterName($rawBranch),
+                ];
+            })
+            ->groupBy('cluster')
+            ->map(function ($items) {
+                return max(1, $items->unique('branch')->count());
+            });
+
+        $clusterTargetTotals = $targetRows
+            ->flatMap(function ($row) {
+                $branch = trim((string) ($row->branch ?: '-'));
+                $clusters = $this->resolveMpccTargetClusters($branch);
+                $clusterCount = max(1, count($clusters));
+
+                return collect($clusters)->map(function ($cluster) use ($row, $clusterCount) {
+                    return [
+                        'cluster' => $cluster,
+                        'target_revenue_cluster_billion' => (float) ($row->target_revenue_cluster_billion ?? 0) / $clusterCount,
+                        'target_revenue_branch_billion' => (float) ($row->target_revenue_branch_billion ?? 0) / $clusterCount,
+                        'target_visit' => (int) round(((int) ($row->target_visit ?? 0)) / $clusterCount),
+                        'target_leads' => (int) round(((int) ($row->target_leads ?? 0)) / $clusterCount),
+                        'target_registrasi' => (int) round(((int) ($row->target_registrasi ?? 0)) / $clusterCount),
+                        'target_topup' => (int) round(((int) ($row->target_topup ?? 0)) / $clusterCount),
+                    ];
+                });
+            })
+            ->groupBy('cluster')
+            ->map(function ($items) {
+                return [
+                    'target_revenue_cluster_billion' => (float) $items->sum('target_revenue_cluster_billion'),
+                    'target_revenue_branch_billion' => (float) $items->sum('target_revenue_branch_billion'),
+                    'target_visit' => (int) $items->sum('target_visit'),
+                    'target_leads' => (int) $items->sum('target_leads'),
+                    'target_registrasi' => (int) $items->sum('target_registrasi'),
+                    'target_topup' => (int) $items->sum('target_topup'),
+                ];
+            });
+        $grouped = [];
+        $jakartaArea = trim((string) ($mpccUsers->first(function ($user) {
+            return str_contains($this->normalizeMpccBranchKey($user->branch ?? null), 'jakarta');
+        })->area ?? 'Area 2'));
+
+        foreach (['Cluster Jakarta Barat', 'Cluster Jakarta Utara', 'Cluster Jakarta Pusat Selatan', 'Cluster Jakarta Timur'] as $cluster) {
+            $branchName = in_array($cluster, ['Cluster Jakarta Barat', 'Cluster Jakarta Utara'], true)
+                ? 'Jakarta Northern'
+                : 'Jakarta Southern';
+            $groupKey = $jakartaArea . '||' . $cluster . '||' . $branchName;
+            $clusterTarget = $clusterTargetTotals->get($cluster, [
+                'target_revenue_cluster_billion' => 0,
+                'target_revenue_branch_billion' => 0,
+                'target_visit' => 0,
+                'target_leads' => 0,
+                'target_registrasi' => 0,
+                'target_topup' => 0,
+            ]);
+            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
+
+            $grouped[$groupKey] = [
+                'area' => $jakartaArea,
+                'cluster' => $cluster,
+                'jumlah_mpcc' => 0,
+                'branch' => $branchName,
+                'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
+                'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
+                'target_visit' => (int) round(($clusterTarget['target_visit'] ?? 0) / $clusterBranchCount),
+                'target_leads' => (int) round(($clusterTarget['target_leads'] ?? 0) / $clusterBranchCount),
+                'target_registrasi' => (int) round(($clusterTarget['target_registrasi'] ?? 0) / $clusterBranchCount),
+                'target_topup' => (int) round(($clusterTarget['target_topup'] ?? 0) / $clusterBranchCount),
+                'actual_visit' => 0,
+                'jumlah_leads' => 0,
+                'jumlah_akun' => 0,
+                'achievement' => 0,
+                'total_topup' => 0,
+                'tgl_transaksi_terakhir' => '-',
+                '_last_transaction_at' => null,
+            ];
+        }
+
+        foreach ($mpccUsers as $mpccUser) {
+            $voucherCode = strtoupper($mpccUser->voucher_code);
+            $voucherInfo = $voucherData->get($voucherCode);
+            $area = trim((string) ($mpccUser->area ?: '-'));
+            $rawBranch = trim((string) ($mpccUser->branch ?: '-'));
+            $branch = $this->resolveMpccBranchName($rawBranch);
+            $cluster = $this->resolveMpccClusterName($rawBranch);
+            $groupKey = $area . '||' . $cluster . '||' . $branch;
+            $clusterTarget = $clusterTargetTotals->get($cluster, [
+                'target_revenue_cluster_billion' => 0,
+                'target_revenue_branch_billion' => 0,
+                'target_visit' => 0,
+                'target_leads' => 0,
+                'target_registrasi' => 0,
+                'target_topup' => 0,
+            ]);
+            $clusterBranchCount = (int) ($branchClusterCounts->get($cluster) ?? 1);
+
+            if (!isset($grouped[$groupKey])) {
+                $grouped[$groupKey] = [
+                    'area' => $area,
+                    'cluster' => $cluster,
+                    'branch' => $branch,
+                    'jumlah_mpcc' => 0,
+                    'target_revenue_cluster_billion' => (float) ($clusterTarget['target_revenue_cluster_billion'] ?? 0),
+                    'target_revenue_branch_billion' => (float) (($clusterTarget['target_revenue_branch_billion'] ?? 0) / $clusterBranchCount),
+                    'target_visit' => (int) round(($clusterTarget['target_visit'] ?? 0) / $clusterBranchCount),
+                    'target_leads' => (int) round(($clusterTarget['target_leads'] ?? 0) / $clusterBranchCount),
+                    'target_registrasi' => (int) round(($clusterTarget['target_registrasi'] ?? 0) / $clusterBranchCount),
+                    'target_topup' => (int) round(($clusterTarget['target_topup'] ?? 0) / $clusterBranchCount),
+                    'actual_visit' => 0,
+                    'jumlah_leads' => 0,
+                    'jumlah_akun' => 0,
+                    'achievement' => 0,
+                    'total_topup' => 0,
+                    'tgl_transaksi_terakhir' => '-',
+                    '_last_transaction_at' => null,
+                ];
+            }
+
+            $jumlahLeads = (int) ($leadAggByUser[$mpccUser->id]->jumlah_leads ?? 0);
+            $jumlahVisit = (int) ($visitAggByName[$mpccUser->name]->jumlah_visit ?? 0);
+            $jumlahAkun = (int) ($voucherInfo->jumlah_akun ?? 0);
+            $totalTopup = (float) ($voucherInfo->total_topup ?? 0);
+            $lastTransaction = !empty($voucherInfo->tgl_transaksi_terakhir)
+                ? Carbon::parse($voucherInfo->tgl_transaksi_terakhir)
+                : null;
+
+            $grouped[$groupKey]['jumlah_mpcc']++;
+            $grouped[$groupKey]['actual_visit'] += $jumlahVisit;
+            $grouped[$groupKey]['jumlah_leads'] += $jumlahLeads;
+            $grouped[$groupKey]['jumlah_akun'] += $jumlahAkun;
+            $grouped[$groupKey]['total_topup'] += $totalTopup;
+
+            if ($lastTransaction && (
+                is_null($grouped[$groupKey]['_last_transaction_at']) ||
+                $lastTransaction->gt($grouped[$groupKey]['_last_transaction_at'])
+            )) {
+                $grouped[$groupKey]['_last_transaction_at'] = $lastTransaction;
+                $grouped[$groupKey]['tgl_transaksi_terakhir'] = $lastTransaction->format('d M Y');
+            }
+        }
+
+        return collect($grouped)
+            ->map(function ($row) {
+                $targetRevenueBranchRp = (float) $row['target_revenue_branch_billion'] * 1000000000;
+                $row['achievement'] = $targetRevenueBranchRp > 0
+                    ? ((float) $row['total_topup'] / $targetRevenueBranchRp) * 100
+                    : 0;
+                return $row;
+            })
+            ->sortBy(['area', 'cluster', 'branch'])
+            ->values()
+            ->all();
+    }
+
+    private function buildMpccPilotCityReport(Carbon $monthDate): array
+    {
+        $config = $this->getMpccPilotCityConfig();
+        $cityKeys = collect($config)
+            ->flatMap(function ($group) {
+                return collect($group['cities'])->pluck('key');
+            })
+            ->values()
+            ->all();
+
+        $stats = [];
+        foreach ($cityKeys as $cityKey) {
+            $stats[$cityKey] = [
+                'mpcc' => 0,
+                'revenue_commitment' => 0,
+                'visits' => 0,
+                'leads' => 0,
+                'customers' => 0,
+                'total_topup' => 0,
+            ];
+        }
+
+        $startDate = $monthDate->copy()->startOfMonth();
+        $endDate = $monthDate->copy()->endOfMonth();
+        $targetMonth = (int) $monthDate->month;
+        $targetYear = (int) $monthDate->year;
+
+        $performanceRows = $this->buildMpccPerformanceRows($startDate, $endDate);
+
+        $targetRows = DB::table('mpcc_branch_targets')
+            ->where('year', $targetYear)
+            ->where('month', $targetMonth)
+            ->select('branch', 'target_revenue_branch_billion')
+            ->get();
+
+        foreach ($targetRows as $targetRow) {
+            $cityKey = $this->resolveMpccPilotCityKey($targetRow->branch);
+            if (!$cityKey || !isset($stats[$cityKey])) {
+                continue;
+            }
+
+            $branchTargetRevenue = (float) ($targetRow->target_revenue_branch_billion ?? 0);
+            $stats[$cityKey]['revenue_commitment'] += $branchTargetRevenue;
+        }
+
+        foreach ($performanceRows as $row) {
+            $cityKey = $this->resolveMpccPilotCityKey($row['branch'] ?? null);
+            if (!$cityKey || !isset($stats[$cityKey])) {
+                continue;
+            }
+
+            $stats[$cityKey]['mpcc']++;
+            $stats[$cityKey]['visits'] += (int) ($row['jumlah_visit'] ?? 0);
+            $stats[$cityKey]['leads'] += (int) ($row['jumlah_leads'] ?? 0);
+            $stats[$cityKey]['customers'] += (int) ($row['deal_topup_total_akun'] ?? 0);
+            $stats[$cityKey]['total_topup'] += (float) ($row['total_topup'] ?? 0);
+        }
+
+        $rows = [
+            [
+                'section' => 'basic',
+                'label' => 'MPCC',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'mpcc'),
+            ],
+            [
+                'section' => 'basic',
+                'label' => 'Local SBP',
+                'values' => $this->buildUnavailableMetricRow($cityKeys),
+            ],
+            [
+                'section' => 'basic',
+                'label' => 'Number of resellers onboarded',
+                'values' => $this->buildUnavailableMetricRow($cityKeys),
+            ],
+            [
+                'section' => 'commitment',
+                'label' => 'Revenue commitment',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'revenue_commitment'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of visits',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'visits'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of leads',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'leads'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => '# of customers',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'customers'),
+            ],
+            [
+                'section' => 'performance',
+                'label' => 'Total top-up',
+                'values' => $this->formatMpccPilotCityMetricRow($cityKeys, $stats, 'total_topup'),
+            ],
+        ];
+
+        return [
+            'config' => $config,
+            'rows' => $rows,
+            'missing_data_notes' => [
+                'Mapping formal `Area VP` dan `pilot city` belum ditemukan di tabel database, jadi saat ini dipasang manual mengikuti contoh yang Anda kirim.',
+                'Baris `Local SBP` belum bisa diisi akurat per pilot city karena tabel `mitra_sbp` hanya punya `area` dan `regional`, belum ada pemetaan langsung ke branch/kota pilot.',
+                'Baris `Number of resellers onboarded` belum ada definisi dan sumber tabel/kolom yang tegas. Saya belum menemukan field `reseller` atau status `onboarded` yang bisa dihitung langsung.',
+            ],
+            'source_notes' => [
+                'MPCC diambil dari `users.role = MPCC` dan dikelompokkan berdasarkan branch/kota pilot.',
+                'Revenue commitment hanya diambil dari `mpcc_branch_targets.target_revenue_branch_billion` pada bulan yang dipilih dan ditampilkan dengan nilai aslinya.',
+                'Visits, leads, total akun (# of customers), dan total top-up mengikuti agregasi yang sama dengan tabel `Report MPCC Deal Top Up & MOM` melalui `buildMpccPerformanceRows()`.',
+            ],
+        ];
+    }
+
+    private function getMpccPilotCityConfig(): array
+    {
+        return [
+            [
+                'vp' => 'P. Saki Hamsat Bramono',
+                'area' => '1',
+                'cities' => [
+                    ['key' => 'palembang', 'label' => 'Palembang'],
+                    ['key' => 'medan', 'label' => 'Medan'],
+                    ['key' => 'pekanbaru', 'label' => 'Pekanbaru'],
+                ],
+            ],
+            [
+                'vp' => 'B. Tuty R. Afriza',
+                'area' => '2',
+                'cities' => [
+                    ['key' => 'bandung', 'label' => 'Bandung'],
+                    ['key' => 'jakarta', 'label' => 'Jakarta'],
+                ],
+            ],
+            [
+                'vp' => 'P. Suryo Hadiyanto',
+                'area' => '3',
+                'cities' => [
+                    ['key' => 'semarang', 'label' => 'Semarang'],
+                    ['key' => 'denpasar', 'label' => 'Denpasar'],
+                    ['key' => 'surabaya', 'label' => 'Surabaya'],
+                ],
+            ],
+            [
+                'vp' => 'P. Murhalis',
+                'area' => '4',
+                'cities' => [
+                    ['key' => 'samarinda', 'label' => 'Samarinda'],
+                    ['key' => 'makassar', 'label' => 'Makassar'],
+                ],
+            ],
+        ];
+    }
+
+    private function resolveMpccPilotCityKey(?string $branch): ?string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        $cityMap = [
+            'palembang' => 'palembang',
+            'medan' => 'medan',
+            'pekanbaru' => 'pekanbaru',
+            'bandung' => 'bandung',
+            'kota bandung' => 'bandung',
+            'cluster kota bandung' => 'bandung',
+            'northern jakarta' => 'jakarta',
+            'jakarta northern' => 'jakarta',
+            'southern jakarta' => 'jakarta',
+            'jakarta southern' => 'jakarta',
+            'western jakarta' => 'jakarta',
+            'jakarta western' => 'jakarta',
+            'eastern jakarta' => 'jakarta',
+            'jakarta eastern' => 'jakarta',
+            'central jakarta' => 'jakarta',
+            'jakarta central' => 'jakarta',
+            'cluster jakarta barat' => 'jakarta',
+            'cluster jakarta utara' => 'jakarta',
+            'cluster jakarta pusat selatan' => 'jakarta',
+            'cluster jakarta timur' => 'jakarta',
+            'jakarta barat' => 'jakarta',
+            'jakarta utara' => 'jakarta',
+            'jakarta pusat' => 'jakarta',
+            'jakarta selatan' => 'jakarta',
+            'jakarta timur' => 'jakarta',
+            'semarang' => 'semarang',
+            'denpasar' => 'denpasar',
+            'surabaya' => 'surabaya',
+            'samarinda' => 'samarinda',
+            'makassar' => 'makassar',
+        ];
+
+        foreach ($cityMap as $keyword => $cityKey) {
+            if ($normalized !== '' && str_contains($normalized, $keyword)) {
+                return $cityKey;
+            }
+        }
+
+        return null;
+    }
+
+    private function formatMpccPilotCityMetricRow(array $cityKeys, array $stats, string $metric): array
+    {
+        $formatted = [];
+
+        foreach ($cityKeys as $cityKey) {
+            $value = $stats[$cityKey][$metric] ?? 0;
+
+            switch ($metric) {
+                case 'revenue_commitment':
+                    $formatted[] = 'Rp ' . number_format((float) $value, 0, ',', '.');
+                    break;
+                case 'total_topup':
+                    $formatted[] = 'Rp ' . number_format((float) $value, 0, ',', '.');
+                    break;
+                default:
+                    $formatted[] = number_format((int) $value, 0, ',', '.');
+                    break;
+            }
+        }
+
+        return $formatted;
+    }
+
+    private function buildUnavailableMetricRow(array $cityKeys): array
+    {
+        return array_fill(0, count($cityKeys), '-');
+    }
+
+    private function resolveMpccClusterName(?string $branch): string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        $clusterMap = [
+            'kota palembang' => 'Cluster Kota Palembang',
+            'palembang' => 'Cluster Kota Palembang',
+            'kota pekanbaru' => 'Cluster Kota Pekanbaru',
+            'pekanbaru' => 'Cluster Kota Pekanbaru',
+            'kota medan' => 'Cluster Kota Medan',
+            'medan' => 'Cluster Kota Medan',
+            'kota makassar' => 'Cluster Kota Makassar',
+            'makassar' => 'Cluster Kota Makassar',
+            'kota samarinda' => 'Cluster Kota Samarinda',
+            'samarinda' => 'Cluster Kota Samarinda',
+            'jakarta barat' => 'Cluster Jakarta Barat',
+            'western jakarta' => 'Cluster Jakarta Barat',
+            'jakarta utara' => 'Cluster Jakarta Utara',
+            'northern jakarta' => 'Cluster Jakarta Utara',
+            'jakarta pusat' => 'Cluster Jakarta Pusat Selatan',
+            'jakarta selatan' => 'Cluster Jakarta Pusat Selatan',
+            'southern jakarta' => 'Cluster Jakarta Pusat Selatan',
+            'jakarta timur' => 'Cluster Jakarta Timur',
+            'eastern jakarta' => 'Cluster Jakarta Timur',
+            'kota bandung' => 'Cluster Kota Bandung',
+            'bandung' => 'Cluster Kota Bandung',
+            'denpasar' => 'Cluster Bali Tengah',
+            'bali tengah' => 'Cluster Bali Tengah',
+            'surabaya' => 'Cluster Surabaya',
+            'semarang' => 'Cluster Semarang',
+        ];
+
+        foreach ($clusterMap as $keyword => $clusterName) {
+            if ($normalized !== '' && str_contains($normalized, $keyword)) {
+                return $clusterName;
+            }
+        }
+
+        return 'Cluster Lainnya';
+    }
+
+    private function resolveMpccTargetClusters(?string $branch): array
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        if ($normalized !== '' && str_contains($normalized, 'jakarta')) {
+            return ['Cluster Jakarta Barat', 'Cluster Jakarta Utara', 'Cluster Jakarta Pusat Selatan', 'Cluster Jakarta Timur'];
+        }
+        return [$this->resolveMpccClusterName($branch)];
+    }
+
+    private function resolveMpccBranchName(?string $branch): string
+    {
+        $normalized = $this->normalizeMpccBranchKey($branch);
+
+        if ($normalized === 'northern jakarta') {
+            return 'Jakarta Northern';
+        }
+
+        if ($normalized === 'southern jakarta') {
+            return 'Jakarta Southern';
+        }
+
+        return trim((string) ($branch ?: '-'));
+    }
+    private function normalizeMpccBranchKey(?string $branch): string
+    {
+        return strtolower(trim((string) $branch));
+    }
+
+    private function getMpccOwnerMapForMonth($mpccUsers, Carbon $monthStart): array
+    {
+        $voucherCodes = collect($mpccUsers)
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($voucherCodes)) {
+            return [];
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $mapping = [];
+        foreach ($historyCodes as $code) {
+            $mapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        foreach ($historyRows as $row) {
+            $mapping[$row->voucher_code] = $row->owner_name;
+        }
+
+        return $mapping;
+    }
+
+    private function getPowerHouseOwnerMapForMonth(array $defaultMapping, Carbon $monthStart): array
+    {
+        $voucherCodes = array_keys($defaultMapping);
+        if (empty($voucherCodes)) {
+            return $defaultMapping;
+        }
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->distinct()
+            ->pluck('voucher_code')
+            ->map(function ($code) {
+                return strtoupper(trim((string) $code));
+            })
+            ->toArray();
+
+        $baseMapping = $defaultMapping;
+        foreach ($historyCodes as $code) {
+            $baseMapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn(DB::raw('UPPER(voucher_code)'), $voucherCodes)
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select(DB::raw('UPPER(voucher_code) as voucher_code'), 'owner_name')
+            ->get();
+
+        $override = [];
+        foreach ($historyRows as $row) {
+            $override[$row->voucher_code] = $row->owner_name;
+        }
+
+        return array_merge($baseMapping, $override);
+    }
+
+    private function getCanvasserOwnerMapForMonth(Carbon $monthStart): array
+    {
+        $defaultMapping = [
+            'EXTRA1' => 'Amanah',
+            'EXTRA2' => 'Indah',
+            'EXTRA3' => 'Maria',
+            'EXTRA4' => 'Meisya',
+            'EXTRA5' => 'Hardi',
+            'EXTRA6' => 'Bustomi',
+            'EXTRA7' => 'Intan',
+            'EXTRA8' => 'Hika Rochmah',
+            'EXTRA9' => 'Akbar Zikron',
+            'EXTRA10' => 'Riva',
+            'EXTRA11' => 'Fanni',
+            'EXTRA12' => 'Maiph',
+            'EXTRA13' => 'Nyayu Z. Septianita',
+            'EXTRA14' => 'Afan',
+            'EXTRA15' => 'Herman',
+            'EXTRA16' => '',
+            'EXTRA17' => '',
+            'EXTRA18' => '',
+            'EXTRA19' => '',
+            'EXTRA20' => '',
+            'EXTRA21' => '',
+            'EXTRA22' => '',
+            'EXTRA23' => '',
+            'EXTRA24' => '',
+            'EXTRA25' => '',
+            'EXTRA26' => ''
+        ];
+
+        $historyCodes = DB::table('voucher_owner_history')
+            ->whereIn('voucher_code', array_keys($defaultMapping))
+            ->distinct()
+            ->pluck('voucher_code')
+            ->toArray();
+
+        $baseMapping = $defaultMapping;
+        foreach ($historyCodes as $code) {
+            $baseMapping[$code] = '';
+        }
+
+        $monthDate = $monthStart->toDateString();
+        $historyRows = DB::table('voucher_owner_history')
+            ->whereIn('voucher_code', array_keys($defaultMapping))
+            ->whereDate('effective_from', '<=', $monthDate)
+            ->where(function ($query) use ($monthDate) {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', $monthDate);
+            })
+            ->select('voucher_code', 'owner_name')
+            ->get();
+
+        $override = [];
+        foreach ($historyRows as $row) {
+            $override[$row->voucher_code] = $row->owner_name;
+        }
+
+        return array_merge($baseMapping, $override);
+    }
+
+    private function isCanvasserInsentifVisible(Carbon $monthStart): bool
+    {
+        $monthKey = $monthStart->format('Y-m');
+        return in_array($monthKey, ['2026-01', '2026-02'], true);
     }
 }

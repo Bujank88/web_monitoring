@@ -489,7 +489,7 @@
                     <button type="button" id="btnSaveCanvasserSummaryImage" class="btn btn-success-custom btn-sm" title="Save as Image">
                         <i class="fas fa-image"></i> Save Image
                     </button>
-                    <a href="{{ route('export.canvasser_voucher_summary') }}" class="btn btn-success-custom btn-sm" title="Download Excel">
+                    <a href="{{ route('export.canvasser_voucher_summary') }}" id="btnExportCanvasserSummary" class="btn btn-success-custom btn-sm" title="Download Excel">
                         <i class="fas fa-file-excel"></i> Download Excel
                     </a>
                 </div>
@@ -529,7 +529,7 @@
                     <button type="button" id="btnSaveCanvasserImage" class="btn btn-success-custom btn-sm" title="Save as Image">
                         <i class="fas fa-image"></i> Save Image
                     </button>
-                    <a href="{{ route('export.canvasser_voucher') }}" class="btn btn-success-custom btn-sm" title="Download Excel">
+                    <a href="{{ route('export.canvasser_voucher') }}" id="btnExportCanvasserDetail" class="btn btn-success-custom btn-sm" title="Download Excel">
                         <i class="fas fa-file-excel"></i> Download Excel
                     </a>
                 </div>
@@ -665,6 +665,8 @@
             var selectedText = $('#filterMonthCvsr option:selected').text();
             // $('#displayedMonthCvsr').text(selectedText);
             // Reload data table
+            updateInsentifVisibility();
+            updateExportLinks();
             table.ajax.reload();
             summaryTable.ajax.reload();
         });
@@ -686,6 +688,48 @@
                     alert('Gagal menyimpan gambar. Silakan coba lagi.');
                 });
         });
+
+        function isInsentifVisible(monthValue) {
+            if (!monthValue) return false;
+            return monthValue.startsWith('2026-01') || monthValue.startsWith('2026-02');
+        }
+
+        function updateInsentifVisibility() {
+            var selectedMonth = $('#filterMonthCvsr').val();
+            var visible = isInsentifVisible(selectedMonth);
+            table.column(5).visible(visible, false);
+            summaryTable.column(5).visible(visible, false);
+            table.columns.adjust().draw(false);
+            summaryTable.columns.adjust().draw(false);
+        }
+
+        function buildExportUrl(baseUrl) {
+            var selectedMonth = $('#filterMonthCvsr').val();
+            if (!selectedMonth) {
+                return baseUrl;
+            }
+
+            var query = new URLSearchParams({ month: selectedMonth });
+            return baseUrl + '?' + query.toString();
+        }
+
+        function updateExportLinks() {
+            $('#btnExportCanvasserDetail').attr('href', buildExportUrl('/export-canvasser-voucher'));
+            $('#btnExportCanvasserSummary').attr('href', buildExportUrl('/export-canvasser-voucher-summary'));
+        }
+
+        $('#btnExportCanvasserDetail').on('click', function(e) {
+            e.preventDefault();
+            window.location.href = buildExportUrl("/export-canvasser-voucher");
+        });
+
+        $('#btnExportCanvasserSummary').on('click', function(e) {
+            e.preventDefault();
+            window.location.href = buildExportUrl("/export-canvasser-voucher-summary");
+        });
+
+        updateInsentifVisibility();
+        updateExportLinks();
     });
 </script>
 @endsection

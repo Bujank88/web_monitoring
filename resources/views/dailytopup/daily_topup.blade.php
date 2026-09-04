@@ -446,7 +446,7 @@
                     <button type="button" id="btnSaveDailyTopupImage" class="btn btn-light btn-sm" title="Save as Image" style="padding: 6px 12px; white-space: nowrap;">
                         <i class="fas fa-image mr-2"></i> Save Image
                     </button>
-                    <a href="{{ route('export.daily_topup') }}" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap;">
+                    <a href="{{ route('export.daily_topup') }}?month={{ $months[array_search(true, array_column($months, 'selected'))]['value'] ?? now()->format('Y-m-d') }}" id="btnExportDailyTopupExcel" class="btn btn-light btn-sm" title="Download Excel" style="padding: 6px 12px; white-space: nowrap;">
                         <i class="fas fa-file-excel mr-2"></i> Download Excel
                     </a>
                 </div>
@@ -457,7 +457,7 @@
                         <thead class="thead-light">
                             <tr>
                                 <th rowspan="3" style="vertical-align: middle; text-align: center; background-color: #f8f9fa;">Tanggal</th>
-                                <th colspan="16" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="18" class="text-center" style="background-color: #f8d7da;">Report Daily TopUp All Channel | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
                                 <th colspan="2" class="text-center" style="background-color: #d1ecf1;">Canvasser</th>
@@ -466,6 +466,7 @@
                                 <th colspan="2" class="text-center" style="background-color: #fcc271;">Internal</th>
                                 <th colspan="2" class="text-center" style="background-color: #eef7d9;">Agency Advertising</th>
                                 <th colspan="2" class="text-center" style="background-color: #d4edea;">B2B</th>
+                                <th colspan="2" class="text-center" style="background-color: #d8e2ff;">Powerhouse</th>
                                 <th colspan="2" class="text-center" style="background-color: #d4edda;">Self Service</th>
                                 <th colspan="2" class="text-center" style="background-color: #f62b3c; color: white;">Total</th>
                             </tr>
@@ -482,6 +483,8 @@
                                 <th class="text-center" style="background-color: #eef7d9;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #d4edea;">user_id</th>
                                 <th class="text-center" style="background-color: #d4edea;">Total Settlement</th>
+                                <th class="text-center" style="background-color: #d8e2ff;">user_id</th>
+                                <th class="text-center" style="background-color: #d8e2ff;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #d4edda;">user_id</th>
                                 <th class="text-center" style="background-color: #d4edda;">Total Settlement</th>
                                 <th class="text-center" style="background-color: #f62b3c; color: white;">User Id</th>
@@ -708,6 +711,20 @@
                     }
                 },
                 {
+                    data: 'powerhouse_user',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: center;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'powerhouse_settle',
+                    render: function(data, type, row) {
+                        let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
+                        return `<div style="text-align: right;" class="${className}">${data || '-'}</div>`;
+                    }
+                },
+                {
                     data: 'self_service_user',
                     render: function(data, type, row) {
                         let className = row.date === 'Total Keseluruhan' ? 'font-weight-bold' : '';
@@ -852,8 +869,14 @@
             ]
         });
 
+        function updateDailyTopupExportLink() {
+            let monthValue = $('#filterMonthPH').val();
+            $('#btnExportDailyTopupExcel').attr('href', "{{ route('export.daily_topup') }}?month=" + monthValue);
+        }
+
         // Event listener untuk filter bulan - reload datatable per province juga
         $('#filterMonthPH').on('change', function() {
+            updateDailyTopupExportLink();
             tableByProvince.ajax.reload();
         });
 
@@ -885,6 +908,8 @@
             let monthValue = $('#filterMonthPH').val();
             window.location = "{{ route('export.daily_topup_by_province') }}?month=" + monthValue;
         });
+
+        updateDailyTopupExportLink();
 
     });
 </script>

@@ -32,6 +32,23 @@ class LeadsMasterController extends Controller
                     ->orderBy('regional')
                     ->pluck('regional')
             ),
+            'flagEvents' => Cache::remember('flag_events_list_leads', 3600, fn() =>
+                DB::table('detail_leads_summary')
+                    ->whereNotNull('flag_event')
+                    ->where('flag_event', '!=', '')
+                    ->distinct()
+                    ->orderBy('flag_event')
+                    ->pluck('flag_event')
+            ),
+            'dataTypes' => Cache::remember('data_types_list_leads_without_enterprise', 3600, fn() =>
+                DB::table('detail_leads_summary')
+                    ->whereNotNull('data_type')
+                    ->where('data_type', '!=', '')
+                    ->where('data_type', '!=', 'Enterprise Akun')
+                    ->distinct()
+                    ->orderBy('data_type')
+                    ->pluck('data_type')
+            ),
         ]);
     }
 
@@ -46,7 +63,13 @@ class LeadsMasterController extends Controller
         // Base query dari summary table (sudah precomputed, lebih cepat)
         $query = DB::table('detail_leads_summary as dls')
             ->select(
-                'dls.*'
+                'dls.*',
+                DB::raw("
+                    CASE
+                        WHEN COALESCE(dls.saldo_utama, 0) >= 1000000 THEN 1
+                        ELSE 0
+                    END as rekomendasi_sort
+                ")
             )
             ->orderBy('dls.total_settlement_klien', 'desc')
             ->orderBy('dls.saldo_utama', 'desc');
@@ -68,6 +91,23 @@ class LeadsMasterController extends Controller
             $query->where('dls.user_id', $request->canvasser);
         }
 
+        // Filter Flag Event
+        if ($request->flag_event) {
+            $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
+        }
+
+        // Filter Rekomendasi
+        if ($request->rekomendasi === 'Push Campaign') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) >= 1000000');
+        } elseif ($request->rekomendasi === 'Push Topup') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) < 1000000');
+        }
+
         // Filter Tanggal
         if ($request->start_date && $request->end_date) {
             $query->whereBetween('dls.created_at', [
@@ -83,11 +123,13 @@ class LeadsMasterController extends Controller
                 ->orWhere('dls.regional', 'like', "%$search%")
                 ->orWhere('dls.company_name', 'like', "%$search%")
                 ->orWhere('dls.email', 'like', "%$search%")
-                ->orWhere('dls.mobile_phone', 'like', "%$search%");
+                ->orWhere('dls.mobile_phone', 'like', "%$search%")
+                ->orWhere('dls.flag_event', 'like', "%$search%");
             });
         }
 
         return datatables()->of($query)
+            ->orderColumn('rekomendasi', 'rekomendasi_sort $1')
             ->addColumn('user_name', function ($row) {
                 return $row->user_name ?? '-';
             })            
@@ -112,6 +154,9 @@ class LeadsMasterController extends Controller
                 }
                 return '<span class="badge badge-secondary">' . $type . '</span>';
             })
+            ->addColumn('flag_event', function ($row) {
+                return $row->flag_event ?? '-';
+            })
             ->editColumn('created_at', function ($row) {
                 return \Carbon\Carbon::parse($row->created_at)->translatedFormat('d M Y');
             })
@@ -132,6 +177,14 @@ class LeadsMasterController extends Controller
                         <i class="fas fa-pencil-alt"></i> Edit
                     </a>
                 ';
+
+                if (!empty($row->email)) {
+                    $btn .= '
+                        <a href="' . route('transaction-detail', ['email' => $row->email]) . '" class="btn btn-sm btn-info mt-1">
+                            <i class="fas fa-receipt"></i> Transaction Detail
+                        </a>
+                    ';
+                }
 
                 // hanya admin dan canvasser yang boleh add to logbook
                 if (auth()->check() && in_array(auth()->user()->role, ['Admin', 'cvsr'])) {
@@ -161,27 +214,58 @@ class LeadsMasterController extends Controller
 
     public function export(Request $request)
     {
-        $query = LeadsMaster::with(['user', 'source', 'sector'])
-            ->orderBy('created_at', 'asc');
+        $query = DB::table('detail_leads_summary as dls')
+            ->select(
+                'dls.user_name',
+                'dls.regional',
+                'dls.company_name',
+                'dls.email',
+                'dls.mobile_phone',
+                'dls.data_type',
+                'dls.flag_event',
+                'dls.created_at',
+                'dls.total_settlement_klien',
+                'dls.saldo_utama'
+            )
+            ->orderBy('dls.total_settlement_klien', 'desc')
+            ->orderBy('dls.saldo_utama', 'desc');
+
 
         // 🔐 ROLE
         if (!auth()->user()->hasRole('Admin')) {
-            $query->where('user_id', auth()->id());
+            $query->where('dls.user_id', auth()->id());
         }
 
         // Filter Canvasser
         if ($request->canvasser) {
-            $query->where('user_id', $request->canvasser);
+            $query->where('dls.user_id', $request->canvasser);
         }
 
         // Filter Regional
         if ($request->regional) {
-            $query->where('regional', $request->regional);
+            $query->where('dls.regional', $request->regional);
+        }
+
+        // Filter Flag Event
+        if ($request->flag_event) {
+            $query->where('dls.flag_event', $request->flag_event);
+        }
+
+        // Filter Tipe Data
+        if ($request->data_type) {
+            $query->where('dls.data_type', $request->data_type);
+        }
+
+        // Filter Rekomendasi
+        if ($request->rekomendasi === 'Push Campaign') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) >= 1000000');
+        } elseif ($request->rekomendasi === 'Push Topup') {
+            $query->whereRaw('COALESCE(dls.saldo_utama, 0) < 1000000');
         }
 
         // Filter Tanggal
         if ($request->start_date && $request->end_date) {
-            $query->whereBetween('created_at', [
+            $query->whereBetween('dls.created_at', [
                 $request->start_date . ' 00:00:00',
                 $request->end_date . ' 23:59:59'
             ]);
@@ -195,14 +279,17 @@ class LeadsMasterController extends Controller
         ];
 
         $columns = [
-            'Status',
             'Canvasser',
             'Regional',
             'Nama Perusahaan',
             'Email',
             'No HP',
             'Tipe Data',
+            'Flag Event',
             'Tanggal',
+            'Total Settlement',
+            'Saldo Utama',
+            'Rekomendasi',
         ];
 
         $callback = function () use ($query, $columns) {
@@ -214,15 +301,22 @@ class LeadsMasterController extends Controller
             fputcsv($file, $columns);
 
             foreach ($query->cursor() as $row) {
+                $totalSettlement = $row->total_settlement_klien ?? 0;
+                $saldoUtama = $row->saldo_utama ?? 0;
+                $rekomendasi = ($saldoUtama >= 1000000) ? 'Push Campaign' : 'Push Topup';
+
                 fputcsv($file, [
-                    $row->status == 1 ? 'Deal' : 'No Deal',
-                    $row->user->name ?? '-',
+                    $row->user_name ?? '-',
                     $row->regional ?? '-',
                     $row->company_name ?? '-',
                     $row->email ?? '-',
                     $row->mobile_phone ?? '-',
                     $row->data_type ?? '-',
-                    $row->created_at->format('Y-m-d'),
+                    $row->flag_event ?? '-',
+                    \Carbon\Carbon::parse($row->created_at)->format('Y-m-d'),
+                    'Rp ' . number_format($totalSettlement, 0, ',', '.'),
+                    'Rp ' . number_format($saldoUtama, 0, ',', '.'),
+                    $rekomendasi,
                 ]);
             }
 
@@ -249,6 +343,15 @@ class LeadsMasterController extends Controller
 
         return view('leads-master.create-existing', compact('leadSources', 'sectors'));
     }
+
+    public function createEnterprise()
+    {
+        logUserLogin();
+        $leadSources = LeadsSource::all();
+        $sectors = Sector::all();
+
+        return view('leads-master.create-enterprise', compact('leadSources', 'sectors'));
+    }
     public function store(Request $request)
     {
         // Custom validation rules
@@ -262,7 +365,7 @@ class LeadsMasterController extends Controller
                 'required',
                 'string',
                 'max:20',
-                'regex:/^62\d{9,14}$/',
+                'regex:/^62\d{9,16}$/',
                 'unique:leads_master,mobile_phone',
             ],
             'email' => [
@@ -372,7 +475,7 @@ class LeadsMasterController extends Controller
                 'required',
                 'string',
                 'max:20',
-                'regex:/^62\d{9,14}$/',
+                'regex:/^62\d{9,16}$/',
                 'unique:leads_master,mobile_phone',
             ],
             'email' => [
@@ -392,7 +495,12 @@ class LeadsMasterController extends Controller
             'nama' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
             'remarks' => 'nullable|string|max:1000',
-            'myads_account' => 'required|string|max:255'
+            'myads_account' => 'required|string|max:255',
+            'schedule_lokasi' => 'nullable|string|max:255',
+            'schedule_tanggal' => 'nullable|date',
+            'schedule_waktu_mulai' => 'nullable|date_format:H:i',
+            'schedule_waktu_selesai' => 'nullable|date_format:H:i',
+            'schedule_keterangan' => 'nullable|string|max:1000'
         ];
 
         $messages = [
@@ -421,6 +529,89 @@ class LeadsMasterController extends Controller
             'data_type' => 'Eksisting Akun',
         ]);
 
+        $scheduleInfo = null;
+        if ($request->filled('schedule_tanggal') && $request->filled('schedule_waktu_mulai') && $request->filled('schedule_waktu_selesai')) {
+            $locationName = $validated['schedule_lokasi'] ?? $validated['company_name'] ?? '-';
+
+            DB::table('bookings')->insert([
+                'nama' => auth()->user()->name,
+                'lokasi' => $locationName,
+                'tanggal' => $validated['schedule_tanggal'],
+                'waktu_mulai' => $validated['schedule_waktu_mulai'],
+                'waktu_selesai' => $validated['schedule_waktu_selesai'],
+                'keterangan' => $validated['schedule_keterangan'] ?? 'Kunjungan dari akun existing: ' . $validated['company_name'],
+                'warna' => '#667eea',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $scheduleDate = \Carbon\Carbon::parse($validated['schedule_tanggal'])->translatedFormat('l, d F Y');
+            $scheduleInfo = "Jadwal: {$scheduleDate} ({$validated['schedule_waktu_mulai']} - {$validated['schedule_waktu_selesai']})";
+        }
+
+        $successMsg = 'Akun existing untuk ' . $validated['company_name'] . ' berhasil ditambahkan.';
+        if ($scheduleInfo) {
+            $successMsg .= "\n" . $scheduleInfo;
+        }
+
+        return redirect()->route('leads-master.index')->with('success_with_schedule', $successMsg);
+    }
+
+    public function storeEnterprise(Request $request)
+    {
+        $rules = [
+            'user_id' => 'required|exists:users,id',
+            'sector_id' => 'nullable|exists:sectors,id',
+            'company_name' => 'required|string|max:255',
+            'mobile_phone' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^62\d{9,16}$/',
+                'unique:leads_master,mobile_phone',
+            ],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:leads_master,email',
+                function ($attribute, $value, $fail) {
+                    if (\DB::table('mitra_sbp')
+                        ->where('email_myads', $value)
+                        ->exists()) {
+                        $fail('Email sudah terdaftar sebagai Mitra SBP.');
+                    }
+                },
+            ],
+            'nama' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'remarks' => 'nullable|string|max:1000',
+            'myads_account' => 'required|string|max:255'
+        ];
+
+        $messages = [
+            'mobile_phone.regex' => 'Nomor HP harus diawali dengan kode negara 62 dan hanya angka (9-12 digit).',
+            'mobile_phone.unique' => 'Nomor HP sudah terdaftar.',
+            'email.unique' => 'Email sudah terdaftar.',
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        $statusValue = 1;
+        LeadsMaster::create([
+            'user_id' => $validated['user_id'],
+            'source_id' => null,
+            'sector_id' => $validated['sector_id'] ?? null,
+            'company_name' => $validated['company_name'] ?? '-',
+            'mobile_phone' => $validated['mobile_phone'],
+            'email' => $validated['email'] ?? null,
+            'status' => $statusValue,
+            'nama' => $validated['nama'],
+            'address' => $validated['address'] ?? null,
+            'remarks' => $validated['remarks'] ?? null,
+            'myads_account' => $validated['myads_account'],
+            'data_type' => 'Enterprise Akun',
+        ]);
 
         return redirect()->route('leads-master.index')->with('success', 'Leads baru berhasil disimpan.');
     }
@@ -634,8 +825,7 @@ class LeadsMasterController extends Controller
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             );
 
-        // Query untuk mendapatkan data yang akan dimasukkan
-        $leadsData = LeadsMaster::with(['user'])
+        $baseQuery = LeadsMaster::with(['user'])
             ->leftJoinSub(
                 $settlementSubquery,
                 'rbt',
@@ -667,57 +857,62 @@ class LeadsMasterController extends Controller
                 'leads_master.komitmen',
                 'leads_master.plan_min_topup',
                 'leads_master.remarks',
+                'leads_master.flag_event',
                 'leads_master.created_at',
                 'leads_master.updated_at',
                 DB::raw('COALESCE(rbt.total_settlement_klien, 0) as total_settlement_klien'),
                 DB::raw('COALESCE(su.saldo_utama, 0) as saldo_utama')
             )
-            ->get();
+            ->orderBy('leads_master.id');
 
-        // Build array untuk batch insert
-        $summaryData = $leadsData->map(function ($lead) {
-            return [
-                'leads_master_id' => $lead->leads_master_id,
-                'user_id' => $lead->user_id,
-                'user_name' => $lead->user->name ?? null,
-                'source_id' => $lead->source_id,
-                'sector_id' => $lead->sector_id,
-                'regional' => $lead->regional,
-                'company_name' => $lead->company_name,
-                'mobile_phone' => $lead->mobile_phone,
-                'email' => $lead->email,
-                'status' => $lead->status,
-                'nama' => $lead->nama,
-                'address' => $lead->address,
-                'myads_account' => $lead->myads_account,
-                'data_type' => $lead->data_type,
-                'komitmen' => $lead->komitmen,
-                'plan_min_topup' => $lead->plan_min_topup,
-                'remarks' => $lead->remarks,
-                'total_settlement_klien' => $lead->total_settlement_klien,
-                'saldo_utama' => $lead->saldo_utama,
-                'created_at' => $lead->created_at,
-                'updated_at' => $lead->updated_at,
-            ];
-        })->toArray();
+        $totalInserted = 0;
 
-        // Truncate dan insert ulang
-        DB::table('detail_leads_summary')->truncate();
-        
-        if (!empty($summaryData)) {
-            // Batch insert untuk performa
-            $chunks = array_chunk($summaryData, 500);
-            foreach ($chunks as $chunk) {
-                DB::table('detail_leads_summary')->insert($chunk);
-            }
-        }
+        DB::transaction(function () use ($baseQuery, &$totalInserted) {
+            // Gunakan delete dalam transaction supaya tabel tidak tertinggal setengah jadi
+            // saat job gagal atau koneksi DB sempat putus di tengah proses refresh.
+            DB::table('detail_leads_summary')->delete();
 
-        \Log::info('Detail Leads Summary - Refreshed: ' . count($summaryData) . ' records');
+            $baseQuery->chunkById(500, function ($leadsData) use (&$totalInserted) {
+                $summaryData = $leadsData->map(function ($lead) {
+                    return [
+                        'leads_master_id' => $lead->leads_master_id,
+                        'user_id' => $lead->user_id,
+                        'user_name' => $lead->user->name ?? null,
+                        'source_id' => $lead->source_id,
+                        'sector_id' => $lead->sector_id,
+                        'regional' => $lead->regional,
+                        'company_name' => $lead->company_name,
+                        'mobile_phone' => $lead->mobile_phone,
+                        'email' => $lead->email,
+                        'status' => $lead->status,
+                        'nama' => $lead->nama,
+                        'address' => $lead->address,
+                        'myads_account' => $lead->myads_account,
+                        'data_type' => $lead->data_type,
+                        'komitmen' => $lead->komitmen,
+                        'plan_min_topup' => $lead->plan_min_topup,
+                        'remarks' => $lead->remarks,
+                        'flag_event' => $lead->flag_event,
+                        'total_settlement_klien' => $lead->total_settlement_klien,
+                        'saldo_utama' => $lead->saldo_utama,
+                        'created_at' => $lead->created_at,
+                        'updated_at' => $lead->updated_at,
+                    ];
+                })->toArray();
+
+                if (!empty($summaryData)) {
+                    DB::table('detail_leads_summary')->insert($summaryData);
+                    $totalInserted += count($summaryData);
+                }
+            }, 'leads_master.id', 'leads_master_id');
+        });
+
+        \Log::info('Detail Leads Summary - Refreshed: ' . $totalInserted . ' records');
 
         return response()->json([
             'success' => true,
-            'message' => "Summary direfresh. Total: " . count($summaryData) . " records",
-            'total_records' => count($summaryData),
+            'message' => "Summary direfresh. Total: " . $totalInserted . " records",
+            'total_records' => $totalInserted,
         ]);
     }
 
@@ -763,6 +958,7 @@ class LeadsMasterController extends Controller
                 'komitmen' => $lead->komitmen,
                 'plan_min_topup' => $lead->plan_min_topup,
                 'remarks' => $lead->remarks,
+                'flag_event' => $lead->flag_event,
                 'total_settlement_klien' => $settlement ?? 0,
                 'saldo_utama' => $saldoUtama ?? 0,
                 'created_at' => $lead->created_at,
@@ -776,7 +972,14 @@ class LeadsMasterController extends Controller
         $validReferralCodes = [
             'EXTRA1','EXTRA2','EXTRA3','EXTRA4','EXTRA5','EXTRA6','EXTRA7',
             'EXTRA8','EXTRA9','EXTRA10','EXTRA11','EXTRA12','EXTRA13','EXTRA14','EXTRA15',
+            'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25',
+            'EXTRA26', 'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30',
+            'EXTRA31', 'EXTRA32', 'EXTRA33', 'EXTRA34', 'EXTRA35',
+            'EXTRA36', 'EXTRA37', 'EXTRA38', 'EXTRA39', 'EXTRA40',
             'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
+            'HEBAT1','HEBAT2','HEBAT3','HEBAT4','HEBAT5','HEBAT6','HEBAT7',
+            'HEBAT8','HEBAT9','HEBAT10','HEBAT11','HEBAT12','HEBAT13',
         ];
 
         // 2️⃣ Ambil data top up + referral_code user
@@ -784,7 +987,6 @@ class LeadsMasterController extends Controller
             ->join('users as u', 'u.referral_code', '=', 'r.voucher_code')
             ->whereIn(DB::raw('UPPER(u.referral_code)'), $validReferralCodes)
             ->whereNotNull('r.email_client')
-            ->whereDate('r.tgl_transaksi', Carbon::today())
             ->select(
                 'u.id as user_id',
                 'r.company_name',
@@ -802,6 +1004,13 @@ class LeadsMasterController extends Controller
                 continue;
             }
 
+            $existsInMitraSbp = DB::table('mitra_sbp')
+                ->where('email_myads', $topUp->email_client)
+                ->exists();
+            if ($existsInMitraSbp) {
+                continue;
+            }
+            
             // 4️⃣ Insert ke leads_master
             LeadsMaster::create([
                 'user_id'        => $topUp->user_id,

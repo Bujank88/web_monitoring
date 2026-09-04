@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Models\LeadsSource;
+use App\Models\Sector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Session;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\File;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class FrontController extends Controller
 {
@@ -27,6 +34,14 @@ class FrontController extends Controller
                 return redirect()->route('report-agency-advertising');
             } else if ('Internal' == Auth::user()->role) {
                 return redirect()->route('mitra-sbp');
+            } else if (in_array(Auth::user()->role, ['SBP', 'Canvasser SBP'])) {
+                return redirect()->route('pilot-sbp-sme');
+            } else if ('Dormant' == Auth::user()->role) {
+                return redirect()->route('data-dormant');
+            } else if ('GOTO' == Auth::user()->role) {
+                return redirect()->route('report-goto');
+            } else if ('Area 2' == Auth::user()->role) {
+                return redirect()->route('area2.leads-master.index');
             } else if ('b2b' == Auth::user()->role) {
                 return redirect()->route('amlevelup.index');
             } else {
@@ -77,6 +92,28 @@ class FrontController extends Controller
             ];
         }
         return view('dailytopup.daily_topup', compact('months'));
+    }
+
+    public function dailyTopupRegional()
+    {
+        logUserLogin();
+        $months = [];
+
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        $regionalName = Auth::user()->regional ?? '-';
+
+        return view('dailytopup.daily_topup_regional', compact('months', 'regionalName'));
     }
     public function logout()
     {
@@ -137,6 +174,347 @@ class FrontController extends Controller
             "Grup Manajemen User Klien"
         ];
         return view('admin.upload', compact('myAdsUploads'));
+    }
+    public function downloadTipsSalesPdf()
+    {
+        $filePath = public_path('images/tips-sales-guide.pdf');
+
+        if (!File::exists($filePath)) {
+            abort(404, 'File PDF contoh wording tidak ditemukan.');
+        }
+
+        return response()->download($filePath, 'Contoh Wording Tips Sales.pdf', [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+    public function uploadAutomatechReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/automatech-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.automatech-report.template');
+
+        return view('admin.upload-automatech-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function uploadGotoReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/goto-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.goto-report.template');
+        $pageTitle = 'Upload Report GOTO';
+        $uploadTitle = 'Upload Excel Report GOTO';
+        $uploadDescription = 'Upload file report GOTO khusus admin. Format file mengikuti template yang sudah disediakan.';
+        $storeRoute = 'admin.upload.goto-report.store';
+        $emptyUploadText = 'Belum ada file report GOTO yang diupload.';
+        $templateButtonText = 'Download Template Laporan GOTO';
+
+        return view('admin.upload-automatech-report', compact(
+            'uploadedFiles',
+            'templateFile',
+            'pageTitle',
+            'uploadTitle',
+            'uploadDescription',
+            'storeRoute',
+            'emptyUploadText',
+            'templateButtonText'
+        ));
+    }
+
+    public function uploadAvalonKemangBogorReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/avalon-kemang-bogor-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.avalon-kemang-bogor-report.template');
+        $pageTitle = 'Upload Report Avalon Kemang Bogor';
+        $uploadTitle = 'Upload Excel Report Avalon Kemang Bogor';
+        $uploadDescription = 'Upload file report Avalon Kemang Bogor khusus admin. Format file mengikuti template yang sudah disediakan.';
+        $storeRoute = 'admin.upload.avalon-kemang-bogor-report.store';
+        $emptyUploadText = 'Belum ada file report Avalon Kemang Bogor yang diupload.';
+        $templateButtonText = 'Download Template Laporan Avalon';
+
+        return view('admin.upload-automatech-report', compact(
+            'uploadedFiles',
+            'templateFile',
+            'pageTitle',
+            'uploadTitle',
+            'uploadDescription',
+            'storeRoute',
+            'emptyUploadText',
+            'templateButtonText'
+        ));
+    }
+
+    public function downloadAutomatechReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1649001', '11 May 2026', 'WABA PROMO DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '5000', '92', '37', '132000'],
+            ['1649002', '12 May 2026', 'SMS PROMO DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '2000', '41', '18', '98000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan Automatech Dummy.xlsx');
+    }
+
+    public function downloadGotoReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['3649001', '11 May 2026', 'GOTO PROMO DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '5000', '92', '37', '132000'],
+            ['3649002', '12 May 2026', 'GOTO PROMO DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '2000', '41', '18', '98000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan GOTO Dummy.xlsx');
+    }
+
+    public function downloadAvalonKemangBogorReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['2649001', '11 May 2026', 'AVALON KEMANG BOGOR DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 125 Gagal: 7', '5000', '92', '37', '132000'],
+            ['2649002', '12 May 2026', 'AVALON KEMANG BOGOR DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 98 Gagal: 12', '2000', '41', '18', '98000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan Avalon Kemang Bogor Dummy.xlsx');
+    }
+
+
+    public function uploadCdsiReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/cdsi-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.cdsi-report.template');
+
+        return view('admin.upload-cdsi-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function downloadCdsiReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1849001', '11 May 2026', 'WABA CDSI DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 105 Gagal: 9', '3000', '75', '29', '118000'],
+            ['1849002', '12 May 2026', 'SMS CDSI DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 87 Gagal: 11', '1000', '38', '14', '91000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan CDSI Dummy.xlsx');
+    }
+    public function uploadMaximReport()
+    {
+        logUserLogin();
+
+        $uploadPath = storage_path('app/maxim-report-uploads');
+        $uploadedFiles = collect();
+
+        if (File::exists($uploadPath)) {
+            $uploadedFiles = collect(File::files($uploadPath))
+                ->sortByDesc(fn ($file) => $file->getMTime())
+                ->map(function ($file) {
+                    return [
+                        'name' => $file->getFilename(),
+                        'size' => number_format($file->getSize() / 1024, 2) . ' KB',
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->format('d M Y H:i'),
+                    ];
+                })
+                ->values();
+        }
+
+        $templateFile = route('admin.upload.maxim-report.template');
+
+        return view('admin.upload-maxim-report', compact('uploadedFiles', 'templateFile'));
+    }
+
+    public function downloadMaximReportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
+            ['1749001', '12 May 2026', 'WABA MAXIM DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 145 Gagal: 10', '7000', '101', '41', '154000'],
+            ['1749002', '13 May 2026', 'SMS MAXIM DUMMY 2', 'TELKOMSEL', 'LBA', 'SMS', 'Sukses: 88 Gagal: 6', '1000', '33', '12', '88000'],
+        ], null, 'A1');
+
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'DC3545'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+        ]);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, 'Template Laporan Maxim Dummy.xlsx');
     }
     public function monitoring_padi_umkm()
     {
@@ -239,6 +617,110 @@ class FrontController extends Controller
         }
         
         return view('admin.powerhouse_referral', compact('months'));
+    }
+    public function monitoringMpccReport()
+    {
+        logUserLogin();
+
+        $months = [];
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->format('Y-m-01');
+
+        for ($i = 1; $i <= 12; ++$i) {
+            $date = Carbon::create($currentYear, $i, 1);
+            $months[] = [
+                'value' => $date->format('Y-m-d'),
+                'label' => $date->translatedFormat('F Y'),
+                'selected' => $date->format('Y-m-d') === $currentMonth,
+            ];
+        }
+
+        return view('admin.mpcc_report', compact('months'));
+    }
+    public function monitoringMpccAreaBranchReport()
+    {
+        logUserLogin();
+
+        return view('admin.mpcc_area_branch_report');
+    }
+    public function monitoringPowerHouseSemester()
+    {
+        logUserLogin();
+
+        $currentDate = Carbon::now();
+        $currentSemester = $currentDate->month <= 6 ? 1 : 2;
+        $selectedSemester = request('semester', $currentDate->year . '-' . $currentSemester);
+        $semesters = [];
+
+        for ($year = $currentDate->year - 1; $year <= $currentDate->year + 1; $year++) {
+            foreach ([1, 2] as $semester) {
+                $startMonth = $semester === 1 ? 1 : 7;
+                $endMonth = $semester === 1 ? 6 : 12;
+                $startDate = Carbon::create($year, $startMonth, 1)->startOfMonth();
+                $endDate = Carbon::create($year, $endMonth, 1)->endOfMonth();
+                $value = $year . '-' . $semester;
+
+                $semesters[] = [
+                    'value' => $value,
+                    'label' => sprintf(
+                        'Semester %d %d (%s - %s)',
+                        $semester,
+                        $year,
+                        $startDate->translatedFormat('F'),
+                        $endDate->translatedFormat('F')
+                    ),
+                    'start_date' => $startDate->format('Y-m-d'),
+                    'end_date' => $endDate->format('Y-m-d'),
+                    'selected' => $value === $selectedSemester,
+                ];
+            }
+        }
+
+        return view('admin.powerhouse_semester', compact('semesters', 'selectedSemester'));
+    }
+    public function powerhouse2mInputLeads()
+    {
+        logUserLogin();
+        $leadSources = LeadsSource::all();
+        $sectors = Sector::all();
+
+        return view('admin.powerhouse_2m_input_leads', compact('leadSources', 'sectors'));
+    }
+
+    public function powerhouse2mSummaryLeads()
+    {
+        logUserLogin();
+        return redirect()->route('powerhouse.2m.summary');
+    }
+
+    public function powerhouse2mReport()
+    {
+        logUserLogin();
+        return view('admin.powerhouse_2m_report');
+    }
+
+    public function pilotSbpToSme()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_to_sme');
+    }
+
+    public function pilotSbpTopupReferral()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_topup_referral');
+    }
+
+    public function pilotSbpReferralCanvasserAgent()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_referral_canvasser_agent');
+    }
+
+    public function pilotSbpDataLeads()
+    {
+        logUserLogin();
+        return view('admin.pilot_sbp_data_leads');
     }
     public function refreshSummarySimpatiTiktok()
     {
@@ -388,3 +870,12 @@ class FrontController extends Controller
         return view('auth.loglogin');
     }
 }
+
+
+
+
+
+
+
+
+

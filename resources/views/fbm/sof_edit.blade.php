@@ -1,0 +1,161 @@
+@extends('master')
+
+@section('title', $pageTitle ?? 'Edit SOF')
+
+@section('content')
+<div class="card card-primary card-outline">
+    <div class="card-header">
+        <h3 class="card-title">{{ $pageTitle ?? 'Edit SOF' }}</h3>
+    </div>
+    <div class="card-body">
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <ul class="mb-0 pl-3">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form action="{{ route('fbm.sof.update', $sof->id) }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            @method('PUT')
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Sender Name</label>
+                        <input type="text" class="form-control" value="{{ $sof->sender_name }}" readonly>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Nomor WA</label>
+                        <input type="text" class="form-control" value="{{ $sof->nomor_wa }}" readonly>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="waba_id">WABA ID</label>
+                        <input type="text" name="waba_id" id="waba_id" class="form-control" value="{{ old('waba_id', $sof->waba_id) }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>PIC</label>
+                        @if($isAdmin)
+                            <select name="pic" id="pic" class="form-control select2" required>
+                                <option value="">Pilih PIC</option>
+                                @foreach($picOptions as $picOption)
+                                    <option value="{{ $picOption }}" {{ old('pic', $sof->pic) === $picOption ? 'selected' : '' }}>{{ $picOption }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" class="form-control" value="{{ $sof->pic }}" readonly>
+                        @endif
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="verif_bisnis">Verif Bisnis</label>
+                        <select name="verif_bisnis" id="verif_bisnis" class="form-control" required>
+                            @foreach(['Yes', 'On Progress', 'No'] as $status)
+                                <option value="{{ $status }}" {{ old('verif_bisnis', $sof->verif_bisnis) === $status ? 'selected' : '' }}>{{ $status }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="credit_line">Credit Line</label>
+                        @if($isAdmin)
+                            <select name="credit_line" id="credit_line" class="form-control" required>
+                                @foreach(['Yes', 'On Progress', 'No'] as $status)
+                                    <option value="{{ $status }}" {{ old('credit_line', $sof->credit_line) === $status ? 'selected' : '' }}>{{ $status }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" class="form-control" value="{{ $sof->credit_line }}" readonly>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>SOF Saat Ini</label>
+                        @if($isAdmin)
+                            @if($sof->sof_file)
+                                <div>
+                                    <a href="{{ route('fbm.sof.download', $sof->id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-file-pdf mr-1"></i> Download PDF
+                                    </a>
+                                </div>
+                            @else
+                                <input type="text" class="form-control" value="Belum ada file" readonly>
+                            @endif
+                        @else
+                            <input type="text" class="form-control" value="Hanya Admin yang dapat melihat SOF" readonly>
+                        @endif
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="sof_file">Upload SOF (PDF)</label>
+                        @if($isAdmin)
+                            <input type="file" name="sof_file" id="sof_file" class="form-control" accept="application/pdf">
+                            <small class="text-muted">Kosongkan jika tidak ingin mengganti file.</small>
+                        @else
+                            <input type="text" class="form-control" value="Hanya Admin yang dapat upload PDF" readonly>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <a href="{{ route('fbm.sof.index') }}" class="btn btn-secondary mr-2">Kembali</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i> Update
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+@section('js')
+<style>
+    .select2-container--default .select2-selection--single {
+        height: calc(2.25rem + 2px);
+        padding: .375rem .75rem;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5rem;
+        padding-left: 0;
+        color: #495057;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(2.25rem + 2px);
+        right: .5rem;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(function () {
+        $('.select2').select2({
+            width: '100%',
+            placeholder: 'Pilih PIC',
+            allowClear: false
+        });
+    });
+</script>
+@endsection

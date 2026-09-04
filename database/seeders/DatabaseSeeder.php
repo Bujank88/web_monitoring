@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             LeadSourceSeeder::class,
+            VoucherOwnerHistorySeeder::class,
+            PowerHouseVoucherOwnerHistorySeeder::class,
+            MpccVoucherOwnerHistorySeeder::class,
         ]);
     }
 }

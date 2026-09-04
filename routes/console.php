@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Schedule;
 use App\Http\Controllers\FrontController;
 use App\Http\Controllers\GetDataController;
 use App\Http\Controllers\PanenPoinController;
+use App\Http\Controllers\PanenPoinV2Controller;
+use App\Http\Controllers\PanenPoinV3Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
@@ -18,6 +20,20 @@ use Carbon\Carbon;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('logbook:refresh-today', function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyToday();
+})->purpose('Refresh logbook daily topup for today (manual_upload_topup)');
+
+Artisan::command('logbook:refresh-past', function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyPast();
+})->purpose('Refresh logbook daily topup for past days (report_balance_top_up)');
+
+Artisan::command('panenpoinv3:refresh-summary', function () {
+    $result = app(PanenPoinV3Controller::class)->refreshSummaryPanenPoinV3();
+    $payload = method_exists($result, 'getData') ? $result->getData(true) : ['message' => 'Refresh selesai'];
+    $this->info($payload['message'] ?? 'Summary Panen Poin V3 berhasil direfresh.');
+})->purpose('Refresh summary Panen Poin V3 untuk periode aktif');
 
 // // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
@@ -143,21 +159,33 @@ Schedule::call(function () {
     \Log::info("Retry Send Presensi - Success: {$success}, Failed: {$failed}");
 })->everyMinute()->name('retrySendPresensiNotifications');
 
+// Schedule::call(function () {
+//     app(PanenPoinController::class)->refreshSummaryPanenPoin();
+// })->everyFiveMinutes()->name('refreshSummaryPanenPoin');
+
 Schedule::call(function () {
-    app(PanenPoinController::class)->refreshSummaryPanenPoin();
-})->everyMinute()->name('refreshSummaryPanenPoin');
+    app(PanenPoinV2Controller::class)->refreshSummaryPanenPoinV2();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoinV2');
+
+Schedule::call(function () {
+    app(PanenPoinV3Controller::class)->refreshSummaryPanenPoinV3();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoinV3');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();
-})->everyMinute()->name('refreshSummaryamlevelup');
+})->everyTwoMinutes()->name('refreshSummaryamlevelup');
 
 Schedule::call(function () {
     app(LogbookController::class)->refreshLogbookStatus();
-})->everyMinute()->name('refreshLogbookStatus');
+})->everyTwoMinutes()->name('refreshLogbookStatus');
 
 Schedule::call(function () {
-    app(LogbookDailyController::class)->refreshLogbookDaily();
-})->everyMinute()->name('refreshLogbookDaily');
+    app(LogbookDailyController::class)->refreshLogbookDailyToday();
+})->everyMinute()->name('refreshLogbookDailyToday');
+
+Schedule::call(function () {
+    app(LogbookDailyController::class)->refreshLogbookDailyPast();
+})->everyTenMinutes()->name('refreshLogbookDailyPast');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegistration();
@@ -165,7 +193,7 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsFromTopUp();
-})->everyTenMinutes()->name('syncLeadsFromTopUp');
+})->twiceDaily()->name('syncLeadsFromTopUp');
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->syncLeadsWithRegional();
@@ -173,7 +201,10 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(LeadsMasterController::class)->refreshDetailLeadsSummary();
-})->everyTwoMinutes()->name('refreshDetailLeadsSummary');
+})->name('refreshDetailLeadsSummary')->withoutOverlapping()->everyThirtyMinutes();
+
+// Refresh Regional Canvasser Summary setiap 5 menit
+Schedule::command('summary:refresh-regional-canvasser')->everyFiveMinutes()->name('refreshRegionalCanvasserSummary');
 
 // // ===== Schedule: Retry send notifikasi logbook yang gagal setiap menit =====
 Schedule::call(function () {

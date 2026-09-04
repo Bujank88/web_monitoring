@@ -143,6 +143,7 @@
                             <th class="text-center">Email</th>
                             <th class="text-center">No HP</th>
                             <th class="text-center">Role</th>
+                            <th class="text-center">Referral Code</th>
                             {{-- <th class="text-center">Treg</th> --}}
                             <th class="text-center">Status</th>
                             <th class="text-center">Tanggal<br>Dibuat</th>
@@ -205,7 +206,41 @@
                             <option value="TCD">TCD</option>
                             <option value="Internal">Internal</option>
                             <option value="b2b">B2B</option>
+                            <option value="Maxim">Maxim</option>
+                            <option value="Automatech">Automatech</option>
+                            <option value="GOTO">GOTO</option>
+                            <option value="CDSI">CDSI</option>
+                            <option value="1Synergy">1Synergy</option>
+                            <option value="KSS">KSS</option>
+                            <option value="Regional">Regional</option>
+                            <option value="Area 2">Area 2</option>
+                            <option value="MPCC">MPCC</option>
+                            <option value="SBP">SBP</option>
+                            <option value="Canvasser SBP">Canvasser SBP</option>
+                            <option value="Dormant">Dormant</option>
                         </select>
+                    </div>
+
+                    <div class="form-group" id="regional_group" style="display: none;">
+                        <label for="regional">Regional <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="regional" name="regional">
+                    </div>
+
+                    <div id="mpcc_fields" style="display: none;">
+                        <div class="form-group">
+                            <label for="area">Area <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="area" name="area">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="branch">Branch <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="branch" name="branch">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="referral_code">Referral Code</label>
+                            <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Contoh: HEBAT14">
+                        </div>
                     </div>
                     
                     {{-- <div class="form-group" id="treg_group" style="display: none;">
@@ -304,9 +339,33 @@
                             badgeClass = 'badge-success';
                         } else if (data === 'b2b') {
                             badgeClass = 'badge-primary';
+                        } else if (data === 'Maxim') {
+                            badgeClass = 'badge-warning';
+                        } else if (data === 'Automatech') {
+                            badgeClass = 'badge-warning';
+                        } else if (data === 'GOTO') {
+                            badgeClass = 'badge-primary';
+                        } else if (data === 'Regional') {
+                            badgeClass = 'badge-info';
+                        } else if (data === 'MPCC') {
+                            badgeClass = 'badge-info';
+                        } else if (data === 'SBP') {
+                            badgeClass = 'badge-success';
+                        } else if (data === 'Canvasser SBP') {
+                            badgeClass = 'badge-primary';
+                        } else if (data === 'Dormant') {
+                            badgeClass = 'badge-secondary';
+                        } else if (data === 'CDSI' || data === 'KSS' || data === 'kss') {
+                            badgeClass = 'badge-danger';
                         }
                         return `<div style="text-align: center;"><span class="badge ${badgeClass}">${data}</span></div>`;
                     }
+                },
+                {
+                    data: 'referral_code',
+                    name: 'referral_code',
+                    orderable: true,
+                    render: data => `<div style="text-align: center; font-weight: 600;">${data || '-'}</div>`
                 },
                 {
                     data: 'status',
@@ -364,12 +423,29 @@
             $('#modalUserLabel').text('Tambah User');
             $('#formUser')[0].reset();
             $('#user_id').val('');
+            toggleRoleFields();
             // $('#treg_group').hide();
         });
 
-        // Show/hide treg dropdown based on role
-        $('#role').change(function() {
-            if ($(this).val() === 'Treg') {
+        function toggleRoleFields() {
+            const role = $('#role').val();
+            const isMpcc = role === 'MPCC';
+            const isRegional = role === 'Regional';
+
+            $('#mpcc_fields').toggle(isMpcc);
+            $('#area, #branch').prop('required', isMpcc);
+            $('#regional_group').toggle(isRegional);
+            $('#regional').prop('required', isRegional);
+
+            if (!isMpcc) {
+                $('#area, #branch, #referral_code').val('');
+            }
+
+            if (!isRegional) {
+                $('#regional').val('');
+            }
+
+            if (role === 'Treg') {
                 // $('#treg_group').show();
                 // $('#treg_id').attr('required', true);
             } else {
@@ -377,7 +453,9 @@
                 // $('#treg_id').attr('required', false);
                 // $('#treg_id').val('');
             }
-        });
+        }
+
+        $('#role').change(toggleRoleFields);
 
         // Form submit handler
         $('#formUser').submit(function(e) {
@@ -443,6 +521,11 @@
                     $('#email').val(user.email);
                     $('#nohp').val(user.nohp);
                     $('#role').val(user.role);
+                    $('#area').val(user.area || '');
+                    $('#branch').val(user.branch || '');
+                    $('#regional').val(user.regional || '');
+                    $('#referral_code').val(user.referral_code || '');
+                    toggleRoleFields();
                     
                     if (user.role === 'Treg') {
                         $('#treg_group').show();

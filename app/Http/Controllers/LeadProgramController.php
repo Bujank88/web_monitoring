@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use App\Models\RegionalSummary;
 
@@ -46,6 +48,11 @@ class LeadProgramController extends Controller
                 ->pluck('id')
                 ->toArray();
 
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
             // Query data topup dari MySQL untuk bulan berjalan atau bulan yang difilter
             if ($monthFilter) {
                 $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
@@ -55,11 +62,25 @@ class LeadProgramController extends Controller
                 $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             }
 
-            // Query dengan LEFT JOIN ke leads_master dan mitra_sbp 
+            // Dedup leads_master by email agar satu email hanya menghasilkan satu baris join.
+            // Ini mencegah transaksi topup terduplikasi ketika ada multiple rows dengan email sama.
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->where('u.role', '!=', 'MPCC')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            // Query dengan LEFT JOIN ke leads_master dan mitra_sbp
             // untuk capture SEMUA transaksi, termasuk yang tidak ada di leads_master
             $topupData = DB::table('report_balance_top_up as rp')
                 ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
-                ->leftJoin('leads_master as lm', 'lm.email', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
                 ->leftJoin('b2b_clients as bc', DB::raw('LOWER(bc.myads_account)'), '=', DB::raw('LOWER(rp.email_client)'))
                 ->select(
                     DB::raw("DATE(rp.tgl_transaksi) as tanggal"),
@@ -96,6 +117,7 @@ class LeadProgramController extends Controller
                         'outlet' => ['settlement' => 0, 'users' => []],
                         'canvasser' => ['settlement' => 0, 'users' => []],
                         'b2b' => ['settlement' => 0, 'users' => []],
+                        'powerhouse' => ['settlement' => 0, 'users' => []],
                         'advertising' => ['settlement' => 0, 'users' => []],
                     ];
                 }
@@ -117,7 +139,12 @@ class LeadProgramController extends Controller
                     $groupedData[$date]['b2b']['settlement'] += $settlement;
                     $groupedData[$date]['b2b']['users'][] = $userId;
                 }
-                // PRIORITY 2: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
+                // PRIORITY 3: Jika email ada di leads_master dan user belongs to PH
+                elseif (!empty($leadsUserId) && in_array($leadsUserId, $powerhouseUserIds)) {
+                    $groupedData[$date]['powerhouse']['settlement'] += $settlement;
+                    $groupedData[$date]['powerhouse']['users'][] = $userId;
+                }
+                // PRIORITY 4: Cek mitra_sbp remark (Internal, Mitra SBP, Agency)
                 // HANYA jika tidak ada di leads_master sebagai cvsr
                 elseif (!empty($row->remark)) {
                     if ($row->remark === 'Internal') {
@@ -166,6 +193,8 @@ class LeadProgramController extends Controller
                 'canvasser_user' => [],
                 'b2b_settle' => 0,
                 'b2b_user' => [],
+                'powerhouse_settle' => 0,
+                'powerhouse_user' => [],
                 'advertising_settle' => 0,
                 'advertising_user' => [],
             ];
@@ -188,6 +217,8 @@ class LeadProgramController extends Controller
                     'canvasser_user' => count(array_unique($data['canvasser']['users'])),
                     'b2b_settle' => number_format($data['b2b']['settlement'], 0, ',', '.'),
                     'b2b_user' => count(array_unique($data['b2b']['users'])),
+                    'powerhouse_settle' => number_format($data['powerhouse']['settlement'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($data['powerhouse']['users'])),
                     'advertising_settle' => number_format($data['advertising']['settlement'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($data['advertising']['users'])),
                     'total' => number_format(
@@ -197,6 +228,7 @@ class LeadProgramController extends Controller
                             $data['outlet']['settlement'] +
                             $data['canvasser']['settlement'] +
                             $data['b2b']['settlement']+
+                            $data['powerhouse']['settlement'] +
                             $data['advertising']['settlement'],
                         0,
                         ',',
@@ -209,6 +241,7 @@ class LeadProgramController extends Controller
                         $data['outlet']['users'],
                         $data['canvasser']['users'],
                         $data['b2b']['users'],
+                        $data['powerhouse']['users'],
                         $data['advertising']['users']
                     ))),
                 ];
@@ -228,6 +261,8 @@ class LeadProgramController extends Controller
                 $totals['canvasser_user'] = array_merge($totals['canvasser_user'], $data['canvasser']['users']);
                 $totals['b2b_settle'] += $data['b2b']['settlement'];
                 $totals['b2b_user'] = array_merge($totals['b2b_user'], $data['b2b']['users']);
+                $totals['powerhouse_settle'] += $data['powerhouse']['settlement'];
+                $totals['powerhouse_user'] = array_merge($totals['powerhouse_user'], $data['powerhouse']['users']);
                 $totals['advertising_settle'] += $data['advertising']['settlement'];
                 $totals['advertising_user'] = array_merge($totals['advertising_user'], $data['advertising']['users']);
             }
@@ -248,6 +283,8 @@ class LeadProgramController extends Controller
                     'canvasser_user' => count(array_unique($totals['canvasser_user'])),
                     'b2b_settle' => number_format($totals['b2b_settle'], 0, ',', '.'),
                     'b2b_user' => count(array_unique($totals['b2b_user'])),
+                    'powerhouse_settle' => number_format($totals['powerhouse_settle'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($totals['powerhouse_user'])),
                     'advertising_settle' => number_format($totals['advertising_settle'], 0, ',', '.'),
                     'advertising_user' => count(array_unique($totals['advertising_user'])),
                     'total' => number_format(
@@ -257,6 +294,7 @@ class LeadProgramController extends Controller
                             $totals['outlet_settle'] +
                             $totals['canvasser_settle'] +
                             $totals['b2b_settle'] +
+                            $totals['powerhouse_settle'] +
                             $totals['advertising_settle'],
                         0,
                         ',',
@@ -269,6 +307,7 @@ class LeadProgramController extends Controller
                         $totals['outlet_user'],
                         $totals['canvasser_user'],
                         $totals['b2b_user'],
+                        $totals['powerhouse_user'],
                         $totals['advertising_user']
                     ))),
                 ];
@@ -353,6 +392,391 @@ class LeadProgramController extends Controller
         }
     }
 
+    public function getDailyTopupRegionalData($monthFilter = null, $regionalName = null)
+    {
+        try {
+            $regionalName = $regionalName ?: Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return [];
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+            }
+
+            $agencyEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Agency')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $internalEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Internal')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $mitraSbpEmails = DB::table('mitra_sbp')
+                ->where('remark', 'Mitra SBP')
+                ->pluck('email_myads')
+                ->toArray();
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $topupQuery = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    DB::raw("DATE(rp.tgl_transaksi) as tanggal"),
+                    'rp.email_client as email',
+                    'rp.user_id as id_user',
+                    'rp.data_province_name',
+                    DB::raw("CAST(rp.total_settlement_klien AS DECIMAL(15,2)) as total_settlement"),
+                    'm.remark',
+                    'lm.user_id as leads_user_id'
+                )
+                ->whereRaw("rp.tgl_transaksi >= ?", [$startDate])
+                ->whereRaw("rp.tgl_transaksi <= ?", [$endDate . ' 23:59:59'])
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name')
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $topupQuery->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $topupQuery->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $topupData = $topupQuery
+                ->orderBy('rp.tgl_transaksi', 'desc')
+                ->get();
+
+            if ($topupData->isEmpty()) {
+                return [];
+            }
+
+            $groupedData = [];
+
+            foreach ($topupData as $row) {
+                $date = $row->tanggal;
+
+                if (!isset($groupedData[$date])) {
+                    $groupedData[$date] = [
+                        'mitra_sbp' => ['settlement' => 0, 'users' => []],
+                        'agency' => ['settlement' => 0, 'users' => []],
+                        'internal' => ['settlement' => 0, 'users' => []],
+                        'powerhouse' => ['settlement' => 0, 'users' => []],
+                        'mpcc' => ['settlement' => 0, 'users' => []],
+                    ];
+                }
+
+                $settlement = (float) $row->total_settlement;
+                $userId = $row->id_user;
+                $leadsUserId = $row->leads_user_id;
+
+                if (!empty($leadsUserId) && in_array($leadsUserId, $mpccUserIds, true)) {
+                    $groupedData[$date]['mpcc']['settlement'] += $settlement;
+                    $groupedData[$date]['mpcc']['users'][] = $userId;
+                } elseif (!empty($leadsUserId) && in_array($leadsUserId, $powerhouseUserIds, true)) {
+                    $groupedData[$date]['powerhouse']['settlement'] += $settlement;
+                    $groupedData[$date]['powerhouse']['users'][] = $userId;
+                } elseif ($row->remark === 'Internal') {
+                    $groupedData[$date]['internal']['settlement'] += $settlement;
+                    $groupedData[$date]['internal']['users'][] = $userId;
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $groupedData[$date]['mitra_sbp']['settlement'] += $settlement;
+                    $groupedData[$date]['mitra_sbp']['users'][] = $userId;
+                } elseif ($row->remark === 'Agency') {
+                    $groupedData[$date]['agency']['settlement'] += $settlement;
+                    $groupedData[$date]['agency']['users'][] = $userId;
+                }
+            }
+
+            $result = [];
+            $totals = [
+                'mitra_sbp_settle' => 0,
+                'mitra_sbp_user' => [],
+                'agency_settle' => 0,
+                'agency_user' => [],
+                'internal_settle' => 0,
+                'internal_user' => [],
+                'powerhouse_settle' => 0,
+                'powerhouse_user' => [],
+                'mpcc_settle' => 0,
+                'mpcc_user' => [],
+            ];
+
+            krsort($groupedData);
+
+            foreach ($groupedData as $date => $data) {
+                $row = [
+                    'date' => Carbon::parse($date)->locale('id')->translatedFormat('d F Y'),
+                    'mitra_sbp_user' => count(array_unique($data['mitra_sbp']['users'])),
+                    'mitra_sbp_settle' => number_format($data['mitra_sbp']['settlement'], 0, ',', '.'),
+                    'agency_user' => count(array_unique($data['agency']['users'])),
+                    'agency_settle' => number_format($data['agency']['settlement'], 0, ',', '.'),
+                    'internal_user' => count(array_unique($data['internal']['users'])),
+                    'internal_settle' => number_format($data['internal']['settlement'], 0, ',', '.'),
+                    'powerhouse_user' => count(array_unique($data['powerhouse']['users'])),
+                    'powerhouse_settle' => number_format($data['powerhouse']['settlement'], 0, ',', '.'),
+                    'mpcc_user' => count(array_unique($data['mpcc']['users'])),
+                    'mpcc_settle' => number_format($data['mpcc']['settlement'], 0, ',', '.'),
+                    'total_user' => count(array_unique(array_merge(
+                        $data['mitra_sbp']['users'],
+                        $data['agency']['users'],
+                        $data['internal']['users'],
+                        $data['powerhouse']['users'],
+                        $data['mpcc']['users']
+                    ))),
+                    'total' => number_format(
+                        $data['mitra_sbp']['settlement'] +
+                        $data['agency']['settlement'] +
+                        $data['internal']['settlement'] +
+                        $data['powerhouse']['settlement'] +
+                        $data['mpcc']['settlement'],
+                        0,
+                        ',',
+                        '.'
+                    ),
+                ];
+
+                $result[] = $row;
+
+                $totals['mitra_sbp_settle'] += $data['mitra_sbp']['settlement'];
+                $totals['mitra_sbp_user'] = array_merge($totals['mitra_sbp_user'], $data['mitra_sbp']['users']);
+                $totals['agency_settle'] += $data['agency']['settlement'];
+                $totals['agency_user'] = array_merge($totals['agency_user'], $data['agency']['users']);
+                $totals['internal_settle'] += $data['internal']['settlement'];
+                $totals['internal_user'] = array_merge($totals['internal_user'], $data['internal']['users']);
+                $totals['powerhouse_settle'] += $data['powerhouse']['settlement'];
+                $totals['powerhouse_user'] = array_merge($totals['powerhouse_user'], $data['powerhouse']['users']);
+                $totals['mpcc_settle'] += $data['mpcc']['settlement'];
+                $totals['mpcc_user'] = array_merge($totals['mpcc_user'], $data['mpcc']['users']);
+            }
+
+            $result[] = [
+                'date' => 'Total Keseluruhan',
+                'mitra_sbp_user' => count(array_unique($totals['mitra_sbp_user'])),
+                'mitra_sbp_settle' => number_format($totals['mitra_sbp_settle'], 0, ',', '.'),
+                'agency_user' => count(array_unique($totals['agency_user'])),
+                'agency_settle' => number_format($totals['agency_settle'], 0, ',', '.'),
+                'internal_user' => count(array_unique($totals['internal_user'])),
+                'internal_settle' => number_format($totals['internal_settle'], 0, ',', '.'),
+                'powerhouse_user' => count(array_unique($totals['powerhouse_user'])),
+                'powerhouse_settle' => number_format($totals['powerhouse_settle'], 0, ',', '.'),
+                'mpcc_user' => count(array_unique($totals['mpcc_user'])),
+                'mpcc_settle' => number_format($totals['mpcc_settle'], 0, ',', '.'),
+                'total_user' => count(array_unique(array_merge(
+                    $totals['mitra_sbp_user'],
+                    $totals['agency_user'],
+                    $totals['internal_user'],
+                    $totals['powerhouse_user'],
+                    $totals['mpcc_user']
+                ))),
+                'total' => number_format(
+                    $totals['mitra_sbp_settle'] +
+                    $totals['agency_settle'] +
+                    $totals['internal_settle'] +
+                    $totals['powerhouse_settle'] +
+                    $totals['mpcc_settle'],
+                    0,
+                    ',',
+                    '.'
+                ),
+            ];
+
+            return $result;
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalData: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return [];
+        }
+    }
+
+    public function getDailyTopupRegionalDataTable(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $result = $this->getDailyTopupRegionalData($monthFilter);
+
+            return datatables()->of(collect($result))->make(true);
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalDataTable: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getDailyTopupRegionalByProvinceDataTable(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $regionalName = Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return response()->json([
+                    'data' => [],
+                    'totals' => [
+                        'total_provinces' => 0,
+                        'total_user_ids' => 0,
+                        'total_emails' => 0,
+                        'total_settlement' => 0,
+                    ]
+                ]);
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::createFromFormat('Y-m-d', $monthFilter)->translatedFormat('F Y');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::now()->translatedFormat('F Y');
+            }
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $query = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    'rp.data_province_name',
+                    'rp.user_id',
+                    'rp.email_client',
+                    'm.remark',
+                    'lm.user_id as leads_user_id',
+                    DB::raw("'" . $displayMonth . "' as month_display"),
+                    DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement')
+                )
+                ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+                ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $query->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $query->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $data = $query
+                ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client', 'm.remark', 'lm.user_id')
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderByDesc('total_settlement')
+                ->get();
+
+            $data = $data->map(function ($row) use ($powerhouseUserIds, $mpccUserIds) {
+                $channel = null;
+
+                if (!empty($row->leads_user_id) && in_array($row->leads_user_id, $mpccUserIds, true)) {
+                    $channel = 'MPCC';
+                } elseif (!empty($row->leads_user_id) && in_array($row->leads_user_id, $powerhouseUserIds, true)) {
+                    $channel = 'Powerhouse';
+                } elseif ($row->remark === 'Internal') {
+                    $channel = 'Internal';
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $channel = 'Mitra SBP';
+                } elseif ($row->remark === 'Agency') {
+                    $channel = 'Agency Indihome';
+                }
+
+                $row->channel = $channel;
+                return $row;
+            })->filter(function ($row) {
+                return !empty($row->channel);
+            })->values();
+
+            $uniqueProvinces = $data->unique('data_province_name')->count();
+            $uniqueUserIds = $data->unique('user_id')->count();
+            $uniqueEmails = $data->unique('email_client')->count();
+            $totalSettlement = $data->sum('total_settlement');
+
+            return response()->json([
+                'data' => $data->map(function ($row) {
+                    return [
+                        'province' => $row->data_province_name,
+                        'data_province_name' => $row->data_province_name,
+                        'user_id' => $row->user_id,
+                        'email_client' => $row->email_client,
+                        'channel' => $row->channel,
+                        'month_display' => $row->month_display,
+                        'total_settlement' => number_format($row->total_settlement, 0, ',', '.'),
+                    ];
+                })->values(),
+                'totals' => [
+                    'total_provinces' => $uniqueProvinces,
+                    'total_user_ids' => $uniqueUserIds,
+                    'total_emails' => $uniqueEmails,
+                    'total_settlement' => number_format($totalSettlement, 0, ',', '.'),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error("Error in getDailyTopupRegionalByProvinceDataTable: " . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function getLeadsAndAccountData()
     {
         try {
@@ -430,6 +854,20 @@ class LeadProgramController extends Controller
 
     public function getRegionalData(Request $request)
     {
+        $month = $request->get('month');
+        $month = !empty($month)
+            ? Carbon::parse(strlen($month) === 7 ? $month . '-01' : $month)->format('Y-m')
+            : Carbon::now()->format('Y-m');
+
+        return Cache::remember(
+            "dashboard:regional:v2:{$month}",
+            now()->addMinutes(10),
+            fn () => $this->buildRegionalData($request)
+        );
+    }
+
+    private function buildRegionalData(Request $request)
+    {
         try {
             $monthFilter = $request->get('month');
             $monthDate = null;
@@ -442,7 +880,7 @@ class LeadProgramController extends Controller
             $canvasers = DB::table('users')
                 ->where('role', 'cvsr')
                 ->where('name', '!=', 'self service')
-                ->select('id', 'name')
+                ->select('id', 'name', 'lokasi_kerja')
                 ->get();
 
             if ($canvasers->isEmpty()) {
@@ -478,16 +916,19 @@ class LeadProgramController extends Controller
                 '2026-12-25',
             ];
 
+            $todayReference = Carbon::today();
+            $holidayLookup = array_flip($holidays);
+
             $remainingWorkingDays = 0;
-            if ($today->month == Carbon::today()->month && $today->year == Carbon::today()->year) {
-                $currentDate = Carbon::today();
+            if ($today->month == $todayReference->month && $today->year == $todayReference->year) {
+                $currentDate = $todayReference->copy();
             } else {
                 $currentDate = $today->copy();
             }
 
             while ($currentDate->lte($endOfMonth)) {
                 $isWeekday = $currentDate->isWeekday();
-                $isNotHoliday = !in_array($currentDate->format('Y-m-d'), $holidays);
+                $isNotHoliday = !isset($holidayLookup[$currentDate->format('Y-m-d')]);
                 if ($isWeekday && $isNotHoliday) {
                     $remainingWorkingDays++;
                 }
@@ -538,14 +979,21 @@ class LeadProgramController extends Controller
 
             $endOfMonthFormatted = $endOfMonth->format('Y-m-d');
             $newAkunStats = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
+                ->join('report_balance_top_up as rp', function ($join) {
+                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                })
+                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $canvaserIds)
+                ->where('dt.status', 'APPROVE')
                 ->whereBetween(
                     DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                     [$startOfMonth, $endOfMonthFormatted]
                 )
+                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
-                ->select('lm.user_id', DB::raw('COUNT(DISTINCT dt.email) as new_akun'))
+                ->select('lm.user_id', DB::raw('COUNT(DISTINCT LOWER(dt.email)) as new_akun'))
                 ->get()
                 ->keyBy('user_id');
 
@@ -553,6 +1001,7 @@ class LeadProgramController extends Controller
                 ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
                 ->whereIn('lm.user_id', $canvaserIds)
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -575,29 +1024,30 @@ class LeadProgramController extends Controller
                     [$startOfMonth, $endOfMonthFormatted]
                 )
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
-                    DB::raw("COUNT(DISTINCT rp.id) as top_up_count"),
+                    DB::raw("COUNT(DISTINCT LOWER(dt.email)) as top_up_count"),
                     DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_new_akun_rp")
                 )
                 ->get()
                 ->keyBy('user_id');
 
-            $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                        ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                })
+            $topUpExistingAkunByUser = DB::table('report_balance_top_up as rp')
+                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->leftJoin('data_registarsi_status_approveorreject as dt', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                 ->whereIn('lm.user_id', $canvaserIds)
-                ->where('dt.status', 'APPROVE')
-                ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
                 ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->where(function ($query) use ($startOfMonth) {
+                    $query->whereNull('dt.email')
+                        ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth]);
+                })
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
-                    DB::raw("COUNT(rp.id) as top_up_existing_akun_count"),
+                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as top_up_existing_akun_count"),
                     DB::raw("SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as top_up_existing_akun_rp")
                 )
                 ->get()
@@ -621,6 +1071,7 @@ class LeadProgramController extends Controller
             $momByUser = DB::table('report_balance_top_up as rp')
                 ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $canvaserIds)
+                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -634,6 +1085,9 @@ class LeadProgramController extends Controller
             foreach ($canvasers as $index => $canvaser) {
                 $canvaserId = $canvaser->id;
                 $regional = $regionalMap[$canvaserId] ?? '-';
+                $lokasiKerja = trim((string) ($canvaser->lokasi_kerja ?? ''));
+                $lokasiKerja = $lokasiKerja !== '' ? $lokasiKerja : '-';
+
                 $totalLeads = (int) ($leadStats[$canvaserId]->leads ?? 0);
                 $existingAkun = (int) ($leadStats[$canvaserId]->existing_akun ?? 0);
                 $newAkun = (int) ($newAkunStats[$canvaserId]->new_akun ?? 0);
@@ -666,8 +1120,10 @@ class LeadProgramController extends Controller
 
                 $result[] = [
                     'no' => $index + 1,
+                    'user_id' => $canvaserId,
                     'regional' => $regional,
                     'canvaser_name' => $canvaser->name ?? '-',
+                    'lokasi_kerja' => $lokasiKerja,
                     'leads' => $totalLeads,
                     'existing_akun' => $existingAkun,
                     'new_akun' => $newAkun,
@@ -685,6 +1141,7 @@ class LeadProgramController extends Controller
                     'mom_current_partial' => number_format($topUpCurrentMonthPartial, 0, ',', '.'),
                     'mom_prev_remaining' => number_format($topUpPrevMonthRemaining, 0, ',', '.'),
                     'mom_gap' => number_format($momGap, 0, ',', '.'),
+                    '_achievement_percent_value' => $achievementPercent,
                 ];
 
                 $totals['leads'] += $totalLeads;
@@ -704,10 +1161,13 @@ class LeadProgramController extends Controller
             }
 
             usort($result, function ($a, $b) {
-                $percentA = floatval(str_replace(['%', ','], ['.', '.'], $a['achievement_percent']));
-                $percentB = floatval(str_replace(['%', ','], ['.', '.'], $b['achievement_percent']));
-                return $percentB <=> $percentA;
+                return ($b['_achievement_percent_value'] ?? 0) <=> ($a['_achievement_percent_value'] ?? 0);
             });
+
+            foreach ($result as &$row) {
+                unset($row['_achievement_percent_value']);
+            }
+            unset($row);
 
             if (!empty($result)) {
                 $totalAchievementPercent = $totals['target'] > 0 ? ($totals['total_top_up_rp'] / $totals['target']) * 100 : 0;
@@ -718,6 +1178,7 @@ class LeadProgramController extends Controller
                     'no' => '',
                     'regional' => '',
                     'canvaser_name' => 'TOTAL',
+                    'lokasi_kerja' => '-',
                     'leads' => $totals['leads'],
                     'existing_akun' => $totals['existing_akun'],
                     'new_akun' => $totals['new_akun'],
@@ -807,9 +1268,21 @@ class LeadProgramController extends Controller
     }
 
 
-    public function getRegionalChartDataForPH()
+    public function getRegionalChartDataForPH(Request $request)
     {
         try {
+            $month = $request->get('month', Carbon::now()->format('Y-m'));
+            $period = Carbon::createFromFormat('Y-m-d', $month . '-01');
+            $startOfMonth = $period->copy()->startOfMonth();
+            $endOfMonth = $period->copy()->endOfMonth();
+            $transactionEnd = $period->isSameMonth(Carbon::today())
+                ? Carbon::now()
+                : $endOfMonth->copy();
+
+            $startDate = $startOfMonth->format('Y-m-d');
+            $endDate = $endOfMonth->format('Y-m-d');
+            $transactionEndDate = $transactionEnd->format('Y-m-d');
+
             // Ambil semua canvasser
             $canvasers = DB::table('users')
                 ->where('role', 'PH')
@@ -821,14 +1294,6 @@ class LeadProgramController extends Controller
                     'canvassers' => []
                 ]);
             }
-
-            $today = Carbon::now();
-            $todayDate = $today->format('Y-m-d'); // Tanggal hari ini untuk filter transaksi
-            $currentMonth = $today->format('Y-m');
-            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = Carbon::now()->endOfMonth();
-            // $result = [];
-
 
             $regionalMap = [
                 'SUMBAGSEL'      => 'Angga Satria Gusti',
@@ -854,6 +1319,7 @@ class LeadProgramController extends Controller
                 'Naqsaybandi'               => 'naqsyabandi@telkomsel.co.id',
                 'Ikrar Dharmawan'           => 'ikrar_dharmawan@telkomsel.co.id',
             ];
+            $userIdByEmail = DB::table('users')->pluck('id', 'email');
 
             foreach ($regionalMap as $region => $picName) {
 
@@ -861,32 +1327,39 @@ class LeadProgramController extends Controller
                 $userId = null;
 
                 if ($picName) {
-                    $userIdByEmail = DB::table('users')
-                        ->pluck('id', 'email'); // [email => id]
                     $picEmail = $picAliasMap[$picName] ?? null;
                     $userId   = $picEmail ? ($userIdByEmail[$picEmail] ?? null) : null;
                 }
 
                 // 1. New Leads (BERDASARKAN USER_ID)
                 $newLeads = 0;
+                $newAkun = 0;
 
                 if ($userId) {
 
                     $newLeads = DB::table('leads_master as lm')
                         ->where('lm.user_id', $userId)
                         ->where('lm.data_type', 'Leads')
+                        ->whereBetween('lm.created_at', [$startOfMonth, $endOfMonth])
                         ->distinct()
                         ->count('lm.id');
                     // 2. New Akun
                     $newAkun = DB::table('data_registarsi_status_approveorreject as dt')
-                        ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
+                        ->join('report_balance_top_up as rp', function ($join) {
+                            $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                                ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
+                        })
+                        ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
                         ->where('lm.user_id', $userId)
+                        ->where('dt.status', 'APPROVE')
                         ->whereBetween(
                             DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
-                            [$startOfMonth, $endOfMonth->format('Y-m-d')]
+                            [$startDate, $endDate]
                         )
+                        ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDate, $transactionEndDate])
+                        ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                         ->distinct()
-                        ->count('dt.email');
+                        ->count(DB::raw('LOWER(dt.email)'));
                 }
 
 
@@ -895,27 +1368,30 @@ class LeadProgramController extends Controller
                     ->join('leads_master as lm', 'lb.leads_master_id', '=', 'lm.id')
                     ->where('lm.regional', $region)
                     ->where('lm.data_type', 'Eksisting Akun')
+                    ->where('lb.bulan', $period->month)
+                    ->where('lb.tahun', $period->year)
                     ->distinct()
                     ->count('lb.leads_master_id');
 
                 // 4. Top Up Existing Akun Count
-                $topUpExistingAkunCount = DB::table('data_registarsi_status_approveorreject as dt')
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
-                    ->join('report_balance_top_up as rp', function($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
-                             ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
-                    })
+                $topUpExistingAkunCount = DB::table('report_balance_top_up as rp')
+                    ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->leftJoin('data_registarsi_status_approveorreject as dt', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
                     ->where('lm.regional', $region)
-                    ->where('dt.status', 'APPROVE')
-                    ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startOfMonth])
-                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startOfMonth, $todayDate])
+                    ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDate, $transactionEndDate])
+                    ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                    ->where(function ($query) use ($startDate) {
+                        $query->whereNull('dt.email')
+                            ->orWhereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDate]);
+                    })
                     ->distinct()
-                    ->count(DB::raw('LOWER(dt.email)'));
+                    ->count(DB::raw('LOWER(rp.email_client)'));
 
                 // 5. Target (optional jika masih per user → boleh di-skip)
                 $targetData = DB::table('region_target')
                     ->where('region_name', strtoupper($region))
-                    ->where('date', now()->startOfMonth()->format('Y-m-d'))
+                    ->where('data_type', 'PowerHouse')
+                    ->where('date', $startDate)
                     ->first();
 
                 $target = $targetData->target_amount ?? 0;
@@ -939,7 +1415,7 @@ class LeadProgramController extends Controller
                     ->table(DB::raw("(
                         SELECT
                             CASE
-                                WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkkulu','Lampung','Bangka Belitung','Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
+                                WHEN data_province_name IN ('Sumatera Selatan','Jambi','Bengkulu','Lampung','Bangka Belitung','Kepulauan Bangka Belitung') THEN 'SUMBAGSEL'
                                 WHEN data_province_name IN ('Sumatera Barat','Riau','Kepulauan Riau') THEN 'SUMBAGTENG'
                                 WHEN data_province_name IN ('Sumatera Utara','Aceh') THEN 'SUMBAGUT'
                                 WHEN data_province_name IN ('DKI Jakarta','Banten') THEN 'JABODETABEK'
@@ -953,10 +1429,15 @@ class LeadProgramController extends Controller
                                 ELSE 'UNKNOWN'
                             END AS region,
                             total_settlement_klien,
-                            tgl_transaksi
+                            tgl_transaksi,
+                            email_client,
+                            payment_method_name
                         FROM report_balance_top_up
                     ) AS x"))
-                    ->whereBetween('tgl_transaksi', [$startOfMonth, $todayDate])
+                    ->whereBetween('tgl_transaksi', [$startOfMonth, $transactionEnd])
+                    ->whereNotNull('email_client')
+                    ->whereNotNull('total_settlement_klien')
+                    ->where('payment_method_name', '!=', 'Voucher Bonus')
                     ->whereRaw('UPPER(region) = ?', [strtoupper(trim($region))])
                     ->sum('total_settlement_klien');
 
@@ -1220,6 +1701,157 @@ class LeadProgramController extends Controller
             }, $fileName);
         } catch (\Exception $e) {
             \Log::error("Error in exportDailyTopupByProvince: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
+        }
+    }
+
+    public function exportDailyTopupRegionalByProvince(Request $request)
+    {
+        try {
+            $monthFilter = $request->get('month');
+            $regionalName = Auth::user()?->regional;
+
+            if (empty($regionalName)) {
+                return redirect()->back()->with('error', 'Regional user tidak ditemukan');
+            }
+
+            if ($monthFilter) {
+                $startDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::createFromFormat('Y-m-d', $monthFilter)->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::createFromFormat('Y-m-d', $monthFilter)->translatedFormat('F Y');
+            } else {
+                $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+                $displayMonth = Carbon::now()->translatedFormat('F Y');
+            }
+
+            $provinceMatches = DB::table('regional_provinces')
+                ->whereRaw('LOWER(regional) = ?', [strtolower(trim($regionalName))])
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->all();
+
+            $leadMasterByEmail = DB::table('leads_master as lm')
+                ->join('users as u', 'u.id', '=', 'lm.user_id')
+                ->select(
+                    DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                    DB::raw('MIN(lm.user_id) as user_id')
+                )
+                ->whereNotNull('lm.email')
+                ->groupBy(DB::raw('LOWER(TRIM(lm.email))'));
+
+            $powerhouseUserIds = DB::table('users')
+                ->where('role', 'PH')
+                ->pluck('id')
+                ->toArray();
+
+            $mpccUserIds = DB::table('users')
+                ->where('role', 'MPCC')
+                ->pluck('id')
+                ->toArray();
+
+            $query = DB::table('report_balance_top_up as rp')
+                ->leftJoin('mitra_sbp as m', 'm.email_myads', '=', 'rp.email_client')
+                ->leftJoinSub($leadMasterByEmail, 'lm', function ($join) {
+                    $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email');
+                })
+                ->select(
+                    'rp.data_province_name',
+                    'rp.user_id',
+                    'rp.email_client',
+                    'm.remark',
+                    'lm.user_id as leads_user_id',
+                    DB::raw('SUM(CAST(rp.total_settlement_klien AS DECIMAL(15,2))) as total_settlement')
+                )
+                ->whereDate('rp.tgl_transaksi', '>=', $startDate)
+                ->whereDate('rp.tgl_transaksi', '<=', $endDate)
+                ->whereNotNull('rp.email_client')
+                ->whereNotNull('rp.total_settlement_klien')
+                ->whereNotNull('rp.data_province_name');
+
+            if (!empty($provinceMatches)) {
+                $normalizedProvinces = array_map(static fn($province) => strtolower(trim($province)), $provinceMatches);
+                $query->whereIn(DB::raw('LOWER(TRIM(rp.data_province_name))'), $normalizedProvinces);
+            } else {
+                $query->whereRaw('LOWER(rp.data_province_name) LIKE ?', ['%' . strtolower(trim($regionalName)) . '%']);
+            }
+
+            $data = $query
+                ->groupBy('rp.data_province_name', 'rp.user_id', 'rp.email_client', 'm.remark', 'lm.user_id')
+                ->orderBy('rp.data_province_name', 'asc')
+                ->orderByDesc('total_settlement')
+                ->get();
+
+            $data = $data->map(function ($row) use ($powerhouseUserIds, $mpccUserIds) {
+                $channel = null;
+
+                if (!empty($row->leads_user_id) && in_array($row->leads_user_id, $mpccUserIds, true)) {
+                    $channel = 'MPCC';
+                } elseif (!empty($row->leads_user_id) && in_array($row->leads_user_id, $powerhouseUserIds, true)) {
+                    $channel = 'Powerhouse';
+                } elseif ($row->remark === 'Internal') {
+                    $channel = 'Internal';
+                } elseif ($row->remark === 'Mitra SBP') {
+                    $channel = 'Mitra SBP';
+                } elseif ($row->remark === 'Agency') {
+                    $channel = 'Agency Indihome';
+                }
+
+                $row->channel = $channel;
+                return $row;
+            })->filter(function ($row) {
+                return !empty($row->channel);
+            })->values();
+
+            if ($data->isEmpty()) {
+                return redirect()->back()->with('error', 'Tidak ada data untuk diekspor');
+            }
+
+            $safeRegionalName = preg_replace('/[^A-Za-z0-9_-]/', '_', $regionalName);
+            $exportData = [];
+            foreach ($data as $row) {
+                $exportData[] = [
+                    'Channel' => $row->channel,
+                    'Province' => $row->data_province_name,
+                    'User ID' => $row->user_id,
+                    'Email' => $row->email_client,
+                    'Bulan' => $displayMonth,
+                    'Total Settlement' => ' ' . number_format((float) $row->total_settlement, 0, ',', '.'),
+                ];
+            }
+
+            $fileName = 'Daily_TopUp_Regional_Per_Province_' . $safeRegionalName . '_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return response()->streamDownload(function () use ($exportData) {
+                $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+
+                $headers = ['Channel', 'Province', 'User ID', 'Email', 'Bulan', 'Total Settlement'];
+                $sheet->fromArray($headers, null, 'A1');
+
+                $headerStyle = [
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E74A3B']],
+                    'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
+                ];
+                $sheet->getStyle('A1:F1')->applyFromArray($headerStyle);
+
+                $row = 2;
+                foreach ($exportData as $item) {
+                    $sheet->fromArray((array) $item, null, 'A' . $row);
+                    $row++;
+                }
+
+                foreach (range('A', 'F') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName);
+        } catch (\Exception $e) {
+            \Log::error("Error in exportDailyTopupRegionalByProvince: " . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengekspor data: ' . $e->getMessage());
         }
     }
