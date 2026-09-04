@@ -42,6 +42,8 @@ class FrontController extends Controller
                 return redirect()->route('report-goto');
             } else if ('Area 2' == Auth::user()->role) {
                 return redirect()->route('area2.leads-master.index');
+            } else if ('AM' == Auth::user()->role) {
+                return redirect()->route('am.referral.index');
             } else if ('b2b' == Auth::user()->role) {
                 return redirect()->route('amlevelup.index');
             } else {
@@ -870,10 +872,6 @@ class FrontController extends Controller
         return view('auth.loglogin');
     }
 }
-
-
-
-
 
 
 

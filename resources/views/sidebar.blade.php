@@ -19,6 +19,7 @@
                 $isTreg = $roleUpper === 'TREG';
                 $isCanv = $roleValue === 'cvsr';
                 $isPH = $roleUpper === 'PH';
+                $isAM = $roleUpper === 'AM';
                 $isTcd = $roleUpper === 'TCD';
                 $isInternal = $roleUpper === 'INTERNAL';
                 $isB2b = strtolower($roleValue) === 'b2b';
@@ -49,6 +50,8 @@
                 <span class="badge badge-success">TSEL</span>
                 @elseif($isPH)
                 <span class="badge badge-info">POWERHOUSE</span>
+                @elseif($isAM)
+                <span class="badge badge-primary">AM</span>
                 @elseif($isTcd)
                 <span class="badge badge-secondary">TCD</span>
                 @elseif($isInternal || $isMpcc)
@@ -789,6 +792,42 @@
                         <p>Logout</p>
                     </a>
                 </li>
+                @elseif($isAM)
+                <li class="nav-header">AM DASHBOARD</li>
+                <li class="nav-item">
+                    <a href="{{ route('daily.topup.channel') }}" class="nav-link {{ request()->routeIs('daily.topup.channel') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-chart-line" style="color:rgb(255,159,64);"></i>
+                        <p>Daily Top Up Channel</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('am.referral.index') }}" class="nav-link {{ request()->routeIs('am.referral.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-user-tie" style="color:#38bdf8;"></i>
+                        <p>AM Referral</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.index') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.index') || request()->routeIs('leads-master.show') || request()->routeIs('leads-master.edit') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
+                        <p>Data Leads & Akun</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-pen" style="color:rgb(1,240,172);"></i>
+                        <p>New Leads</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create-existing') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143,142,142);"></i>
+                        <p>New/Eksisting Akun</p>
+                    </a>
+                </li>
+                <li class="nav-header">System Management</li>
+                <li class="nav-item"><a href="{{ url('change-password') }}" class="nav-link {{ request()->routeIs('change-password') ? 'active' : '' }}"><i class="nav-icon fas fa-key"></i><p>Change Password</p></a></li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item"><a href="{{ url('logout') }}" class="nav-link"><i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i><p>Logout</p></a></li>
                 @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
@@ -904,6 +943,14 @@
                             </a>
                         </li>
                     </ul>
+                </li>
+                @endif
+                @if($isAdmin)
+                <li class="nav-item">
+                    <a href="{{ route('am.referral.index') }}" class="nav-link {{ request()->routeIs('am.referral.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-user-tie" style="color:#38bdf8;"></i>
+                        <p>AM Referral</p>
+                    </a>
                 </li>
                 @endif
                 @endif

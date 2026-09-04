@@ -23,7 +23,9 @@ class LeadsMasterController extends Controller
     {
         logUserLogin();
         return view('leads-master.index', [
-            'canvassers' => Cache::remember('users_list_leads', 3600, fn() => User::whereIn('role', ['cvsr', 'PH'])->orderBy('name')->get()),
+            'canvassers' => auth()->user()->role === 'Admin'
+                ? Cache::remember('users_list_leads_with_am_v2', 3600, fn() => User::whereIn('role', ['cvsr', 'PH', 'AM'])->orderBy('name')->get())
+                : collect(),
             'sources'    => Cache::remember('sources_list_leads', 3600, fn() => LeadsSource::orderBy('name')->get()),
             'regionals'  => Cache::remember('regionals_list_leads', 3600, fn() => 
                 DB::table('regional_provinces')
@@ -62,8 +64,10 @@ class LeadsMasterController extends Controller
 
         // Base query dari summary table (sudah precomputed, lebih cepat)
         $query = DB::table('detail_leads_summary as dls')
+            ->leftJoin('users as filter_user', 'filter_user.id', '=', 'dls.user_id')
             ->select(
                 'dls.*',
+                'filter_user.role as user_role',
                 DB::raw("
                     CASE
                         WHEN COALESCE(dls.saldo_utama, 0) >= 1000000 THEN 1
@@ -87,7 +91,7 @@ class LeadsMasterController extends Controller
         }
         
         // Filter Canvasser
-        if ($request->canvasser) {
+        if (auth()->user()->role === 'Admin' && $request->canvasser) {
             $query->where('dls.user_id', $request->canvasser);
         }
 
@@ -120,6 +124,7 @@ class LeadsMasterController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('dls.user_name', 'like', "%$search%")
+                ->orWhere('filter_user.role', 'like', "%$search%")
                 ->orWhere('dls.regional', 'like', "%$search%")
                 ->orWhere('dls.company_name', 'like', "%$search%")
                 ->orWhere('dls.email', 'like', "%$search%")
@@ -132,7 +137,10 @@ class LeadsMasterController extends Controller
             ->orderColumn('rekomendasi', 'rekomendasi_sort $1')
             ->addColumn('user_name', function ($row) {
                 return $row->user_name ?? '-';
-            })            
+            })
+            ->addColumn('user_role', function ($row) {
+                return $row->user_role ?? '-';
+            })
             ->addColumn('regional', function ($row) {
                 return $row->regional ?? '-';
             })
@@ -215,8 +223,10 @@ class LeadsMasterController extends Controller
     public function export(Request $request)
     {
         $query = DB::table('detail_leads_summary as dls')
+            ->leftJoin('users as filter_user', 'filter_user.id', '=', 'dls.user_id')
             ->select(
                 'dls.user_name',
+                'filter_user.role as user_role',
                 'dls.regional',
                 'dls.company_name',
                 'dls.email',
@@ -237,7 +247,7 @@ class LeadsMasterController extends Controller
         }
 
         // Filter Canvasser
-        if ($request->canvasser) {
+        if (auth()->user()->role === 'Admin' && $request->canvasser) {
             $query->where('dls.user_id', $request->canvasser);
         }
 
@@ -279,7 +289,8 @@ class LeadsMasterController extends Controller
         ];
 
         $columns = [
-            'Canvasser',
+            'User',
+            'Role',
             'Regional',
             'Nama Perusahaan',
             'Email',
@@ -307,6 +318,7 @@ class LeadsMasterController extends Controller
 
                 fputcsv($file, [
                     $row->user_name ?? '-',
+                    $row->user_role ?? '-',
                     $row->regional ?? '-',
                     $row->company_name ?? '-',
                     $row->email ?? '-',
@@ -405,7 +417,7 @@ class LeadsMasterController extends Controller
         // $statusValue = $validated['status'] === 'Ok' ? 1 : 0;
         $statusValue = 1; // Default ke 1 (Yes) karena field status di form disembunyikan
         $leads = LeadsMaster::create([
-            'user_id' => $validated['user_id'],
+            'user_id' => auth()->user()->role === 'Admin' ? $validated['user_id'] : auth()->id(),
             'source_id' => $validated['source_id'],
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
@@ -514,7 +526,7 @@ class LeadsMasterController extends Controller
         // $statusValue = $validated['status'] === 'Ok' ? 1 : 0;
         $statusValue = 1; // Default ke 1 (Yes) karena field status di form disembunyikan
         LeadsMaster::create([
-            'user_id' => $validated['user_id'],
+            'user_id' => auth()->user()->role === 'Admin' ? $validated['user_id'] : auth()->id(),
             'source_id' => null,
             'sector_id' => $validated['sector_id'] ?? null,
             // 'kode_voucher' => $validated['kode_voucher'],
@@ -621,6 +633,7 @@ class LeadsMasterController extends Controller
         logUserLogin();
         // Load lead beserta relasi
         $lead = LeadsMaster::with(['user', 'source', 'sector'])->findOrFail($id);
+        $this->authorizeOwnedLead($lead);
 
         return view('leads-master.show', compact('lead'));
     }
@@ -628,18 +641,23 @@ class LeadsMasterController extends Controller
     public function edit(LeadsMaster $lead)
     {
         logUserLogin();
+        $this->authorizeOwnedLead($lead);
         
         $leadSources = LeadsSource::all();
         $sectors = Sector::all();
-        $canvassers = Cache::remember('users_list_leads', 3600, fn() => User::orderBy('name')->get());
+        $canvassers = Cache::remember('users_list_leads_with_am_v2', 3600, fn() => User::whereIn('role', ['cvsr', 'PH', 'AM'])->orderBy('name')->get());
         return view('leads-master.edit', compact('lead', 'leadSources', 'sectors', 'canvassers'));
     }
 
     public function update(Request $request, LeadsMaster $lead)
     {
+        $this->authorizeOwnedLead($lead);
         $lead = LeadsMaster::findOrFail($lead->id);
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => [
+                'required',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->whereIn('role', ['cvsr', 'PH', 'AM'])),
+            ],
             'source_id' => 'nullable|exists:leads_source,id',
             'sector_id' => 'required|exists:sectors,id',
             // 'kode_voucher' => 'string|max:255',
@@ -681,6 +699,13 @@ class LeadsMasterController extends Controller
         ]);
 
         return redirect()->route('leads-master.index')->with('success', 'Lead berhasil diupdate');
+    }
+
+    private function authorizeOwnedLead(LeadsMaster $lead): void
+    {
+        if (auth()->user()->role !== 'Admin' && (int) $lead->user_id !== (int) auth()->id()) {
+            abort(403);
+        }
     }
 
     /**

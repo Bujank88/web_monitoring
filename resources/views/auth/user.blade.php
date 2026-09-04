@@ -217,6 +217,7 @@
                             <option value="MPCC">MPCC</option>
                             <option value="SBP">SBP</option>
                             <option value="Canvasser SBP">Canvasser SBP</option>
+                            <option value="AM">AM</option>
                             <option value="Dormant">Dormant</option>
                         </select>
                     </div>
@@ -237,10 +238,10 @@
                             <input type="text" class="form-control" id="branch" name="branch">
                         </div>
 
-                        <div class="form-group">
-                            <label for="referral_code">Referral Code</label>
-                            <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Contoh: HEBAT14">
-                        </div>
+                    </div>
+                    <div class="form-group" id="referral_code_group" style="display: none;">
+                        <label for="referral_code">Referral Code</label>
+                        <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Untuk AM: AM1 sampai AM8">
                     </div>
                     
                     {{-- <div class="form-group" id="treg_group" style="display: none;">
@@ -430,15 +431,21 @@
         function toggleRoleFields() {
             const role = $('#role').val();
             const isMpcc = role === 'MPCC';
+            const hasReferralCode = isMpcc || role === 'AM';
             const isRegional = role === 'Regional';
 
             $('#mpcc_fields').toggle(isMpcc);
+            $('#referral_code_group').toggle(hasReferralCode);
             $('#area, #branch').prop('required', isMpcc);
             $('#regional_group').toggle(isRegional);
             $('#regional').prop('required', isRegional);
 
             if (!isMpcc) {
-                $('#area, #branch, #referral_code').val('');
+                $('#area, #branch').val('');
+            }
+
+            if (!hasReferralCode) {
+                $('#referral_code').val('');
             }
 
             if (!isRegional) {
