@@ -402,7 +402,7 @@ class PanenPoinV4Controller extends Controller
         DB::beginTransaction();
         try {
             $akun = AkunPanenPoinV4::findOrFail($request->akun_id);
-            $prize = DB::table('prizes_v2')->where('id', $request->prize_id)->lockForUpdate()->first();
+            $prize = DB::table('prizes_v4')->where('id', $request->prize_id)->lockForUpdate()->first();
             if (!$prize || (int) $prize->stock <= 0) {
                 throw new \Exception('Hadiah tidak tersedia.');
             }
@@ -432,7 +432,7 @@ class PanenPoinV4Controller extends Controller
                 'updated_at' => now(),
             ]);
 
-            DB::table('prizes_v2')->where('id', $prize->id)->update([
+            DB::table('prizes_v4')->where('id', $prize->id)->update([
                 'stock' => DB::raw('stock - 1'),
                 'updated_at' => now(),
             ]);

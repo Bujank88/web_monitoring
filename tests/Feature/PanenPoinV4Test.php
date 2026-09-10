@@ -191,22 +191,22 @@ class PanenPoinV4Test extends TestCase
     public function test_redeem_updates_points_and_stock_and_rejects_insufficient_points(): void
     {
         $this->travelTo(\Carbon\Carbon::parse('2026-09-15 12:00:00', 'Asia/Jakarta'));
-        Schema::create('prizes_v2', function (Blueprint $t) {
+        Schema::create('prizes_v4', function (Blueprint $t) {
             $t->id(); $t->integer('point'); $t->integer('stock'); $t->timestamps();
         });
-        DB::table('prizes_v2')->insert(['id' => 1, 'point' => 2, 'stock' => 3]);
+        DB::table('prizes_v4')->insert(['id' => 1, 'point' => 2, 'stock' => 3]);
         DB::table('report_balance_top_up')->insert(['email_client' => 'client@example.test', 'tgl_transaksi' => '2026-09-15', 'total_settlement_klien' => 750000]);
         $controller = app(PanenPoinV4Controller::class);
         $controller->refreshSummaryPanenPoinV4();
         $request = Request::create('/', 'POST', ['akun_id' => 1, 'prize_id' => 1]);
         $this->assertSame(200, $controller->redeemPrize($request)->getStatusCode());
         $this->assertDatabaseHas('summary_panen_poin_v4', ['poin' => 3, 'poin_redeem' => 2]);
-        $this->assertDatabaseHas('prizes_v2', ['stock' => 2]);
+        $this->assertDatabaseHas('prizes_v4', ['stock' => 2]);
         $this->assertDatabaseCount('prize_redeems_v4', 1);
         $this->assertDatabaseCount('prize_redeems_v3', 0);
         $this->assertSame(422, $controller->redeemPrize($request)->getStatusCode());
         $this->assertDatabaseCount('prize_redeems_v4', 1);
-        $this->assertDatabaseHas('prizes_v2', ['stock' => 2]);
+        $this->assertDatabaseHas('prizes_v4', ['stock' => 2]);
         $controller->refreshSummaryPanenPoinV4();
         $this->assertDatabaseHas('summary_panen_poin_v4', ['poin' => 3, 'poin_redeem' => 2]);
         $this->travelBack();
@@ -232,6 +232,44 @@ class PanenPoinV4Test extends TestCase
         $this->assertCount(1, $events);
         $this->assertSame('refreshSummaryPanenPoinV4', $events[0]->description);
         $this->assertSame('*/5 * * * *', $events[0]->expression);
+    }
+
+    public function test_prize_migration_copies_v3_catalog_and_keeps_stock_independent(): void
+    {
+        Schema::create('prizes_v3', function (Blueprint $table) {
+            $table->integer('id'); $table->string('img'); $table->string('name');
+            $table->integer('point'); $table->integer('stock'); $table->timestamps();
+        });
+        DB::table('prizes_v3')->insert([
+            ['id' => 15, 'img' => 'gift.png', 'name' => 'Gift', 'point' => 100, 'stock' => 5],
+            ['id' => 18, 'img' => 'reward.png', 'name' => 'Reward', 'point' => 300, 'stock' => 2],
+        ]);
+        (require database_path('migrations/2026_09_10_110000_create_prizes_v4_table.php'))->up();
+        $this->assertDatabaseCount('prizes_v4', 2);
+        $this->assertSame([18, 15], DB::table('prizes_v4')->orderBy('point', 'desc')->pluck('id')->all());
+        $this->assertDatabaseHas('prizes_v4', ['id' => 18, 'img' => 'reward.png', 'stock' => 2]);
+        DB::table('prizes_v4')->where('id', 18)->decrement('stock');
+        $this->assertDatabaseHas('prizes_v3', ['id' => 18, 'stock' => 2]);
+        $this->assertDatabaseHas('prizes_v4', ['id' => 18, 'stock' => 1]);
+    }
+
+    public function test_contact_table_supports_portal_lookup_and_contact_updates(): void
+    {
+        $migration = require database_path('migrations/2026_09_10_120000_create_user_contact_infos_v4_table.php');
+        $migration->up();
+        $this->assertCount(0, DB::table('user_contact_infos_v4')->where('user_id', 33)->orderBy('created_at', 'desc')->get());
+        DB::table('user_contact_infos_v4')->insert([
+            'user_id' => 33, 'phone' => '081234567890', 'address' => 'Test address', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $contact = DB::table('user_contact_infos_v4')->where('user_id', 33)->orderBy('created_at', 'desc')->first();
+        $this->assertSame('081234567890', $contact->phone);
+        $this->assertNull($contact->remark);
+        DB::table('user_contact_infos_v4')->where('user_id', 33)->update(['address' => 'Updated address', 'remark' => 'Test']);
+        $this->assertDatabaseHas('user_contact_infos_v4', ['user_id' => 33, 'address' => 'Updated address', 'remark' => 'Test']);
+        $unique = collect(Schema::getIndexes('user_contact_infos_v4'))->contains(fn ($index) => $index['unique'] && $index['columns'] === ['user_id']);
+        $this->assertTrue($unique);
+        $migration->down();
+        $this->assertFalse(Schema::hasTable('user_contact_infos_v4'));
     }
 
 }
