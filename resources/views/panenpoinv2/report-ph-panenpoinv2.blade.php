@@ -494,19 +494,19 @@
     </div>
 </div>
 
-<!-- Report PanenPoinV2 Powerhouse -->
+<!-- Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="panenPoinTableCard">
             <div class="card-header bg-gradient-danger text-white">
-                <h4 class="mb-0"><i class="fas fa-table"></i> Report PanenPoinV2 Powerhouse</h4>
+                <h4 class="mb-0"><i class="fas fa-table"></i> Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse</h4>
             </div>
             <div class="card-body">
                 <div id="capturePanenPoinV2Table" class="table-responsive">
             <table class="table table-sm w-100 table-bordered table-hover" id="panenPoinPHTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PanenPoinV2 Powerhouse | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse | Periode: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>

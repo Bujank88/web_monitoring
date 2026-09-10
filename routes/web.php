@@ -14,6 +14,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
 use App\Http\Controllers\PanenPoinV3Controller;
+use App\Http\Controllers\PanenPoinV4Controller;
 use App\Http\Controllers\PilotSbpController;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
@@ -342,6 +343,20 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('panen-poin-v3/refresh-summary', [PanenPoinV3Controller::class, 'refreshSummaryPanenPoinV3'])->name('panenpoinv3.refresh');
     Route::get('panen-poin-v3/list-akun', [PanenPoinV3Controller::class, 'listAkun'])->name('panenpoinv3.list-akun');
     Route::get('panen-poin-v3/akun-data', [PanenPoinV3Controller::class, 'getAkunData'])->name('panenpoinv3.akun-data');
+
+    // Panen Poin V4 Routes
+    Route::get('panen-poin-v4/input', [PanenPoinV4Controller::class, 'index'])->name('panenpoinv4.index');
+    Route::post('panen-poin-v4/store', [PanenPoinV4Controller::class, 'store'])->name('panenpoinv4.store');
+    Route::get('panen-poin-v4/report', [PanenPoinV4Controller::class, 'report'])->name('panenpoinv4.report');
+    Route::get('panen-poin-v4/report-data', [PanenPoinV4Controller::class, 'getReportData'])->name('panenpoinv4.report-data');
+    Route::get('panen-poin-v4/report-canvasser', [PanenPoinV4Controller::class, 'reportCanvasser'])->name('panenpoinv4.report-canvasser');
+    Route::get('panen-poin-v4/report-canvasser-data', [PanenPoinV4Controller::class, 'getReportCanvasserData'])->name('panenpoinv4.report-canvasser-data');
+    Route::get('panen-poin-v4/report-ph', [PanenPoinV4Controller::class, 'reportPowerhouse'])->name('panenpoinv4.report-ph');
+    Route::get('panen-poin-v4/report-ph-data', [PanenPoinV4Controller::class, 'getReportPowerhouseData'])->name('panenpoinv4.report-ph-data');
+    Route::get('panen-poin-v4/export', [PanenPoinV4Controller::class, 'export'])->name('panenpoinv4.export');
+    Route::get('panen-poin-v4/refresh-summary', [PanenPoinV4Controller::class, 'refreshSummaryPanenPoinV4'])->name('panenpoinv4.refresh');
+    Route::get('panen-poin-v4/list-akun', [PanenPoinV4Controller::class, 'listAkun'])->name('panenpoinv4.list-akun');
+    Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
 
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
