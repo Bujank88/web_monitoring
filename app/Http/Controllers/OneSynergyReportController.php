@@ -23,6 +23,8 @@ class OneSynergyReportController extends Controller
 {
     private const MONITORING_EMAIL = 'arief_azhar@ptkam.co.id';
     private const REFERRAL_SENDER_ID = 'REG-DO-000000661407';
+    private const RATE_CATEGORIES = ['sms' => 'SMS', 'waba' => 'WABA'];
+    private const RATE_CHANNELS = ['lba' => 'LBA', 'broadcast' => 'Broadcast', 'targeted' => 'Targeted'];
 
     public function monitoringSaldo(Request $request)
     {
@@ -407,12 +409,11 @@ class OneSynergyReportController extends Controller
     {
         [$month, $startDate, $endDate] = $this->period($request);
         $rates = DB::table('one_synergy_monthly_multipliers')->where('month', $month)->first();
-        $hasRates = $rates !== null && $rates->sms_multiplier !== null && $rates->waba_multiplier !== null;
         $baseQuery = $this->baseQuery($startDate, $endDate, (string) $request->get('merchant', ''));
 
         if ($baseQuery === null) {
             $summary = $this->emptySummary();
-            $summary['total_harga'] = $hasRates ? 0 : null;
+            $summary['total_harga'] = $rates === null ? null : 0;
             return datatables()->of(collect([]))->with('summary', $summary)->make(true);
         }
 
@@ -424,18 +425,40 @@ class OneSynergyReportController extends Controller
             'cr.kategori_iklan',
             'cr.tipe_kanal',
             'cr.sukses as success',
-            DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
+            DB::raw('COALESCE(cr.gagal, 0) as failed'),
             'cr.read',
             'cr.click'
         );
 
+        $channel = "CASE WHEN UPPER(TRIM(cr.kategori_iklan)) IN ('SMS', 'WABA') THEN UPPER(TRIM(cr.kategori_iklan)) ELSE UPPER(TRIM(cr.tipe_kanal)) END";
         $summaryRow = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_campaign')
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_waba")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_waba")
+            ->selectRaw("SUM(CASE WHEN ($channel) = 'SMS' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_sms")
+            ->selectRaw("SUM(CASE WHEN ($channel) = 'WABA' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_waba")
+            ->selectRaw("SUM(CASE WHEN ($channel) = 'SMS' THEN COALESCE(cr.gagal, 0) ELSE 0 END) as total_failed_sms")
+            ->selectRaw("SUM(CASE WHEN ($channel) = 'WABA' THEN COALESCE(cr.gagal, 0) ELSE 0 END) as total_failed_waba")
             ->first();
+
+        $usage = (clone $baseQuery)
+            ->selectRaw("($channel) as rate_category, UPPER(TRIM(cr.tipe_kanal)) as rate_channel")
+            ->selectRaw('SUM(COALESCE(cr.sukses, 0)) as successes')
+            ->groupByRaw("($channel), UPPER(TRIM(cr.tipe_kanal))")
+            ->get();
+        $totalBalance = $rates === null ? null : 0;
+        foreach ($usage as $item) {
+            if ((int) $item->successes === 0) {
+                continue;
+            }
+            $categoryKey = strtolower((string) $item->rate_category);
+            $channelKey = strtolower((string) $item->rate_channel);
+            $field = $categoryKey . '_' . $channelKey . '_multiplier';
+            if (!isset(self::RATE_CATEGORIES[$categoryKey], self::RATE_CHANNELS[$channelKey])
+                || $rates === null || $rates->{$field} === null) {
+                $totalBalance = null;
+                break;
+            }
+            $totalBalance += (float) $item->successes * (float) $rates->{$field};
+        }
 
         $summary = [
             'total_campaign' => (int) ($summaryRow->total_campaign ?? 0),
@@ -443,11 +466,7 @@ class OneSynergyReportController extends Controller
             'total_success_waba' => (int) ($summaryRow->total_success_waba ?? 0),
             'total_failed_sms' => (int) ($summaryRow->total_failed_sms ?? 0),
             'total_failed_waba' => (int) ($summaryRow->total_failed_waba ?? 0),
-            'total_harga' => $hasRates ? round(
-                (float) ($summaryRow->total_success_sms ?? 0) * (float) $rates->sms_multiplier
-                + (float) ($summaryRow->total_success_waba ?? 0) * (float) $rates->waba_multiplier,
-                2
-            ) : null,
+            'total_harga' => $totalBalance === null ? null : round($totalBalance, 2),
         ];
 
         return datatables()->of($query)
@@ -465,25 +484,27 @@ class OneSynergyReportController extends Controller
             'month' => $month,
             'rates' => DB::table('one_synergy_monthly_multipliers')->where('month', $month)->first(),
             'settings' => DB::table('one_synergy_monthly_multipliers')->orderByDesc('month')->get(),
+            'rateCategories' => self::RATE_CATEGORIES,
+            'rateChannels' => self::RATE_CHANNELS,
         ]);
     }
 
     public function saveMonthlyMultiplier(Request $request)
     {
         abort_unless(Auth::user()?->role === 'Admin', 403);
-        $validated = $request->validate([
-            'month' => 'required|date_format:Y-m',
-            'sms_multiplier' => 'required|numeric|min:0|max:9999999999999.99|decimal:0,2',
-            'waba_multiplier' => 'required|numeric|min:0|max:9999999999999.99|decimal:0,2',
-        ]);
+        $rules = ['month' => 'required|date_format:Y-m'];
+        foreach (self::RATE_CATEGORIES as $category => $label) {
+            foreach (self::RATE_CHANNELS as $channel => $channelLabel) {
+                $rules[$category . '_' . $channel . '_multiplier'] = 'required|numeric|min:0|max:9999999999999.99|decimal:0,2';
+            }
+        }
+        $validated = $request->validate($rules);
         DB::table('one_synergy_monthly_multipliers')->upsert([
-            'month' => $validated['month'],
-            'sms_multiplier' => $validated['sms_multiplier'],
-            'waba_multiplier' => $validated['waba_multiplier'],
+            ...$validated,
             'updated_by' => Auth::id(),
             'created_at' => now(),
             'updated_at' => now(),
-        ], ['month'], ['sms_multiplier', 'waba_multiplier', 'updated_by', 'updated_at']);
+        ], ['month'], [...array_diff(array_keys($rules), ['month']), 'updated_by', 'updated_at']);
 
         return redirect()->route('one-synergy.monthly-multipliers', ['month' => $validated['month']])
             ->with('success', 'Pengali bulanan berhasil disimpan.');
@@ -514,8 +535,8 @@ class OneSynergyReportController extends Controller
             DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
             'cr.id_iklan', 'cr.judul_pesan_iklan', 'cr.operator_seluler',
             'cr.kategori_iklan', 'cr.tipe_kanal', 'cr.sukses as success',
-            DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
-            'cr.refunded', 'cr.read', 'cr.click', 'cr.detil_status',
+            DB::raw('COALESCE(cr.gagal, 0) as failed'),
+            'cr.read', 'cr.click', 'cr.detil_status',
             DB::raw('CASE WHEN COALESCE(cr.sukses, 0) > 0 THEN (COALESCE(cr.read, 0) / cr.sukses) * 100 ELSE 0 END as percentage_read'),
             DB::raw('CASE WHEN COALESCE(cr.read, 0) > 0 THEN (COALESCE(cr.click, 0) / cr.read) * 100 ELSE 0 END as percentage_click')
         )->orderByDesc('cr.tgl_tayang')->orderByDesc('cr.id_iklan')->get();
@@ -526,13 +547,13 @@ class OneSynergyReportController extends Controller
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setCellValue('A1', 'REPORT 1SYNERGY - ' . $month)->mergeCells('A1:N1');
+        $sheet->setCellValue('A1', 'REPORT 1SYNERGY - ' . $month)->mergeCells('A1:M1');
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $headers = ['Tanggal Tayang', 'ID Iklan', 'Judul Pesan Iklan', 'Operator Seluler', 'Kategori Iklan', 'Tipe Kanal', 'Success', 'Failed', 'Refunded', 'Read', 'Click', 'Percentage Read', 'Percentage Click', 'Detil Status'];
+        $headers = ['Tanggal Tayang', 'ID Iklan', 'Judul Pesan Iklan', 'Operator Seluler', 'Kategori Iklan', 'Tipe Kanal', 'Success', 'Failed', 'Read', 'Click', 'Percentage Read', 'Percentage Click', 'Detil Status'];
         $sheet->fromArray($headers, null, 'A3');
-        $sheet->getStyle('A3:N3')->applyFromArray([
+        $sheet->getStyle('A3:M3')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -543,14 +564,14 @@ class OneSynergyReportController extends Controller
             $sheet->fromArray([
                 $row->tanggal_iklan, $row->id_iklan, $row->judul_pesan_iklan,
                 $row->operator_seluler, $row->kategori_iklan, $row->tipe_kanal,
-                $row->success, $row->failed, $row->refunded, $row->read, $row->click,
+                $row->success, $row->failed, $row->read, $row->click,
                 round((float) $row->percentage_read, 2) . '%',
                 round((float) $row->percentage_click, 2) . '%',
                 $row->detil_status,
             ], null, 'A' . $rowNum++);
         }
 
-        foreach (range('A', 'N') as $column) {
+        foreach (range('A', 'M') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -579,6 +600,8 @@ class OneSynergyReportController extends Controller
             'templateFile' => route('one-synergy.upload.template'),
             'uploadAction' => route('one-synergy.upload.store'),
             'brandLabel' => '1Synergy',
+            'acceptCsv' => true,
+            'csvExample' => asset('examples/report-1synergy.csv'),
         ]);
     }
 
@@ -587,15 +610,15 @@ class OneSynergyReportController extends Controller
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([
-            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'REFUNDED', 'READ', 'CLICK', 'TOTAL HARGA'],
-            ['1849001', '11 May 2026', 'WABA 1SYNERGY DUMMY 1', 'TELKOMSEL', 'WABA', 'LBA', 'Sukses: 105 Gagal: 9', '3000', '75', '29', '118000'],
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'READ', 'CLICK'],
+            ['1849001', '15 Sep 2026', 'Contoh WABA 1Synergy', 'TELKOMSEL', 'WABA', 'BROADCAST', 'Sukses: 5.304 Gagal: 1.131', '2929', '0'],
         ], null, 'A1');
-        $sheet->getStyle('A1:K1')->applyFromArray([
+        $sheet->getStyle('A1:I1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
-        foreach (range('A', 'K') as $column) {
+        foreach (range('A', 'I') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -607,7 +630,7 @@ class OneSynergyReportController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'report_file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+            'report_file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'extensions:xlsx,xls,csv', 'max:10240'],
         ]);
 
         if (!Schema::hasTable((new OneSynergyCampaignReport())->getTable())) {
@@ -619,30 +642,42 @@ class OneSynergyReportController extends Controller
         $fileName = $safeName . '-' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
         $storedPath = $file->storeAs('one-synergy-report-uploads', $fileName);
         $rows = IOFactory::load($file->getRealPath())->getActiveSheet()->toArray(null, true, true, true);
+        $headers = [];
+        foreach (array_shift($rows) ?? [] as $column => $header) {
+            $key = strtoupper(trim(str_replace("\xEF\xBB\xBF", '', (string) $header)));
+            $headers[$key] = $column;
+        }
+        $required = ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'READ', 'CLICK'];
+        if ($missing = array_diff($required, array_keys($headers))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'report_file' => 'Kolom wajib tidak ditemukan: ' . implode(', ', $missing),
+            ]);
+        }
         $payload = [];
 
-        foreach (array_slice($rows, 1) as $row) {
-            $idIklan = trim((string) ($row['A'] ?? ''));
-            $judul = trim((string) ($row['C'] ?? ''));
-            $status = trim((string) ($row['G'] ?? ''));
+        foreach ($rows as $row) {
+            $cell = fn (string $name) => isset($headers[$name]) ? ($row[$headers[$name]] ?? null) : null;
+            $idIklan = trim((string) $cell('ID IKLAN'));
+            $judul = trim((string) $cell('JUDUL PESAN IKLAN'));
+            $status = trim((string) $cell('DETIL STATUS'));
             if ($idIklan === '') {
                 continue;
             }
             [$sukses, $gagal] = $this->parseStatus($status);
             $payload[] = [
                 'id_iklan' => $idIklan,
-                'tgl_tayang' => $this->parseDate($row['B'] ?? null),
+                'tgl_tayang' => $this->parseDate($cell('TGL TAYANG')),
                 'judul_pesan_iklan' => $judul ?: null,
-                'operator_seluler' => trim((string) ($row['D'] ?? '')) ?: null,
-                'kategori_iklan' => trim((string) ($row['E'] ?? '')) ?: null,
-                'tipe_kanal' => trim((string) ($row['F'] ?? '')) ?: null,
+                'operator_seluler' => trim((string) $cell('OPERATOR SELULER')) ?: null,
+                'kategori_iklan' => trim((string) $cell('KATEGORI IKLAN')) ?: null,
+                'tipe_kanal' => trim((string) $cell('TIPE KANAL')) ?: null,
                 'detil_status' => $status ?: null,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
-                'refunded' => $this->parseInteger($row['H'] ?? 0),
-                'read' => $this->parseInteger($row['I'] ?? 0),
-                'click' => $this->parseInteger($row['J'] ?? 0),
-                'total_harga' => $this->parseInteger($row['K'] ?? 0),
+                'refunded' => 0,
+                'read' => $this->parseInteger($cell('READ')),
+                'click' => $this->parseInteger($cell('CLICK')),
+                'total_harga' => $this->parseInteger($cell('TOTAL HARGA')),
                 'source_file_name' => $file->getClientOriginalName(),
                 'upload_batch' => now()->format('YmdHis'),
                 'created_at' => now(),
@@ -651,7 +686,7 @@ class OneSynergyReportController extends Controller
         }
 
         if ($payload === []) {
-            return redirect()->route('one-synergy.upload')->with('error', 'Tidak ada baris valid dalam file Excel.');
+            return redirect()->route('one-synergy.upload')->with('error', 'Tidak ada baris valid dalam file report.');
         }
 
         DB::transaction(function () use ($payload) {
