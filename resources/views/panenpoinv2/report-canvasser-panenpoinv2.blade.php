@@ -523,6 +523,11 @@
 <!-- Filter Section -->
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+        @if(($routePrefix ?? '') === 'panenpoinv4')
+        <button type="button" class="btn btn-success" id="saveReportImage" data-table="panenPoinTable" data-period="filterMonthCanvasser" data-report="Canvasser" disabled>
+            <i class="fas fa-image mr-1"></i> Save Image
+        </button>
+        @endif
         <select id="filterMonthCanvasser" name="filterMonthCanvasser" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
             @foreach ($months as $month)
             <option value="{{ $month['value'] }}" {{ $month['selected'] ? 'selected' : '' }}>
@@ -593,6 +598,9 @@
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+@if(($routePrefix ?? '') === 'panenpoinv4')
+<script src="{{ asset('js/panen-poin-report-image.js') }}"></script>
+@endif
 <script>
     $(document).ready(function() {
         // Initialize DataTables
