@@ -56,12 +56,12 @@
     @php
         $balanceCards = [
         ['Saldo Awal', $openingBalance, 'text-dark', 'Akumulasi sebelum bulan terpilih'],
-        ['Total Keluar', $totalOut, 'text-danger', 'Saldo keluar melalui transfer'],
+        ['Total Keluar', $totalOut, 'text-danger', $outgoingBalanceNote],
         ['Saldo Akhir', $endingBalance, 'text-primary', 'Saldo akhir bulan terpilih'],
         ];
         if ($canViewIncomingBalance) {
             array_splice($balanceCards, 1, 0, [[
-                'Total Masuk', $totalIn, 'text-success', 'Saldo masuk melalui top up'
+                'Total Masuk', $totalIn, 'text-success', $incomingBalanceNote
             ]]);
         }
     @endphp

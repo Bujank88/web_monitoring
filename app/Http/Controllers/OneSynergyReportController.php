@@ -29,16 +29,6 @@ class OneSynergyReportController extends Controller
         logUserLogin();
         $month = $request->get('month', now()->format('Y-m'));
         $history = $this->monitoringSaldoHistory($month);
-        $canViewIncomingBalance = strcasecmp((string) Auth::user()?->role, '1Synergy') !== 0;
-
-        if (!$canViewIncomingBalance) {
-            $history['total_in'] = null;
-            $history['rows'] = collect($history['rows'])->map(function ($row) {
-                $row['amount_in'] = null;
-
-                return $row;
-            })->all();
-        }
 
         return view('one_synergy.monitoring_saldo', [
             'pageTitle' => 'Monitoring Saldo 1Synergy',
@@ -46,7 +36,9 @@ class OneSynergyReportController extends Controller
             'months' => $this->monthOptions($month),
             'monitoringEmail' => self::MONITORING_EMAIL,
             'senderId' => self::REFERRAL_SENDER_ID,
-            'canViewIncomingBalance' => $canViewIncomingBalance,
+            'canViewIncomingBalance' => true,
+            'incomingBalanceNote' => 'Saldo masuk melalui transfer',
+            'outgoingBalanceNote' => 'Balance terpakai dari Report 1Synergy',
             'remainingBalance' => $history['remaining_balance'],
             'openingBalance' => $history['opening_balance'],
             'totalIn' => $history['total_in'],
@@ -647,46 +639,38 @@ class OneSynergyReportController extends Controller
     private function monitoringSaldoHistory(string $month): array
     {
         $monthDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d 00:00:00');
-        $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
-        $targetEmail = strtolower(trim(self::MONITORING_EMAIL));
-
-        $openingIn = (float) DB::table('report_balance_top_up')
-            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->where('tgl_transaksi', '<', $startDate)
-            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
-        $openingOut = (float) DB::table('transaksi_balance_transfer')
-            ->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->where('tanggal', '<', $startDate)
-            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
-        $openingBalance = $openingIn - $openingOut;
-
-        $remainingIn = (float) DB::table('report_balance_top_up')
-            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
-        $remainingOut = (float) DB::table('transaksi_balance_transfer')
-            ->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
-
-        $incomingRows = DB::table('report_balance_top_up')->select([
+        $incoming = DB::table('transaksi_balance_transfer')->select([
             DB::raw("'Masuk' as transaction_type"),
-            DB::raw("'Top Up' as source"),
-            'tgl_transaksi as transaction_datetime',
-            'email_client as reference_email',
-            DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2)) as amount_in'),
-            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_out'),
-        ])->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->whereBetween('tgl_transaksi', [$startDate, $endDate])->get();
-
-        $outgoingRows = DB::table('transaksi_balance_transfer')->select([
-            DB::raw("'Keluar' as transaction_type"),
             DB::raw("'Balance Transfer' as source"),
             'tanggal as transaction_datetime',
             'email_penerima as reference_email',
-            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_in'),
-            DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2)) as amount_out'),
-        ])->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->whereBetween('tanggal', [$startDate, $endDate])->get();
+            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_out'),
+            DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2)) as amount_in'),
+        ])->whereRaw('LOWER(TRIM(email_penerima)) = ?', [strtolower(self::MONITORING_EMAIL)]);
+
+        // 1Synergy receives transfers and spends balance on reported campaigns.
+        $outgoing = OneSynergyCampaignReport::query()->select([
+                DB::raw("'Keluar' as transaction_type"),
+                DB::raw("'Balance Terpakai Report 1Synergy' as source"),
+                'tgl_tayang as transaction_datetime',
+                DB::raw("'-' as reference_email"),
+                DB::raw('0 as amount_in'),
+                DB::raw('COALESCE(total_harga, 0) as amount_out'),
+            ])->toBase();
+
+        $incomingHistory = DB::query()->fromSub($incoming, 'incoming_history');
+        $outgoingHistory = DB::query()->fromSub($outgoing, 'outgoing_history');
+        $periodStart = $monthDate->format('Y-m-d');
+        $periodEnd = $monthDate->copy()->addMonth()->format('Y-m-d');
+        $openingIn = (float) (clone $incomingHistory)->where('transaction_datetime', '<', $periodStart)->sum('amount_in');
+        $openingOut = (float) (clone $outgoingHistory)->where('transaction_datetime', '<', $periodStart)->sum('amount_out');
+        $openingBalance = $openingIn - $openingOut;
+        $remainingIn = (float) (clone $incomingHistory)->sum('amount_in');
+        $remainingOut = (float) (clone $outgoingHistory)->sum('amount_out');
+        $incomingRows = $incomingHistory->where('transaction_datetime', '>=', $periodStart)
+            ->where('transaction_datetime', '<', $periodEnd)->get();
+        $outgoingRows = $outgoingHistory->where('transaction_datetime', '>=', $periodStart)
+            ->where('transaction_datetime', '<', $periodEnd)->get();
 
         $runningBalance = $openingBalance;
         $totalIn = 0;
