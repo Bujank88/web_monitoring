@@ -22,7 +22,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 class OneSynergyReportController extends Controller
 {
     private const MONITORING_EMAIL = 'arief_azhar@ptkam.co.id';
-    private const REFERRAL_SENDER_ID = 'REG-DO-000000662035';
+    private const REFERRAL_SENDER_ID = 'REG-DO-000000661407';
 
     public function monitoringSaldo(Request $request)
     {
