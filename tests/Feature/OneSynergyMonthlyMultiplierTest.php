@@ -129,6 +129,44 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         }
     }
 
+    public function test_merchant_summary_only_includes_user_role(): void
+    {
+        config(['database.connections.kam_myads' => config('database.connections.sqlite')]);
+        DB::purge('kam_myads');
+        Schema::connection('kam_myads')->create('merchant_campaign_mappings', function (Blueprint $table) {
+            $table->string('merchant_id');
+            $table->string('campaign_id');
+        });
+        Schema::connection('kam_myads')->create('users', function (Blueprint $table) {
+            $table->string('merchant_id');
+            $table->string('name');
+            $table->string('role');
+        });
+        DB::connection('kam_myads')->table('users')->insert([
+            ['merchant_id' => 'customer', 'name' => 'Customer', 'role' => 'user'],
+            ['merchant_id' => 'customer', 'name' => 'Z Admin', 'role' => 'admin'],
+            ['merchant_id' => 'staff', 'name' => 'Staff', 'role' => 'admin'],
+        ]);
+        DB::connection('kam_myads')->table('merchant_campaign_mappings')->insert([
+            ['merchant_id' => 'customer', 'campaign_id' => '1'],
+            ['merchant_id' => 'staff', 'campaign_id' => '2'],
+            ['merchant_id' => 'orphan', 'campaign_id' => '2'],
+        ]);
+        $controller = new \App\Http\Controllers\OneSynergyReportController();
+        $optionsMethod = new \ReflectionMethod($controller, 'merchantOptions');
+        $options = $optionsMethod->invoke($controller, true);
+        $this->assertCount(1, $options);
+        $this->assertSame('customer', $options[0]['id']);
+        $this->assertSame('Customer (customer)', $options[0]['label']);
+        $this->assertCount(3, $optionsMethod->invoke($controller));
+        $rows = (new \ReflectionMethod($controller, 'merchantSummaryRows'))->invoke($controller, '2026-09');
+        $total = end($rows);
+        $this->assertSame(1, $total['total_campaign']);
+        $this->assertSame('999.999', $total['total_balance']);
+        $this->assertArrayNotHasKey('merchant_' . md5('staff') . '_campaign', $total);
+        $this->assertArrayNotHasKey('merchant_' . md5('orphan') . '_campaign', $total);
+    }
+
     public function test_migration_preserves_existing_monthly_rates(): void
     {
         Schema::drop('one_synergy_monthly_multipliers');

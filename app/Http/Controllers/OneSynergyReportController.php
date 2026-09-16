@@ -173,7 +173,7 @@ class OneSynergyReportController extends Controller
 
         return view('one_synergy.merchant_summary', [
             'months' => $this->monthOptions($month),
-            'merchants' => $this->merchantOptions(),
+            'merchants' => $this->merchantOptions(true),
             'pageTitle' => 'Summary Merchant 1Synergy',
             'dataUrl' => route('one-synergy.merchant-summary.data'),
         ]);
@@ -260,12 +260,13 @@ class OneSynergyReportController extends Controller
         ]);
     }
 
-    private function merchantOptions(): array
+    private function merchantOptions(bool $usersOnly = false): array
     {
         try {
             return DB::connection('kam_myads')
                 ->table('merchant_campaign_mappings as m')
                 ->leftJoin('users as u', 'u.merchant_id', '=', 'm.merchant_id')
+                ->when($usersOnly, fn ($query) => $query->where('u.role', 'user'))
                 ->select('m.merchant_id', DB::raw('MAX(u.name) as merchant_name'))
                 ->groupBy('m.merchant_id')
                 ->orderBy('merchant_name')
@@ -302,7 +303,7 @@ class OneSynergyReportController extends Controller
     private function merchantSummaryRows(string $month): array
     {
         $date = Carbon::createFromFormat('Y-m', $month);
-        $merchants = collect($this->merchantOptions());
+        $merchants = collect($this->merchantOptions(true));
 
         if ($merchants->isEmpty()) {
             return [];
@@ -310,6 +311,7 @@ class OneSynergyReportController extends Controller
 
         $mappings = DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
+            ->whereIn('merchant_id', $merchants->pluck('id')->all())
             ->get(['merchant_id', 'campaign_id'])
             ->groupBy(fn ($row) => (string) $row->campaign_id);
 
