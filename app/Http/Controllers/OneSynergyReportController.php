@@ -29,14 +29,30 @@ class OneSynergyReportController extends Controller
         logUserLogin();
         $month = $request->get('month', now()->format('Y-m'));
         $history = $this->monitoringSaldoHistory($month);
+        $canViewIncomingBalance = strcasecmp(trim((string) Auth::user()?->role), '1Synergy') !== 0;
+        if (!$canViewIncomingBalance) {
+            $history['total_in'] = null;
+            $history['remaining_balance'] = null;
+            $history['opening_balance'] = null;
+            $history['ending_balance'] = null;
+            $history['rows'] = array_values(array_filter(
+                $history['rows'],
+                fn ($row) => $row['transaction_type'] === 'Keluar'
+            ));
+            foreach ($history['rows'] as &$row) {
+                $row['amount_in'] = null;
+                $row['running_balance'] = null;
+            }
+            unset($row);
+        }
 
         return view('one_synergy.monitoring_saldo', [
             'pageTitle' => 'Monitoring Saldo 1Synergy',
             'month' => $month,
             'months' => $this->monthOptions($month),
-            'monitoringEmail' => self::MONITORING_EMAIL,
-            'senderId' => self::REFERRAL_SENDER_ID,
-            'canViewIncomingBalance' => true,
+            'monitoringEmail' => $canViewIncomingBalance ? self::MONITORING_EMAIL : null,
+            'senderId' => $canViewIncomingBalance ? self::REFERRAL_SENDER_ID : null,
+            'canViewIncomingBalance' => $canViewIncomingBalance,
             'incomingBalanceNote' => 'Saldo masuk melalui transfer',
             'outgoingBalanceNote' => 'Balance terpakai dari Report 1Synergy',
             'remainingBalance' => $history['remaining_balance'],
