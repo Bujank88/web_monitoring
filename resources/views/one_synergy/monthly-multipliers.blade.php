@@ -13,7 +13,7 @@
 <div class="card">
     <div class="card-header"><h3 class="card-title">Pengali Bulanan 1Synergy</h3></div>
     <div class="card-body">
-        <p>Total Balance Terpakai = (sukses SMS &times; pengali SMS) + (sukses WABA &times; pengali WABA) pada bulan terpilih.</p>
+        <p>Total Balance Terpakai adalah jumlah sukses setiap kategori dan kanal dikalikan pengalinya pada bulan terpilih.</p>
         <form method="GET" action="{{ route('one-synergy.monthly-multipliers') }}" class="mb-4">
             <label for="selectedMonth">Pilih bulan</label>
             <div class="input-group" style="max-width: 380px;">
@@ -24,12 +24,26 @@
         <form method="POST" action="{{ route('one-synergy.monthly-multipliers.store') }}">
             @csrf
             <input type="hidden" name="month" value="{{ $month }}">
-            @foreach(['sms_multiplier' => 'SMS', 'waba_multiplier' => 'WABA'] as $field => $channel)
-            <div class="form-group" style="max-width: 380px;">
-                <label for="{{ $field }}">Pengali {{ $channel }} untuk {{ $month }} (Rp per sukses)</label>
-                <input type="number" id="{{ $field }}" name="{{ $field }}" class="form-control" min="0" max="9999999999999.99" step="0.01" value="{{ old('month') === $month ? old($field, $rates?->{$field}) : $rates?->{$field} }}" required>
+            <h5>Pengali {{ $month }} (Rp per sukses)</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead><tr><th>Kategori</th>@foreach($rateChannels as $label)<th>{{ $label }}</th>@endforeach</tr></thead>
+                    <tbody>
+                        @foreach($rateCategories as $category => $categoryLabel)
+                        <tr>
+                            <th scope="row">{{ $categoryLabel }}</th>
+                            @foreach($rateChannels as $channel => $channelLabel)
+                            @php($field = $category . '_' . $channel . '_multiplier')
+                            <td>
+                                <label class="sr-only" for="{{ $field }}">Pengali {{ $categoryLabel }} {{ $channelLabel }}</label>
+                                <input type="number" id="{{ $field }}" name="{{ $field }}" class="form-control" style="min-width: 130px;" min="0" max="9999999999999.99" step="0.01" value="{{ old('month') === $month ? old($field, $rates?->{$field}) : $rates?->{$field} }}" required>
+                            </td>
+                            @endforeach
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            @endforeach
             <p class="text-muted">Perubahan langsung digunakan pada ringkasan report bulan tersebut.</p>
             <button type="submit" class="btn btn-primary">Simpan Pengali</button>
         </form>
@@ -39,18 +53,22 @@
     <div class="card-header"><h3 class="card-title">Daftar Pengali Bulanan</h3></div>
     <div class="card-body table-responsive">
         <table class="table table-bordered">
-            <thead><tr><th>Bulan</th><th>Pengali SMS</th><th>Pengali WABA</th><th>Terakhir diubah</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>Bulan</th>@foreach($rateCategories as $categoryLabel)@foreach($rateChannels as $channelLabel)<th>{{ $categoryLabel }} {{ $channelLabel }}</th>@endforeach @endforeach<th>Terakhir diubah</th><th>Aksi</th></tr></thead>
             <tbody>
                 @forelse($settings as $setting)
                 <tr>
                     <td>{{ $setting->month }}</td>
-                    <td>{{ number_format($setting->sms_multiplier, 2, ',', '.') }}</td>
-                    <td>{{ $setting->waba_multiplier === null ? 'Belum diatur' : number_format($setting->waba_multiplier, 2, ',', '.') }}</td>
+                    @foreach($rateCategories as $category => $categoryLabel)
+                    @foreach($rateChannels as $channel => $channelLabel)
+                    @php($field = $category . '_' . $channel . '_multiplier')
+                    <td>{{ $setting->{$field} === null ? 'Belum diatur' : number_format($setting->{$field}, 2, ',', '.') }}</td>
+                    @endforeach
+                    @endforeach
                     <td>{{ $setting->updated_at }}</td>
                     <td><a class="btn btn-sm btn-outline-primary" href="{{ route('one-synergy.monthly-multipliers', ['month' => $setting->month]) }}">Edit</a></td>
                 </tr>
                 @empty
-                <tr><td colspan="5" class="text-center">Belum ada pengali yang diatur.</td></tr>
+                <tr><td colspan="9" class="text-center">Belum ada pengali yang diatur.</td></tr>
                 @endforelse
             </tbody>
         </table>
