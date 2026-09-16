@@ -187,7 +187,6 @@
                                 <th>Failed</th>
                                 <th>Read</th>
                                 <th>Click</th>
-                                <th>Total Harga</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -241,8 +240,7 @@
                 { data: 'success', name: 'cr.sukses' },
                 { data: 'failed', name: 'cr.gagal' },
                 { data: 'read', name: 'cr.read' },
-                { data: 'click', name: 'cr.click' },
-                { data: 'total_harga', name: 'cr.total_harga' }
+                { data: 'click', name: 'cr.click' }
             ],
             order: [[0, 'desc']],
             pageLength: 25,
@@ -272,7 +270,7 @@
                 $('#countSuccessWaba').text(new Intl.NumberFormat('id-ID').format(summary.total_success_waba || 0));
                 $('#countFailedSms').text(new Intl.NumberFormat('id-ID').format(summary.total_failed_sms || 0));
                 $('#countFailedWaba').text(new Intl.NumberFormat('id-ID').format(summary.total_failed_waba || 0));
-                $('#countTotalBalance').text(formatRupiah(summary.total_harga || 0));
+                $('#countTotalBalance').text(summary.total_harga == null ? 'Belum diatur' : formatRupiah(summary.total_harga));
             }
         });
 

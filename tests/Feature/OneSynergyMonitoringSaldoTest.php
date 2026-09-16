@@ -100,21 +100,11 @@ class OneSynergyMonitoringSaldoTest extends TestCase
         $user->forceFill(['id' => 1, 'name' => 'Synergy', 'email' => 'synergy@example.com', 'role' => '1synergy']);
         $this->actingAs($user);
         $request = \Illuminate\Http\Request::create('/', 'GET', ['month' => '2026-09']);
-        $restricted = $controller->monitoringSaldo($request)->getData();
-        $this->assertFalse($restricted['canViewIncomingBalance']);
-        $this->assertNull($restricted['totalIn']);
-        $this->assertNull($restricted['remainingBalance']);
-        $this->assertNull($restricted['openingBalance']);
-        $this->assertEquals(15000000, $restricted['totalOut']);
-        $this->assertNull($restricted['endingBalance']);
-        $this->assertNull($restricted['monitoringEmail']);
-        $this->assertNull($restricted['senderId']);
-        $this->assertCount(1, $restricted['historyRows']);
-        $this->assertSame([0], array_keys($restricted['historyRows']));
-        foreach ($restricted['historyRows'] as $row) {
-            $this->assertSame('Keluar', $row['transaction_type']);
-            $this->assertNull($row['amount_in']);
-            $this->assertNull($row['running_balance']);
+        try {
+            $controller->monitoringSaldo($request);
+            $this->fail('1Synergy must not access Monitoring Saldo.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
         }
 
         $user->role = 'Admin';

@@ -519,6 +519,8 @@ Route::middleware(['auth', 'checkrole:Admin,1Synergy'])->group(function () {
 
 Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
     Route::post('/one-synergy/referral-topup/update-myads-invoice', [OneSynergyReportController::class, 'updateMyadsInvoice'])->name('one-synergy.referral-topup.update-myads-invoice');
+    Route::get('/one-synergy/monthly-multipliers', [OneSynergyReportController::class, 'monthlyMultipliers'])->name('one-synergy.monthly-multipliers');
+    Route::post('/one-synergy/monthly-multipliers', [OneSynergyReportController::class, 'saveMonthlyMultiplier'])->name('one-synergy.monthly-multipliers.store');
     Route::get('/one-synergy/referrals', [OneSynergyReportController::class, 'referralIndex'])->name('one-synergy.referrals');
     Route::get('/one-synergy/referrals/data', [OneSynergyReportController::class, 'referralData'])->name('one-synergy.referrals.data');
     Route::get('/one-synergy/referrals/generate', [OneSynergyReportController::class, 'generateReferralCode'])->name('one-synergy.referrals.generate');

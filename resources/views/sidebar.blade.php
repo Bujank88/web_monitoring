@@ -349,13 +349,6 @@
                 @elseif($isOneSynergy)
                 <li class="nav-header">1SYNERGY REPORTING</li>
                 <li class="nav-item">
-                    <a href="{{ route('one-synergy.monitoring-saldo') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('one-synergy.monitoring-saldo') ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-scale-balanced" style="color:#60a5fa;"></i>
-                        <p>Monitoring Saldo</p>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a href="{{ route('one-synergy.report') }}"
                         class="nav-link waves-effect {{ request()->routeIs('one-synergy.report*') ? 'active' : '' }}">
                         <i class="nav-icon fa-solid fa-chart-column" style="color:#60a5fa;"></i>
@@ -1374,6 +1367,13 @@
                                 class="nav-link waves-effect {{ request()->routeIs('one-synergy.merchant-summary*') ? 'active' : '' }}" style="padding-left: 45px;">
                                 <i class="nav-icon fa-solid fa-chart-pie" style="color:#34d399;"></i>
                                 <p>Summary Merchant</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('one-synergy.monthly-multipliers') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('one-synergy.monthly-multipliers*') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-calculator" style="color:#fbbf24;"></i>
+                                <p>Pengali Bulanan</p>
                             </a>
                         </li>
                         <li class="nav-item">
