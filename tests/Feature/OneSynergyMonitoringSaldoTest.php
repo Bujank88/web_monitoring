@@ -88,5 +88,42 @@ class OneSynergyMonitoringSaldoTest extends TestCase
         $this->assertEquals(15000000, $spent['total_out']);
         $this->assertEquals(85000000, $spent['ending_balance']);
         $this->assertEquals(85000000, $spent['remaining_balance']);
+
+        Schema::create('loglogin', function (Blueprint $table) {
+            $table->integer('user_id');
+            foreach (['tgl', 'nama', 'role', 'email'] as $column) {
+                $table->string($column)->nullable();
+            }
+            $table->timestamps();
+        });
+        $user = new \App\Models\User();
+        $user->forceFill(['id' => 1, 'name' => 'Synergy', 'email' => 'synergy@example.com', 'role' => '1synergy']);
+        $this->actingAs($user);
+        $request = \Illuminate\Http\Request::create('/', 'GET', ['month' => '2026-09']);
+        $restricted = $controller->monitoringSaldo($request)->getData();
+        $this->assertFalse($restricted['canViewIncomingBalance']);
+        $this->assertNull($restricted['totalIn']);
+        $this->assertNull($restricted['remainingBalance']);
+        $this->assertNull($restricted['openingBalance']);
+        $this->assertEquals(15000000, $restricted['totalOut']);
+        $this->assertNull($restricted['endingBalance']);
+        $this->assertNull($restricted['monitoringEmail']);
+        $this->assertNull($restricted['senderId']);
+        $this->assertCount(1, $restricted['historyRows']);
+        $this->assertSame([0], array_keys($restricted['historyRows']));
+        foreach ($restricted['historyRows'] as $row) {
+            $this->assertSame('Keluar', $row['transaction_type']);
+            $this->assertNull($row['amount_in']);
+            $this->assertNull($row['running_balance']);
+        }
+
+        $user->role = 'Admin';
+        $admin = $controller->monitoringSaldo($request)->getData();
+        $this->assertTrue($admin['canViewIncomingBalance']);
+        $this->assertEquals(100000000, $admin['totalIn']);
+        $this->assertEquals(85000000, $admin['remainingBalance']);
+        $this->assertCount(2, $admin['historyRows']);
+        $this->assertEquals(0, $admin['openingBalance']);
+        $this->assertEquals(85000000, $admin['endingBalance']);
     }
 }
