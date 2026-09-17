@@ -242,7 +242,7 @@
                     </div>
                     <div class="form-group" id="referral_code_group" style="display: none;">
                         <label for="referral_code">Referral Code</label>
-                        <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Untuk AM: AM1 sampai AM8">
+                        <input type="text" class="form-control" id="referral_code" name="referral_code" placeholder="Untuk AM: AM1 sampai AM15">
                     </div>
                     
                     {{-- <div class="form-group" id="treg_group" style="display: none;">
