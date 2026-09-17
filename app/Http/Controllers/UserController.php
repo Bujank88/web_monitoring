@@ -114,7 +114,7 @@ class UserController extends Controller
                 'nullable', 'string', 'max:255',
                 Rule::requiredIf(fn () => $request->role === 'AM'),
                 function ($attribute, $value, $fail) use ($request, $id) {
-                    if ($request->role === 'AM' && !preg_match('/^AM[1-15]$/i', trim((string) $value))) {
+                    if ($request->role === 'AM' && !preg_match('/^AM(?:[1-9]|1[0-5])$/i', trim((string) $value))) {
                         $fail('Referral Code untuk role AM harus AM1 sampai 15.');
                     }
                     if ($value && DB::table('users')->where('id', '!=', $id)->whereRaw('UPPER(referral_code) = ?', [strtoupper(trim($value))])->exists()) {
