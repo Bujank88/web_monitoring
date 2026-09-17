@@ -14,7 +14,7 @@ class AmReferral extends Model
     public function scopeActiveAm($query)
     {
         return $query->whereRaw('UPPER(role) = ?', ['AM'])
-            ->whereIn(DB::raw('UPPER(referral_code)'), ['AM1', 'AM2', 'AM3', 'AM4', 'AM5', 'AM6', 'AM7', 'AM8'])
+            ->whereIn(DB::raw('UPPER(referral_code)'), ['AM1', 'AM2', 'AM3', 'AM4', 'AM5', 'AM6', 'AM7', 'AM8', 'AM9', 'AM10', 'AM11', 'AM12', 'AM13', 'AM14', 'AM15'])
             ->where('status', 'Aktif');
     }
 }
