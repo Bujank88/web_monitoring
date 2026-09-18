@@ -1,0 +1,447 @@
+@extends('master')
+
+@section('title', 'Powerhouse 2M - Input Leads')
+
+@section('css')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .card-title { font-weight: bold; }
+    .form-group label { font-weight: 600; font-size: 14px; color: #333; }
+    .form-control {
+        border: 2px solid #e0e0e0 !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+    .form-control:focus {
+        border-color: #17a2b8 !important;
+        box-shadow: 0 0 0 0.2rem rgba(23, 162, 184, 0.25) !important;
+        background-color: #f8ffff;
+    }
+    input[type="date"],
+    input[type="time"] {
+        cursor: pointer;
+        padding: 10px 12px !important;
+        font-size: 14px;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        margin-right: 8px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover,
+    input[type="time"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+    }
+    .select2-container .select2-selection--single {
+        height: 40px !important;
+        padding: 8px 12px !important;
+        border: 2px solid #e0e0e0 !important;
+        border-radius: 8px !important;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        background-color: #fff;
+    }
+    .d-flex.gap-3 > label {
+        cursor: pointer;
+        user-select: none;
+    }
+    .text-danger { font-size: 13px; }
+    .modal-header {
+        border-radius: 8px 8px 0 0 !important;
+        padding: 1.5rem !important;
+    }
+    .modal-body {
+        padding: 2rem !important;
+    }
+    .modal-footer {
+        padding: 1.5rem !important;
+        background-color: #f8f9fa;
+        border-top: 1px solid #e0e0e0;
+    }
+    .btn {
+        border-radius: 6px !important;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .btn-info {
+        background-color: #17a2b8 !important;
+        border-color: #17a2b8 !important;
+    }
+    .btn-info:hover,
+    .btn-primary:hover,
+    .btn-secondary:hover {
+        transform: translateY(-2px);
+    }
+    #scheduleStatus {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    #scheduleStatus .text-success {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 6px 12px;
+        border-radius: 20px;
+        display: inline-block;
+    }
+    .card {
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+    .card-header {
+        background-color: #6f42c1 !important;
+        border-radius: 8px 8px 0 0 !important;
+    }
+</style>
+@endsection
+
+@section('content')
+<div class="card card-primary">
+    <div class="card-header">
+        <h3 class="card-title">Input Leads 2M</h3>
+    </div>
+
+    <div class="card-body">
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                <strong>Data belum bisa disimpan.</strong>
+                <ul class="mb-0 mt-2 pl-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        <form action="{{ route('powerhouse.2m.store') }}" method="POST" enctype="multipart/form-data" id="formPowerhouse2MLead">
+            @csrf
+
+            <input type="hidden" id="schedule_lokasi" name="schedule_lokasi">
+            <input type="hidden" id="schedule_tanggal" name="schedule_tanggal">
+            <input type="hidden" id="schedule_waktu_mulai" name="schedule_waktu_mulai">
+            <input type="hidden" id="schedule_waktu_selesai" name="schedule_waktu_selesai">
+            <input type="hidden" id="schedule_keterangan" name="schedule_keterangan">
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>User Canvasser</label>
+                        <input type="text" class="form-control" value="{{ auth()->user()->name }}" disabled>
+                        <input type="hidden" name="user_id" value="{{ auth()->id() }}">
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="source_id">Source Leads</label>
+                        <select name="source_id" id="source_id" class="form-control select2" required>
+                            @foreach ($leadSources as $ls)
+                                <option value="{{ $ls->id }}" {{ old('source_id') == $ls->id ? 'selected' : '' }}>
+                                    {{ $ls->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('source_id')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="company_name">Nama Perusahaan / Instansi</label>
+                        <input type="text" id="company_name" name="company_name" class="form-control"
+                            placeholder="Masukkan nama perusahaan atau instansi" value="{{ old('company_name') }}">
+                        @error('company_name')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="mobile_phone">No HP Pelanggan</label>
+                        <input type="text" id="mobile_phone" name="mobile_phone" class="form-control"
+                            placeholder="Masukkan nomor HP pelanggan" value="{{ old('mobile_phone') }}">
+                        @error('mobile_phone')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="email">Email Pelanggan</label>
+                        <input type="email" id="email" name="email" class="form-control"
+                            placeholder="Masukkan email pelanggan" value="{{ old('email') }}">
+                        @error('email')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="nama">Nama Pelanggan</label>
+                        <input type="text" id="nama" name="nama" class="form-control"
+                            placeholder="Masukkan nama pelanggan" value="{{ old('nama') }}">
+                        @error('nama')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="sector_id">Sector</label>
+                        <select name="sector_id" id="sector_id" class="form-control select2" required>
+                            @foreach ($sectors as $sector)
+                                <option value="{{ $sector->id }}" {{ old('sector_id') == $sector->id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('sector_id')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="myads_account">Akun MyAds</label>
+                        <input type="text" id="myads_account" name="myads_account" class="form-control"
+                            placeholder="Masukkan Akun MyAds" value="{{ old('myads_account') }}">
+                        <small class="text-danger">*) Diisi jika sudah register akun MyAds</small>
+                        @error('myads_account')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="usecase">Usecase</label>
+                        <textarea id="usecase" name="usecase" class="form-control" rows="4"
+                            placeholder="Masukkan usecase lead 2M">{{ old('usecase') }}</textarea>
+                        @error('usecase')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC']))
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-group">
+                        <label class="d-block">Jadwal Kunjungan</label>
+                        <button type="button" class="btn btn-info" id="btnScheduleVisit" data-toggle="modal" data-target="#modalScheduleVisit">
+                            <i class="fas fa-calendar-plus"></i> Atur Jadwal Kunjungan
+                        </button>
+                        <span id="scheduleStatus" class="ml-2 text-muted">Belum diatur</span>
+                        <small class="text-danger">*) Wajib Diisi sebelum menambahkan Leads 2M</small>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-group d-flex gap-2">
+                        <a href="{{ route('powerhouse.2m.summary') }}" class="btn btn-secondary flex-grow-1 m-1">Kembali</a>
+                        <button type="submit" class="btn btn-primary flex-grow-1 m-1">Simpan</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+<div class="modal fade" id="modalScheduleVisit" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-calendar-check mr-2"></i>Atur Jadwal Kunjungan
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="modalScheduleLokasi"><i class="fas fa-map-marker-alt text-info mr-2"></i>Lokasi Kunjungan</label>
+                            <input type="text" id="modalScheduleLokasi" class="form-control" placeholder="Masukkan lokasi kunjungan" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="modalScheduleDate"><i class="fas fa-calendar-alt text-info mr-2"></i>Tanggal Kunjungan</label>
+                            <input type="date" id="modalScheduleDate" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="modalScheduleTimeStart"><i class="fas fa-clock text-info mr-2"></i>Waktu Mulai</label>
+                            <input type="time" id="modalScheduleTimeStart" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="modalScheduleTimeEnd"><i class="fas fa-clock text-info mr-2"></i>Waktu Selesai</label>
+                            <input type="time" id="modalScheduleTimeEnd" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="modalScheduleKeterangan"><i class="fas fa-pen-fancy text-info mr-2"></i>Keterangan Kunjungan</label>
+                            <textarea id="modalScheduleKeterangan" class="form-control" rows="3"
+                                placeholder="Tambahkan keterangan kunjungan (opsional)"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-info" id="btnSaveSchedule">
+                    <i class="fas fa-check mr-2"></i>Simpan Jadwal
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section('js')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('.select2').select2({
+            placeholder: "-- Pilih --",
+            allowClear: true,
+            width: '100%'
+        });
+
+        const today = new Date().toISOString().split('T')[0];
+        $('#modalScheduleDate').attr('min', today);
+
+        const requiresSchedule = {{ (auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC'])) ? 'true' : 'false' }};
+
+        $('#btnScheduleVisit').on('click', function() {
+            $('#modalScheduleLokasi').val($('#schedule_lokasi').val());
+            $('#modalScheduleDate').val($('#schedule_tanggal').val());
+            $('#modalScheduleTimeStart').val($('#schedule_waktu_mulai').val());
+            $('#modalScheduleTimeEnd').val($('#schedule_waktu_selesai').val());
+            $('#modalScheduleKeterangan').val($('#schedule_keterangan').val());
+        });
+
+        $('#btnSaveSchedule').on('click', function() {
+            const lokasi = $('#modalScheduleLokasi').val();
+            const tanggal = $('#modalScheduleDate').val();
+            const waktuMulai = $('#modalScheduleTimeStart').val();
+            const waktuSelesai = $('#modalScheduleTimeEnd').val();
+            const keterangan = $('#modalScheduleKeterangan').val();
+
+            if (!lokasi || !tanggal || !waktuMulai || !waktuSelesai) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data Tidak Lengkap',
+                    html: 'Mohon isi <strong>lokasi, tanggal, dan waktu kunjungan</strong>',
+                    confirmButtonColor: '#17a2b8',
+                    confirmButtonText: 'Mengerti'
+                });
+                return;
+            }
+
+            $('#schedule_lokasi').val(lokasi);
+            $('#schedule_tanggal').val(tanggal);
+            $('#schedule_waktu_mulai').val(waktuMulai);
+            $('#schedule_waktu_selesai').val(waktuSelesai);
+            $('#schedule_keterangan').val(keterangan);
+
+            const dateObj = new Date(tanggal);
+            const dateStr = dateObj.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            $('#scheduleStatus').html(`<span class="text-success"><i class="fas fa-check-circle"></i> ${dateStr} ${waktuMulai}-${waktuSelesai}</span>`);
+
+            $('#modalScheduleVisit').modal('hide');
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Jadwal Berhasil Disimpan',
+                html: `Jadwal kunjungan ke <strong>${lokasi}</strong> pada <strong>${dateStr}</strong> telah diatur`,
+                timer: 2000,
+                timerProgressBar: true,
+                confirmButtonColor: '#17a2b8',
+                showConfirmButton: false
+            });
+        });
+
+        $('#formPowerhouse2MLead').on('submit', function(e) {
+            const tanggal = $('#schedule_tanggal').val();
+            const waktuMulai = $('#schedule_waktu_mulai').val();
+            const waktuSelesai = $('#schedule_waktu_selesai').val();
+
+            if (requiresSchedule && (!tanggal || !waktuMulai || !waktuSelesai)) {
+                e.preventDefault();
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Jadwal Kunjungan Belum Diatur',
+                    html: 'Anda <strong>harus mengatur jadwal kunjungan</strong> terlebih dahulu sebelum menyimpan leads',
+                    confirmButtonColor: '#17a2b8',
+                    confirmButtonText: 'Atur Jadwal Sekarang'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $('#modalScheduleVisit').modal('show');
+                    }
+                });
+                return false;
+            }
+
+            $('button[type="submit"]').prop('disabled', true).text('Menyimpan...');
+        });
+    });
+</script>
+@endsection

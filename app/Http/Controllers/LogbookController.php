@@ -385,8 +385,8 @@ class LogbookController extends Controller
                     ->whereYear('report_balance_top_up.tgl_transaksi', $year);
                 })
             ->where(function ($q) {
-                $q->whereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%leads ramadhan 2026%'])
-                ->orWhereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%existing ramadhan 2026%']);
+                $q->whereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%leads april 2026%'])
+                ->orWhereRaw("LOWER(leads_master.flag_event) LIKE ?", ['%eksisting april 2026%']);
             })
             ->select([
                 'leads_master.id',
@@ -471,8 +471,8 @@ class LogbookController extends Controller
             $plan = (float) ($row->plan_min_topup ?? 0);
             $realisasi = (float) ($row->total_settlement_klien ?? 0);
 
-            $isLeadsRamadhan = str_contains($flagEvent, 'leads ramadhan 2026');
-            $isExistingRamadhan = str_contains($flagEvent, 'existing ramadhan 2026');
+            $isLeadsRamadhan = str_contains($flagEvent, 'leads april 2026');
+            $isExistingRamadhan = str_contains($flagEvent, 'eksisting april 2026');
             $isEksistingAkun = ($dataType === 'eksisting akun');
 
             if ($isExistingRamadhan) {

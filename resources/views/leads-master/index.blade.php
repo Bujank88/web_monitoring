@@ -153,16 +153,16 @@
     <h5><i class="fas fa-filter"></i> FILTER DATA LEADS</h5>
     
     <div class="filter-row">
-        @if(Auth::user()->role != 'cvsr')
+        @if(Auth::user()->hasRole(['Admin', 'AM Leader']))
         <div class="filter-group">
-            <label for="filter_canvasser">Canvasser</label>
+            <label for="filter_canvasser">User / Role</label>
             <select id="filter_canvasser" class="form-control select2">
-                <option value="">Semua Canvasser</option>
+                <option value="">Semua User</option>
                 @foreach($canvassers as $c)
-                    <option value="{{ $c->id }}">{{ $c->name }}</option>
+                    <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->role }})</option>
                 @endforeach
             </select>
-            <small>Pilih canvasser untuk memfilter canvasser</small>
+            <small>Pilih user berdasarkan nama dan role</small>
         </div>
         @endif
 
@@ -178,6 +178,38 @@
             <small>Pilih regional untuk memfilter regional</small>
         </div>
         @endif
+
+        <div class="filter-group">
+            <label for="filter_flag_event">Flag Event</label>
+            <select id="filter_flag_event" class="form-control select2">
+                <option value="">Semua Flag Event</option>
+                @foreach($flagEvents as $flagEvent)
+                    <option value="{{ $flagEvent }}">{{ $flagEvent }}</option>
+                @endforeach
+            </select>
+            <small>Pilih flag event untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter_data_type">Tipe Data</label>
+            <select id="filter_data_type" class="form-control select2">
+                <option value="">Semua Tipe Data</option>
+                @foreach($dataTypes as $dataType)
+                    <option value="{{ $dataType }}">{{ $dataType }}</option>
+                @endforeach
+            </select>
+            <small>Pilih tipe data untuk memfilter data</small>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter_rekomendasi">Rekomendasi</label>
+            <select id="filter_rekomendasi" class="form-control select2">
+                <option value="">Semua Rekomendasi</option>
+                <option value="Push Campaign">Push Campaign</option>
+                <option value="Push Topup">Push Topup</option>
+            </select>
+            <small>Pilih rekomendasi untuk memfilter data</small>
+        </div>
 
         <div class="filter-group">
             <label for="start_date">Tanggal Mulai</label>
@@ -211,12 +243,14 @@
             <table class="table table-bordered table-sm" id="leadsMasterTable">
                 <thead class="bg-dark text-white">
                     <tr>
-                        <th>Canvasser</th>
+                        <th>User</th>
+                        <th>Role</th>
                         <th>Regional</th>
                         <th>Nama Perusahaan</th>
                         <th>Email</th>
                         <th>No HP</th>
                         <th>Tipe Data</th>
+                        <th>Flag Event</th>
                         <th>Tanggal</th>
                         <th>Total Settlement ({{now()->translatedFormat('F Y')}})</th>
                         <th>Saldo Utama</th>
@@ -341,6 +375,9 @@ $(function () {
                 d.start_date = $('#start_date').val();
                 d.end_date   = $('#end_date').val();
                 d.regional = $('#filter_regional').val();
+                d.flag_event = $('#filter_flag_event').val();
+                d.data_type = $('#filter_data_type').val();
+                d.rekomendasi = $('#filter_rekomendasi').val();
             },
             beforeSend: function() {
                 showLoading();
@@ -350,16 +387,18 @@ $(function () {
             }
         },
         columns: [
-            { data: 'user_name', searchable: true },
-            { data: 'regional', searchable: true },
-            { data: 'company_name', searchable: true },
-            { data: 'email', searchable: true },
-            { data: 'mobile_phone', searchable: true },
-            { data: 'data_type', searchable: false },
-            { data: 'created_at', searchable: false },
-            { data: 'total_settlement_klien', searchable: false },
-            { data: 'saldo_utama', searchable: false },
-            { data: 'rekomendasi', searchable: false },
+            { data: 'user_name', name: 'dls.user_name', searchable: true },
+            { data: 'user_role', name: 'filter_user.role', searchable: true },
+            { data: 'regional', name: 'dls.regional', searchable: true },
+            { data: 'company_name', name: 'dls.company_name', searchable: true },
+            { data: 'email', name: 'dls.email', searchable: true },
+            { data: 'mobile_phone', name: 'dls.mobile_phone', searchable: true },
+            { data: 'data_type', name: 'dls.data_type', searchable: false },
+            { data: 'flag_event', name: 'dls.flag_event', searchable: true },
+            { data: 'created_at', name: 'dls.created_at', searchable: false },
+            { data: 'total_settlement_klien', name: 'dls.total_settlement_klien', searchable: false },
+            { data: 'saldo_utama', name: 'dls.saldo_utama', searchable: false },
+            { data: 'rekomendasi', name: 'rekomendasi', searchable: false },
             { data: 'aksi', orderable: false, searchable: false }
         ]
     });
@@ -370,6 +409,18 @@ $(function () {
     });
 
     $('#filter_regional').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_flag_event').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_data_type').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#filter_rekomendasi').on('change', function () {
         table.ajax.reload();
     });
 
@@ -407,7 +458,10 @@ $(function () {
             start_date: $('#start_date').val(),
             end_date: $('#end_date').val(),
             canvasser: $('#filter_canvasser').val(),
-            regional: $('#filter_regional').val()
+            regional: $('#filter_regional').val(),
+            flag_event: $('#filter_flag_event').val(),
+            data_type: $('#filter_data_type').val(),
+            rekomendasi: $('#filter_rekomendasi').val()
         };
 
         let query = $.param(params);
