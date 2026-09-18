@@ -100,8 +100,11 @@ class BackController extends Controller
         $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
         
         if (!empty($allTeamUserIds)) {
+            // Email columns use case-insensitive *_unicode_ci collations.
+            // Compare columns directly so the database can use their email indexes;
+            // wrapping both sides in LOWER() forces expensive scans of leads.
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->where('rp.tgl_transaksi', '>=', $startDateFormatted)
@@ -121,10 +124,10 @@ class BackController extends Controller
 
             $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                 ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                    $join->on('dt.email', '=', 'rp.email_client')
                         ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                 })
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
@@ -144,9 +147,9 @@ class BackController extends Controller
                 ->keyBy('user_id');
 
             $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                 ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                    $join->on('dt.email', '=', 'rp.email_client')
                         ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                 })
                 ->whereIn('lm.user_id', $allTeamUserIds)
@@ -174,7 +177,7 @@ class BackController extends Controller
             $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
 
             $momByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->where('rp.tgl_transaksi', '>=', $prevMonthStart)
@@ -191,7 +194,7 @@ class BackController extends Controller
 
             if (Schema::hasTable('saldo_transfer')) {
                 $saldoTransferStatsByUser = DB::table('saldo_transfer as st')
-                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'st.email_client', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('st.tgl_transaksi', '>=', $startDateFormatted)
                     ->where('st.tgl_transaksi', '<', $endDateExclusive)
@@ -210,10 +213,10 @@ class BackController extends Controller
 
                 $saldoTransferNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('saldo_transfer as st', function ($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                        $join->on('dt.email', '=', 'st.email_client')
                             ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                     })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('dt.status', 'APPROVE')
                     ->whereBetween(
@@ -233,10 +236,10 @@ class BackController extends Controller
 
                 $saldoTransferExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('saldo_transfer as st', function ($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                        $join->on('dt.email', '=', 'st.email_client')
                             ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                     })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('dt.status', 'APPROVE')
                     ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
@@ -252,7 +255,7 @@ class BackController extends Controller
                     ->keyBy('user_id');
 
                 $saldoTransferMomByUser = DB::table('saldo_transfer as st')
-                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'st.email_client', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('st.tgl_transaksi', '>=', $prevMonthStart)
                     ->where('st.tgl_transaksi', '<', $momReference->copy()->addDay()->startOfDay())
