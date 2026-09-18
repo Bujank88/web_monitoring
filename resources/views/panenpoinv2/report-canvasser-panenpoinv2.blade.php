@@ -599,7 +599,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 @if(($routePrefix ?? '') === 'panenpoinv4')
-<script src="{{ asset('js/panen-poin-report-image.js') }}?v={{ filemtime(public_path('js/panen-poin-report-image.js')) }}"></script>
+@include('panenpoinv2.partials.report-image-script')
 @endif
 <script>
     $(document).ready(function() {

@@ -140,6 +140,10 @@ class PanenPoinV4Test extends TestCase
                     $response->assertSee('01 Sep 2026 - 09 Okt 2026');
                     $response->assertDontSee('Report PanenPoinV2');
                 }
+                if (in_array($page, ['report-canvasser', 'report-ph'], true)) {
+                    $response->assertSee("button.addEventListener('click'", false)
+                        ->assertDontSee('js/panen-poin-report-image.js', false);
+                }
             }
         }
     }
