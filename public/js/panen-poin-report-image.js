@@ -4,20 +4,45 @@ $(function () {
 
     const reportTable = document.getElementById(button.dataset.table);
     const period = document.getElementById(button.dataset.period);
+    if (!reportTable || !period) return;
+
     let loading = true;
     let saving = false;
-    const updateButton = () => { button.disabled = loading || saving; };
+    let failed = false;
+    const updateButton = () => {
+        button.disabled = loading || saving || failed;
+        button.title = failed
+            ? 'Data report gagal dimuat. Pilih ulang periode untuk mencoba kembali.'
+            : loading ? 'Menunggu data report selesai dimuat.' : '';
+    };
+
+    // The helper can load after DataTables has already drawn the report.
+    if ($.fn.dataTable && $.fn.dataTable.isDataTable(reportTable)) {
+        const settings = $(reportTable).DataTable().settings()[0];
+        loading = !settings._bInitComplete || !!(settings.jqXHR && settings.jqXHR.readyState !== 4);
+        failed = !!(settings.jqXHR && settings.jqXHR.readyState === 4 && !settings.json);
+    }
 
     $(reportTable).on('preXhr.dt', function () {
         loading = true;
+        failed = false;
         updateButton();
-    }).on('draw.dt', function () {
+    }).on('draw.dt init.dt', function () {
         loading = false;
         updateButton();
+    }).on('xhr.dt', function (event, settings, json) {
+        failed = !json || !!json.error;
+        if (failed) loading = false;
+        updateButton();
+    }).on('error.dt', function () {
+        loading = false;
+        failed = true;
+        updateButton();
     });
+    updateButton();
 
     button.addEventListener('click', async function () {
-        if (loading || saving) return;
+        if (loading || saving || failed) return;
         saving = true;
         updateButton();
         const originalLabel = button.innerHTML;
