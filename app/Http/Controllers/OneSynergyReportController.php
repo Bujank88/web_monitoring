@@ -23,6 +23,7 @@ class OneSynergyReportController extends Controller
 {
     private const MONITORING_EMAIL = 'arief_azhar@ptkam.co.id';
     private const REFERRAL_SENDER_ID = 'REG-DO-000000662035';
+    private const MERCHANT_WHITELIST = ['CH778899'];
 
     public function monitoringSaldo(Request $request)
     {
@@ -256,6 +257,7 @@ class OneSynergyReportController extends Controller
         try {
             return DB::connection('kam_myads')
                 ->table('merchant_campaign_mappings as m')
+                ->whereIn('m.merchant_id', self::MERCHANT_WHITELIST)
                 ->leftJoin('users as u', 'u.merchant_id', '=', 'm.merchant_id')
                 ->select('m.merchant_id', DB::raw('MAX(u.name) as merchant_name'))
                 ->groupBy('m.merchant_id')
@@ -278,13 +280,15 @@ class OneSynergyReportController extends Controller
 
     private function campaignIdsForMerchant(string $merchantId): array
     {
-        if ($merchantId === '') {
+        if ($merchantId !== '' && !in_array($merchantId, self::MERCHANT_WHITELIST, true)) {
             return [];
         }
 
         return DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
-            ->where('merchant_id', $merchantId)
+            ->whereIn('merchant_id', self::MERCHANT_WHITELIST)
+            ->when($merchantId !== '', fn ($query) => $query->where('merchant_id', $merchantId))
+            ->distinct()
             ->pluck('campaign_id')
             ->map(fn ($id) => (string) $id)
             ->all();
@@ -301,6 +305,8 @@ class OneSynergyReportController extends Controller
 
         $mappings = DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
+            ->whereIn('merchant_id', self::MERCHANT_WHITELIST)
+            ->distinct()
             ->get(['merchant_id', 'campaign_id'])
             ->groupBy(fn ($row) => (string) $row->campaign_id);
 
@@ -310,7 +316,9 @@ class OneSynergyReportController extends Controller
                 $date->copy()->endOfMonth()->format('Y-m-d'),
             ])
             ->whereIn('id_iklan', $mappings->keys()->all())
-            ->get(['id_iklan', 'tgl_tayang', 'total_harga']);
+            ->get(['id_iklan', 'tgl_tayang', 'sukses', 'kategori_iklan', 'tipe_kanal']);
+
+        $monthlyPrices = $this->monthlyPrices($month);
 
         $daily = [];
         $totals = [];
@@ -320,12 +328,13 @@ class OneSynergyReportController extends Controller
 
         foreach ($reports as $report) {
             $day = Carbon::parse($report->tgl_tayang)->format('Y-m-d');
+            $balance = $this->merchantReportBalance($report, $monthlyPrices);
             foreach ($mappings->get((string) $report->id_iklan, collect()) as $mapping) {
                 $merchantId = (string) $mapping->merchant_id;
                 $daily[$day][$merchantId]['campaign'] = ($daily[$day][$merchantId]['campaign'] ?? 0) + 1;
-                $daily[$day][$merchantId]['balance'] = ($daily[$day][$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+                $daily[$day][$merchantId]['balance'] = ($daily[$day][$merchantId]['balance'] ?? 0) + $balance;
                 $totals[$merchantId]['campaign'] = ($totals[$merchantId]['campaign'] ?? 0) + 1;
-                $totals[$merchantId]['balance'] = ($totals[$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+                $totals[$merchantId]['balance'] = ($totals[$merchantId]['balance'] ?? 0) + $balance;
             }
         }
 
@@ -363,22 +372,67 @@ class OneSynergyReportController extends Controller
         return $rows;
     }
 
+    private function merchantReportBalance(OneSynergyCampaignReport $report, ?object $monthlyPrices): float
+    {
+        $category = strtolower(trim((string) $report->kategori_iklan));
+        $type = strtolower(trim((string) $report->tipe_kanal));
+
+        // Uploaded reports can put SMS/WABA in either category or channel.
+        $channel = in_array($category, ['sms', 'waba'], true) ? $category : $type;
+        $campaignType = $channel === $category ? $type : $category;
+        if (!in_array($channel, ['sms', 'waba'], true)) {
+            return 0;
+        }
+
+        $price = $monthlyPrices->{$channel . '_' . $campaignType . '_multiplier'}
+            ?? $monthlyPrices->{$channel . '_multiplier'}
+            ?? 0;
+
+        return (int) $report->sukses * (float) $price;
+    }
+
+    private function monthlyPrices(string $month): ?object
+    {
+        return Schema::hasTable('one_synergy_monthly_multipliers')
+            ? DB::table('one_synergy_monthly_multipliers')->where('month', $month)->first()
+            : null;
+    }
+
     private function baseQuery(Carbon $startDate, Carbon $endDate, string $merchantId = '')
     {
         if (!Schema::hasTable((new OneSynergyCampaignReport())->getTable())) {
             return null;
         }
 
-        // Keep the `cr` alias used by the shared CDSI DataTable column config.
-        $query = OneSynergyCampaignReport::query()->from((new OneSynergyCampaignReport())->getTable() . ' as cr')
+        $prices = $this->monthlyPrices($startDate->format('Y-m'));
+        $channelSql = "CASE WHEN UPPER(TRIM(source.kategori_iklan)) IN ('SMS', 'WABA')
+            THEN UPPER(TRIM(source.kategori_iklan)) ELSE UPPER(TRIM(source.tipe_kanal)) END";
+        $typeSql = "CASE WHEN UPPER(TRIM(source.kategori_iklan)) IN ('SMS', 'WABA')
+            THEN UPPER(TRIM(source.tipe_kanal)) ELSE UPPER(TRIM(source.kategori_iklan)) END";
+        $priceCases = [];
+        $priceBindings = [];
+        foreach (['sms', 'waba'] as $channel) {
+            foreach (['lba', 'broadcast', 'targeted'] as $type) {
+                $priceCases[] = "WHEN ($channelSql) = ? AND ($typeSql) = ? THEN ?";
+                array_push($priceBindings, strtoupper($channel), strtoupper($type),
+                    (float) ($prices->{$channel . '_' . $type . '_multiplier'} ?? $prices->{$channel . '_multiplier'} ?? 0));
+            }
+            $priceCases[] = "WHEN ($channelSql) = ? THEN ?";
+            array_push($priceBindings, strtoupper($channel), (float) ($prices->{$channel . '_multiplier'} ?? 0));
+        }
+        $pricedReports = DB::table((new OneSynergyCampaignReport())->getTable() . ' as source')
+            ->select('source.*')
+            ->selectRaw("($channelSql) as report_channel")
+            ->selectRaw('COALESCE(source.sukses, 0) * (CASE ' . implode(' ', $priceCases) . ' ELSE 0 END) as balance_terpakai', $priceBindings);
+
+        $query = OneSynergyCampaignReport::query()->fromSub($pricedReports, 'cr')
+            ->withCasts(['total_harga' => 'float'])
             ->whereBetween('cr.tgl_tayang', [
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d'),
             ]);
 
-        if ($merchantId !== '') {
-            $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
-        }
+        $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
 
         return $query;
     }
@@ -411,16 +465,16 @@ class OneSynergyReportController extends Controller
             DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
             'cr.read',
             'cr.click',
-            'cr.total_harga'
+            'cr.balance_terpakai as total_harga'
         );
 
         $summaryRow = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_campaign')
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_waba")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'SMS' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_sms")
-            ->selectRaw("SUM(CASE WHEN UPPER(TRIM(cr.tipe_kanal)) = 'WABA' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_waba")
-            ->selectRaw('SUM(COALESCE(cr.total_harga, 0)) as total_harga')
+            ->selectRaw("SUM(CASE WHEN cr.report_channel = 'SMS' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_sms")
+            ->selectRaw("SUM(CASE WHEN cr.report_channel = 'WABA' THEN COALESCE(cr.sukses, 0) ELSE 0 END) as total_success_waba")
+            ->selectRaw("SUM(CASE WHEN cr.report_channel = 'SMS' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_sms")
+            ->selectRaw("SUM(CASE WHEN cr.report_channel = 'WABA' THEN COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0) ELSE 0 END) as total_failed_waba")
+            ->selectRaw('SUM(COALESCE(cr.balance_terpakai, 0)) as total_harga')
             ->first();
 
         $summary = [
@@ -429,7 +483,7 @@ class OneSynergyReportController extends Controller
             'total_success_waba' => (int) ($summaryRow->total_success_waba ?? 0),
             'total_failed_sms' => (int) ($summaryRow->total_failed_sms ?? 0),
             'total_failed_waba' => (int) ($summaryRow->total_failed_waba ?? 0),
-            'total_harga' => (int) ($summaryRow->total_harga ?? 0),
+            'total_harga' => (float) ($summaryRow->total_harga ?? 0),
         ];
 
         return datatables()->of($query)
@@ -464,7 +518,7 @@ class OneSynergyReportController extends Controller
             'cr.id_iklan', 'cr.judul_pesan_iklan', 'cr.operator_seluler',
             'cr.kategori_iklan', 'cr.tipe_kanal', 'cr.sukses as success',
             DB::raw('(COALESCE(cr.gagal, 0) + COALESCE(cr.refunded, 0)) as failed'),
-            'cr.refunded', 'cr.read', 'cr.click', 'cr.total_harga', 'cr.detil_status',
+            'cr.refunded', 'cr.read', 'cr.click', 'cr.balance_terpakai as total_harga', 'cr.detil_status',
             DB::raw('CASE WHEN COALESCE(cr.sukses, 0) > 0 THEN (COALESCE(cr.read, 0) / cr.sukses) * 100 ELSE 0 END as percentage_read'),
             DB::raw('CASE WHEN COALESCE(cr.read, 0) > 0 THEN (COALESCE(cr.click, 0) / cr.read) * 100 ELSE 0 END as percentage_click')
         )->orderByDesc('cr.tgl_tayang')->orderByDesc('cr.id_iklan')->get();
@@ -651,47 +705,52 @@ class OneSynergyReportController extends Controller
         $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
         $targetEmail = strtolower(trim(self::MONITORING_EMAIL));
 
-        $openingIn = (float) DB::table('report_balance_top_up')
-            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->where('tgl_transaksi', '<', $startDate)
-            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
-        $openingOut = (float) DB::table('transaksi_balance_transfer')
-            ->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->where('tanggal', '<', $startDate)
-            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
-        $openingBalance = $openingIn - $openingOut;
-
-        $remainingIn = (float) DB::table('report_balance_top_up')
-            ->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->sum(DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2))'));
-        $remainingOut = (float) DB::table('transaksi_balance_transfer')
-            ->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->sum(DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2))'));
-
-        $incomingRows = DB::table('report_balance_top_up')->select([
+        $incomingRows = DB::table('transaksi_balance_transfer')->select([
             DB::raw("'Masuk' as transaction_type"),
-            DB::raw("'Top Up' as source"),
-            'tgl_transaksi as transaction_datetime',
-            'email_client as reference_email',
-            DB::raw('CAST(COALESCE(amount, 0) AS DECIMAL(15,2)) as amount_in'),
-            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_out'),
-        ])->whereRaw('LOWER(TRIM(email_client)) = ?', [$targetEmail])
-            ->whereBetween('tgl_transaksi', [$startDate, $endDate])->get();
-
-        $outgoingRows = DB::table('transaksi_balance_transfer')->select([
-            DB::raw("'Keluar' as transaction_type"),
             DB::raw("'Balance Transfer' as source"),
             'tanggal as transaction_datetime',
             'email_penerima as reference_email',
-            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_in'),
-            DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2)) as amount_out'),
-        ])->where('id_klien_pengirim', self::REFERRAL_SENDER_ID)
-            ->whereBetween('tanggal', [$startDate, $endDate])->get();
+            DB::raw('CAST(COALESCE(jumlah, 0) AS DECIMAL(15,2)) as amount_in'),
+            DB::raw('CAST(0 AS DECIMAL(15,2)) as amount_out'),
+        ])->whereRaw('LOWER(TRIM(email_penerima)) = ?', [$targetEmail])
+            ->whereRaw('LOWER(TRIM(status)) = ?', ['paid'])
+            ->whereNotNull('tanggal')
+            ->get();
+
+        $reports = Schema::hasTable((new OneSynergyCampaignReport())->getTable())
+            ? OneSynergyCampaignReport::query()->whereNotNull('tgl_tayang')
+                ->whereIn('id_iklan', $this->campaignIdsForMerchant(''))
+                ->get(['tgl_tayang', 'sukses', 'kategori_iklan', 'tipe_kanal'])
+            : collect();
+        $pricesByMonth = [];
+        $outgoingRows = $reports->groupBy(fn ($report) => $report->tgl_tayang->format('Y-m-d'))
+            ->map(function ($dailyReports, $day) use (&$pricesByMonth) {
+                $reportMonth = substr($day, 0, 7);
+                if (!array_key_exists($reportMonth, $pricesByMonth)) {
+                    $pricesByMonth[$reportMonth] = $this->monthlyPrices($reportMonth);
+                }
+
+                return (object) [
+                    'transaction_type' => 'Keluar',
+                    'source' => 'Balance Terpakai Report 1Synergy',
+                    'transaction_datetime' => $day . ' 00:00:00',
+                    'reference_email' => '-',
+                    'amount_in' => 0,
+                    'amount_out' => $dailyReports->sum(fn ($report) => $this->merchantReportBalance($report, $pricesByMonth[$reportMonth])),
+                ];
+            })->values();
+
+        $remainingIn = (float) $incomingRows->sum('amount_in');
+        $remainingOut = (float) $outgoingRows->sum('amount_out');
+        $openingIn = (float) $incomingRows->where('transaction_datetime', '<', $startDate)->sum('amount_in');
+        $openingOut = (float) $outgoingRows->where('transaction_datetime', '<', $startDate)->sum('amount_out');
+        $openingBalance = $openingIn - $openingOut;
 
         $runningBalance = $openingBalance;
         $totalIn = 0;
         $totalOut = 0;
         $rows = $incomingRows->concat($outgoingRows)
+            ->whereBetween('transaction_datetime', [$startDate, $endDate])
             ->sortBy(fn ($row) => Carbon::parse($row->transaction_datetime)->timestamp)
             ->values()
             ->map(function ($row) use (&$runningBalance, &$totalIn, &$totalOut) {

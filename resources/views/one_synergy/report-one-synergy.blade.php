@@ -242,7 +242,7 @@
                 { data: 'failed', name: 'cr.gagal' },
                 { data: 'read', name: 'cr.read' },
                 { data: 'click', name: 'cr.click' },
-                { data: 'total_harga', name: 'cr.total_harga' }
+                { data: 'total_harga', name: 'cr.balance_terpakai' }
             ],
             order: [[0, 'desc']],
             pageLength: 25,
