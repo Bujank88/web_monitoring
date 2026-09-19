@@ -8,6 +8,7 @@ use App\Http\Controllers\GetDataController;
 use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
 use App\Http\Controllers\PanenPoinV3Controller;
+use App\Http\Controllers\PanenPoinV4Controller;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\LogbookController;
 use App\Http\Controllers\LogbookDailyController;
@@ -34,6 +35,12 @@ Artisan::command('panenpoinv3:refresh-summary', function () {
     $payload = method_exists($result, 'getData') ? $result->getData(true) : ['message' => 'Refresh selesai'];
     $this->info($payload['message'] ?? 'Summary Panen Poin V3 berhasil direfresh.');
 })->purpose('Refresh summary Panen Poin V3 untuk periode aktif');
+
+Artisan::command('panenpoinv4:refresh-summary', function () {
+    $result = app(PanenPoinV4Controller::class)->refreshSummaryPanenPoinV4();
+    $payload = method_exists($result, 'getData') ? $result->getData(true) : ['message' => 'Refresh selesai'];
+    $this->info($payload['message'] ?? 'Summary Panen Poin V4 berhasil direfresh.');
+})->purpose('Refresh summary Panen Poin V4 untuk periode aktif');
 
 // // ===== Schedule: Retry send notifikasi presensi yang gagal setiap menit =====
 Schedule::call(function () {
@@ -164,12 +171,8 @@ Schedule::call(function () {
 // })->everyFiveMinutes()->name('refreshSummaryPanenPoin');
 
 Schedule::call(function () {
-    app(PanenPoinV2Controller::class)->refreshSummaryPanenPoinV2();
-})->everyFiveMinutes()->name('refreshSummaryPanenPoinV2');
-
-Schedule::call(function () {
-    app(PanenPoinV3Controller::class)->refreshSummaryPanenPoinV3();
-})->everyFiveMinutes()->name('refreshSummaryPanenPoinV3');
+    app(PanenPoinV4Controller::class)->refreshSummaryPanenPoinV4();
+})->everyFiveMinutes()->name('refreshSummaryPanenPoinV4');
 
 Schedule::call(function () {
     app(AmLevelUpController::class)->refreshSummaryamlevelup();

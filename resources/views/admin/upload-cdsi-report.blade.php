@@ -63,9 +63,9 @@
                 <form action="{{ $uploadAction ?? route('admin.upload.cdsi-report.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="form-group">
-                        <label for="report_file">Pilih File Excel</label>
-                        <input type="file" class="form-control" id="report_file" name="report_file" accept=".xlsx,.xls" required>
-                        <small class="form-text text-muted">Format yang didukung: <code>.xlsx</code> dan <code>.xls</code>, maksimal 10 MB.</small>
+                        <label for="report_file">Pilih File {{ ($acceptCsv ?? false) ? 'Excel / CSV' : 'Excel' }}</label>
+                        <input type="file" class="form-control" id="report_file" name="report_file" accept="{{ ($acceptCsv ?? false) ? '.xlsx,.xls,.csv' : '.xlsx,.xls' }}" required>
+                        <small class="form-text text-muted">Format: .xlsx, .xls{{ ($acceptCsv ?? false) ? ', .csv' : '' }}, maksimal 10 MB.</small>
                     </div>
 
                     <div class="helper-box mb-4">
@@ -74,6 +74,9 @@
                         <a href="{{ $templateFile }}" class="btn btn-outline-primary" target="_blank">
                             <i class="fas fa-file-excel mr-1"></i>Download Template Laporan {{ $brandLabel }}
                         </a>
+                        @isset($csvExample)
+                        <a href="{{ $csvExample }}" class="btn btn-outline-primary mt-2" download>Download Contoh CSV</a>
+                        @endisset
                     </div>
 
                     <button type="submit" class="btn btn-danger">

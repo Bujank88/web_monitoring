@@ -44,6 +44,7 @@
 </div>
 
 <div class="row">
+    @if($canViewIncomingBalance)
     <div class="col-12 mb-3">
         <div class="card one-synergy-saldo-card one-synergy-saldo-highlight">
             <div class="card-body">
@@ -53,16 +54,18 @@
             </div>
         </div>
     </div>
+    @endif
     @php
         $balanceCards = [
-        ['Saldo Awal', $openingBalance, 'text-dark', 'Akumulasi sebelum bulan terpilih'],
-        ['Total Keluar', $totalOut, 'text-danger', 'Balance terpakai dari Report 1Synergy'],
-        ['Saldo Akhir', $endingBalance, 'text-primary', 'Saldo akhir bulan terpilih'],
+        ['Total Keluar', $totalOut, 'text-danger', $outgoingBalanceNote],
         ];
         if ($canViewIncomingBalance) {
-            array_splice($balanceCards, 1, 0, [[
-                'Total Masuk', $totalIn, 'text-success', 'Saldo masuk melalui transfer'
-            ]]);
+            $balanceCards = [
+                ['Saldo Awal', $openingBalance, 'text-dark', 'Akumulasi sebelum bulan terpilih'],
+                ['Total Masuk', $totalIn, 'text-success', $incomingBalanceNote],
+                ...$balanceCards,
+                ['Saldo Akhir', $endingBalance, 'text-primary', 'Saldo akhir bulan terpilih'],
+            ];
         }
     @endphp
     @foreach($balanceCards as [$label, $value, $class, $note])
@@ -83,7 +86,7 @@
     <div class="card-body">
         <div class="table-responsive">
             <table id="oneSynergyMonitoringSaldoTable" class="table table-bordered table-striped one-synergy-history w-100">
-                <thead><tr><th>No</th><th>Tanggal</th><th>Tipe</th><th>Sumber</th><th>Email Reference</th>@if($canViewIncomingBalance)<th>Saldo Masuk</th>@endif<th>Saldo Keluar</th><th>Running Balance</th></tr></thead>
+                <thead><tr><th>No</th><th>Tanggal</th><th>Tipe</th><th>Sumber</th><th>Email Reference</th>@if($canViewIncomingBalance)<th>Saldo Masuk</th>@endif<th>Saldo Keluar</th>@if($canViewIncomingBalance)<th>Running Balance</th>@endif</tr></thead>
                 <tbody>
                     @foreach($historyRows as $index => $row)
                     <tr>
@@ -96,7 +99,9 @@
                         <td>{{ $row['amount_in'] > 0 ? 'Rp ' . number_format($row['amount_in'], 0, ',', '.') : '-' }}</td>
                         @endif
                         <td>{{ $row['amount_out'] > 0 ? 'Rp ' . number_format($row['amount_out'], 0, ',', '.') : '-' }}</td>
+                        @if($canViewIncomingBalance)
                         <td><strong>Rp {{ number_format($row['running_balance'], 0, ',', '.') }}</strong></td>
+                        @endif
                     </tr>
                     @endforeach
                 </tbody>

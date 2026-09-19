@@ -484,6 +484,11 @@
 <!-- Filter Section -->
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+        @if(($routePrefix ?? '') === 'panenpoinv4')
+        <button type="button" class="btn btn-success" id="saveReportImage" data-table="panenPoinPHTable" data-period="filterMonthPH" data-report="Powerhouse" disabled>
+            <i class="fas fa-image mr-1"></i> Save Image
+        </button>
+        @endif
         <select id="filterMonthPH" name="filterMonthPH" class="form-control" style="background-color: #313131; color: white; min-width: 180px; max-width: 200px;">
             @foreach ($months as $month)
             <option value="{{ $month['value'] }}" {{ $month['selected'] ? 'selected' : '' }}>
@@ -494,19 +499,19 @@
     </div>
 </div>
 
-<!-- Report PanenPoinV2 Powerhouse -->
+<!-- Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card" id="panenPoinTableCard">
             <div class="card-header bg-gradient-danger text-white">
-                <h4 class="mb-0"><i class="fas fa-table"></i> Report PanenPoinV2 Powerhouse</h4>
+                <h4 class="mb-0"><i class="fas fa-table"></i> Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse</h4>
             </div>
             <div class="card-body">
                 <div id="capturePanenPoinV2Table" class="table-responsive">
             <table class="table table-sm w-100 table-bordered table-hover" id="panenPoinPHTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PanenPoinV2 Powerhouse | Bulan: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
+                                <th colspan="5" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report {{ $programLabel ?? 'Panen Poin V2' }} Powerhouse | Periode: <span id="displayedMonthPH">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? now()->format('F Y') }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -554,6 +559,9 @@
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+@if(($routePrefix ?? '') === 'panenpoinv4')
+@include('panenpoinv2.partials.report-image-script')
+@endif
 <script>
     $(document).ready(function() {
         // Initialize DataTables

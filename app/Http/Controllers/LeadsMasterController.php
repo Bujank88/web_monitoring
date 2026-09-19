@@ -24,19 +24,19 @@ class LeadsMasterController extends Controller
         logUserLogin();
         return view('leads-master.index', [
             'canvassers' => auth()->user()->role === 'Admin'
-                ? Cache::remember('users_list_leads_with_am_v2', 3600, fn() => User::whereIn('role', ['cvsr', 'PH', 'AM'])->orderBy('name')->get())
+                ? Cache::remember('users_list_leads_with_am_v2', 300, fn() => User::whereIn('role', ['cvsr', 'PH', 'AM'])->orderBy('name')->get())
                 : (auth()->user()->hasRole('AM Leader')
                     ? User::whereRaw('UPPER(role) = ?', ['AM'])->orderBy('name')->get()
                     : collect()),
-            'sources'    => Cache::remember('sources_list_leads', 3600, fn() => LeadsSource::orderBy('name')->get()),
-            'regionals'  => Cache::remember('regionals_list_leads', 3600, fn() => 
+            'sources'    => Cache::remember('sources_list_leads', 300, fn() => LeadsSource::orderBy('name')->get()),
+            'regionals'  => Cache::remember('regionals_list_leads', 300, fn() => 
                 DB::table('regional_provinces')
                     ->select('regional')
                     ->distinct()
                     ->orderBy('regional')
                     ->pluck('regional')
             ),
-            'flagEvents' => Cache::remember('flag_events_list_leads', 3600, fn() =>
+            'flagEvents' => Cache::remember('flag_events_list_leads', 300, fn() =>
                 DB::table('detail_leads_summary')
                     ->whereNotNull('flag_event')
                     ->where('flag_event', '!=', '')
@@ -44,7 +44,7 @@ class LeadsMasterController extends Controller
                     ->orderBy('flag_event')
                     ->pluck('flag_event')
             ),
-            'dataTypes' => Cache::remember('data_types_list_leads_without_enterprise', 3600, fn() =>
+            'dataTypes' => Cache::remember('data_types_list_leads_without_enterprise', 300, fn() =>
                 DB::table('detail_leads_summary')
                     ->whereNotNull('data_type')
                     ->where('data_type', '!=', '')

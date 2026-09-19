@@ -70,6 +70,7 @@ class BackController extends Controller
     ): array {
         $startDateFormatted = $startDate->copy()->startOfDay()->format('Y-m-d');
         $endDateFormatted = $endDate->copy()->endOfDay()->format('Y-m-d');
+        $endDateExclusive = $endDate->copy()->addDay()->startOfDay();
 
         $phUsers = DB::table('users')
             ->where('role', 'PH')
@@ -99,40 +100,34 @@ class BackController extends Controller
         $targetByTeam = collect($targetResolver($phUsers, $startDate, $endDate));
         
         if (!empty($allTeamUserIds)) {
+            // Email columns use case-insensitive *_unicode_ci collations.
+            // Compare columns directly so the database can use their email indexes;
+            // wrapping both sides in LOWER() forces expensive scans of leads.
             $topUpStatsByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->where('rp.tgl_transaksi', '>=', $startDateFormatted)
+                ->where('rp.tgl_transaksi', '<', $endDateExclusive)
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
                     DB::raw("COUNT(rp.id) as top_up_count"),
+                    DB::raw('COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun'),
+                    DB::raw('MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir'),
                     DB::raw("SUM(CAST(rp.amount AS DECIMAL(15,2))) as total_top_up_rp")
                 )
                 ->get()
                 ->keyBy('user_id');
 
-            $topUpAggByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                ->whereIn('lm.user_id', $allTeamUserIds)
-                ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
-                ->groupBy('lm.user_id')
-                ->select(
-                    'lm.user_id',
-                    DB::raw("COUNT(DISTINCT LOWER(rp.email_client)) as jumlah_akun"),
-                    DB::raw("MAX(rp.tgl_transaksi) as tgl_transaksi_terakhir")
-                )
-                ->get()
-                ->keyBy('user_id');
+            $topUpAggByUser = $topUpStatsByUser;
 
             $topUpNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                 ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                    $join->on('dt.email', '=', 'rp.email_client')
                         ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                 })
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
@@ -140,7 +135,8 @@ class BackController extends Controller
                     DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                     [$startDateFormatted, $endDateFormatted]
                 )
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->where('rp.tgl_transaksi', '>=', $startDateFormatted)
+                ->where('rp.tgl_transaksi', '<', $endDateExclusive)
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -151,16 +147,17 @@ class BackController extends Controller
                 ->keyBy('user_id');
 
             $topUpExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
-                ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                 ->join('report_balance_top_up as rp', function ($join) {
-                    $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(rp.email_client)'))
+                    $join->on('dt.email', '=', 'rp.email_client')
                         ->whereRaw("DATE(rp.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                 })
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('dt.status', 'APPROVE')
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
                 ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
-                ->whereBetween(DB::raw("DATE(rp.tgl_transaksi)"), [$startDateFormatted, $endDateFormatted])
+                ->where('rp.tgl_transaksi', '>=', $startDateFormatted)
+                ->where('rp.tgl_transaksi', '<', $endDateExclusive)
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -180,9 +177,11 @@ class BackController extends Controller
             $prevMonthRemainingStart = $prevMonthRef->copy()->addDay()->format('Y-m-d');
 
             $momByUser = DB::table('report_balance_top_up as rp')
-                ->join('leads_master as lm', DB::raw('LOWER(rp.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                ->join('leads_master as lm', 'rp.email_client', '=', 'lm.email')
                 ->whereIn('lm.user_id', $allTeamUserIds)
                 ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+                ->where('rp.tgl_transaksi', '>=', $prevMonthStart)
+                ->where('rp.tgl_transaksi', '<', $momReference->copy()->addDay()->startOfDay())
                 ->groupBy('lm.user_id')
                 ->select(
                     'lm.user_id',
@@ -195,44 +194,37 @@ class BackController extends Controller
 
             if (Schema::hasTable('saldo_transfer')) {
                 $saldoTransferStatsByUser = DB::table('saldo_transfer as st')
-                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'st.email_client', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
-                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->where('st.tgl_transaksi', '>=', $startDateFormatted)
+                    ->where('st.tgl_transaksi', '<', $endDateExclusive)
                     ->groupBy('lm.user_id')
                     ->select(
                         'lm.user_id',
                         DB::raw('COUNT(st.id) as top_up_count'),
+                        DB::raw('COUNT(DISTINCT LOWER(st.email_client)) as jumlah_akun'),
+                        DB::raw('MAX(st.tgl_transaksi) as tgl_transaksi_terakhir'),
                         DB::raw('SUM(CAST(st.amount AS DECIMAL(18,2))) as total_top_up_rp')
                     )
                     ->get()
                     ->keyBy('user_id');
 
-                $saldoTransferAggByUser = DB::table('saldo_transfer as st')
-                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
-                    ->whereIn('lm.user_id', $allTeamUserIds)
-                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
-                    ->groupBy('lm.user_id')
-                    ->select(
-                        'lm.user_id',
-                        DB::raw('COUNT(DISTINCT LOWER(st.email_client)) as jumlah_akun'),
-                        DB::raw('MAX(st.tgl_transaksi) as tgl_transaksi_terakhir')
-                    )
-                    ->get()
-                    ->keyBy('user_id');
+                $saldoTransferAggByUser = $saldoTransferStatsByUser;
 
                 $saldoTransferNewAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('saldo_transfer as st', function ($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                        $join->on('dt.email', '=', 'st.email_client')
                             ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                     })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('dt.status', 'APPROVE')
                     ->whereBetween(
                         DB::raw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')"),
                         [$startDateFormatted, $endDateFormatted]
                     )
-                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->where('st.tgl_transaksi', '>=', $startDateFormatted)
+                    ->where('st.tgl_transaksi', '<', $endDateExclusive)
                     ->groupBy('lm.user_id')
                     ->select(
                         'lm.user_id',
@@ -244,14 +236,15 @@ class BackController extends Controller
 
                 $saldoTransferExistingAkunByUser = DB::table('data_registarsi_status_approveorreject as dt')
                     ->join('saldo_transfer as st', function ($join) {
-                        $join->on(DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(st.email_client)'))
+                        $join->on('dt.email', '=', 'st.email_client')
                             ->whereRaw("DATE(st.tgl_transaksi) >= STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d')");
                     })
-                    ->join('leads_master as lm', DB::raw('LOWER(dt.email)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'dt.email', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
                     ->where('dt.status', 'APPROVE')
                     ->whereRaw("STR_TO_DATE(dt.tanggal_approval_aktivasi, '%Y-%m-%d') < ?", [$startDateFormatted])
-                    ->whereBetween(DB::raw('DATE(st.tgl_transaksi)'), [$startDateFormatted, $endDateFormatted])
+                    ->where('st.tgl_transaksi', '>=', $startDateFormatted)
+                    ->where('st.tgl_transaksi', '<', $endDateExclusive)
                     ->groupBy('lm.user_id')
                     ->select(
                         'lm.user_id',
@@ -262,8 +255,10 @@ class BackController extends Controller
                     ->keyBy('user_id');
 
                 $saldoTransferMomByUser = DB::table('saldo_transfer as st')
-                    ->join('leads_master as lm', DB::raw('LOWER(st.email_client)'), '=', DB::raw('LOWER(lm.email)'))
+                    ->join('leads_master as lm', 'st.email_client', '=', 'lm.email')
                     ->whereIn('lm.user_id', $allTeamUserIds)
+                    ->where('st.tgl_transaksi', '>=', $prevMonthStart)
+                    ->where('st.tgl_transaksi', '<', $momReference->copy()->addDay()->startOfDay())
                     ->groupBy('lm.user_id')
                     ->select(
                         'lm.user_id',
@@ -1785,7 +1780,8 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26',
+            'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30', 'EXTRA31'
         ];
         // Query dengan JOIN (per akun, bukan aggregate)
         $data = DB::table('report_balance_top_up as rb')
@@ -2311,7 +2307,8 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26',
+            'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30', 'EXTRA31'
         ];
         // Mapping voucher code ke nama canvasser
         $canvasserMapping = $this->getCanvasserOwnerMapForMonth($monthStart);
@@ -2386,7 +2383,8 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26',
+            'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30', 'EXTRA31'
         ];
         
         // Mapping voucher code ke nama canvasser
@@ -2466,7 +2464,8 @@ class BackController extends Controller
             'EXTRA6', 'EXTRA7', 'EXTRA8', 'EXTRA9', 'EXTRA10',
             'EXTRA11', 'EXTRA12', 'EXTRA13', 'EXTRA14', 'EXTRA15',
             'EXTRA16', 'EXTRA17', 'EXTRA18', 'EXTRA19', 'EXTRA20',
-            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26'
+            'EXTRA21', 'EXTRA22', 'EXTRA23', 'EXTRA24', 'EXTRA25', 'EXTRA26',
+            'EXTRA27', 'EXTRA28', 'EXTRA29', 'EXTRA30', 'EXTRA31'
         ];
         
         // Mapping voucher code ke nama canvasser
@@ -4318,7 +4317,12 @@ class BackController extends Controller
             'EXTRA23' => '',
             'EXTRA24' => '',
             'EXTRA25' => '',
-            'EXTRA26' => ''
+            'EXTRA26' => '',
+            'EXTRA27' => '',
+            'EXTRA28' => '',
+            'EXTRA29' => '',
+            'EXTRA30' => '',
+            'EXTRA31' => ''
         ];
 
         $historyCodes = DB::table('voucher_owner_history')

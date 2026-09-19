@@ -330,14 +330,14 @@
         <h5 style="margin: 0;"><i class="fas fa-filter"></i> FILTER DATA POIN CANVASSER</h5>
         <div style="background: linear-gradient(87deg, #e74a3b 0, #be2617 100%); color: white; padding: 8px 15px; border-radius: 6px; font-weight: 600; font-size: 14px;">
             <i class="fas fa-calendar-alt mr-2"></i>
-            <strong>Bulan:</strong> 
+            <strong>Periode:</strong>
             <span id="selectedMonth">{{ $months[array_search(true, array_column($months, 'selected'))]['label'] ?? 'Januari 2026' }}</span>
         </div>
     </div>
     
     <div class="filter-row">
         <div class="filter-group">
-            <label for="tanggal">Bulan</label>
+            <label for="tanggal">Periode</label>
             <select id="tanggal" name="tanggal" class="form-control">
                 @foreach ($months as $month)
                 <option value="{{ $month['value'] }}" {{ $month['selected'] ? 'selected' : '' }}>
@@ -345,14 +345,14 @@
                 </option>
                 @endforeach
             </select>
-            <small>Pilih bulan untuk melihat data poin canvasser</small>
+            <small>Pilih periode untuk melihat data poin canvasser</small>
         </div>
 
         <div class="filter-group">
             <label for="source">Source</label>
             <select id="source" name="source" class="form-control">
                 <option value="">Semua Source</option>
-                <option value="{{ ($routePrefix ?? 'panenpoinv2') === 'panenpoinv3' ? 'user_panen_poin_v3' : 'user_panen_poin_v2' }}">User {{ $programLabel ?? 'Panen Poin V2' }}</option>
+                <option value="{{ 'user_panen_poin_' . str_replace('panenpoin', '', ($routePrefix ?? 'panenpoinv2')) }}">User {{ $programLabel ?? 'Panen Poin V2' }}</option>
                 <option value="leads_master">Leads Master</option>
             </select>
             <small>Pilih sumber data untuk memfilter tipe akun</small>
@@ -418,7 +418,7 @@
     <div class="col-12">
         <div class="alert alert-info">
             <i class="fas fa-info-circle mr-2"></i>
-            <strong>Keterangan:</strong> Setiap Rp 250.000 settlement = 1 poin. Data menampilkan bulan berjalan dengan akumulasi poin dari bulan sebelumnya di tahun yang sama.
+            <strong>Keterangan:</strong> Setiap Rp 250.000 settlement = 1 poin. {{ $pointPeriodDescription ?? 'Data menampilkan bulan berjalan dengan akumulasi poin dari bulan sebelumnya di tahun yang sama.' }}
         </div>
     </div>
 </div>
@@ -488,7 +488,7 @@
                 {
                     data: 'source',
                     render: function(data) {
-                        if (data === 'user_panen_poin_v2' || data === 'user_panen_poin_v3') {
+                        if (data === 'user_panen_poin_v2' || data === 'user_panen_poin_v3' || data === 'user_panen_poin_v4') {
                             return '<span class="badge badge-primary"><i class="fas fa-user-edit"></i> {{ $programLabel ?? 'Panen Poin V2' }}</span>';
                         } else {
                             return '<span class="badge badge-secondary"><i class="fas fa-database"></i> Leads Master</span>';

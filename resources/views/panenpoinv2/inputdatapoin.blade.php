@@ -115,7 +115,7 @@
                 Swal.fire({
                     icon: 'info',
                     title: 'Akun Sudah Ada',
-                    html: `{{ session('success') }}<br><br><small class="text-muted">Notifikasi akun telah dikirim ke email dan WhatsApp Anda.</small>`,
+                    html: `{{ session('success') }}@if(($routePrefix ?? 'panenpoinv2') === 'panenpoinv2')<br><br><small class="text-muted">Notifikasi akun telah dikirim ke email dan WhatsApp Anda.</small>@endif`,
                     confirmButtonColor: '#4e73df',
                     timer: 5000,
                     showConfirmButton: true
