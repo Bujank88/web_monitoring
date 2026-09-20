@@ -49,7 +49,7 @@
         <div class="card one-synergy-saldo-card one-synergy-saldo-highlight">
             <div class="card-body">
                 <div class="one-synergy-saldo-label">Sisa Saldo</div>
-                <div class="one-synergy-saldo-value">Rp {{ number_format($remainingBalance, 0, ',', '.') }}</div>
+                <div class="one-synergy-saldo-value">{{ $remainingBalance === null ? '-' : 'Rp ' . number_format($remainingBalance, 0, ',', '.') }}</div>
                 <p class="one-synergy-saldo-note">Akumulasi seluruh histori, tidak mengikuti filter bulan</p>
             </div>
         </div>
@@ -73,7 +73,7 @@
         <div class="card one-synergy-saldo-card h-100">
             <div class="card-body">
                 <div class="one-synergy-saldo-label">{{ $label }}</div>
-                <div class="one-synergy-saldo-value {{ $class }}">Rp {{ number_format($value, 0, ',', '.') }}</div>
+                <div class="one-synergy-saldo-value {{ $class }}">{{ $value === null ? '-' : 'Rp ' . number_format($value, 0, ',', '.') }}</div>
                 <p class="one-synergy-saldo-note">{{ $note }}</p>
             </div>
         </div>
@@ -100,7 +100,7 @@
                         @endif
                         <td>{{ $row['amount_out'] > 0 ? 'Rp ' . number_format($row['amount_out'], 0, ',', '.') : '-' }}</td>
                         @if($canViewIncomingBalance)
-                        <td><strong>Rp {{ number_format($row['running_balance'], 0, ',', '.') }}</strong></td>
+                        <td><strong>{{ $row['running_balance'] === null ? '-' : 'Rp ' . number_format($row['running_balance'], 0, ',', '.') }}</strong></td>
                         @endif
                     </tr>
                     @endforeach

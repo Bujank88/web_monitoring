@@ -21,6 +21,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class OneSynergyReportController extends Controller
 {
+    private const MERCHANT_WHITELIST = ['CH778899'];
     private const MONITORING_EMAIL = 'arief_azhar@ptkam.co.id';
     private const REFERRAL_SENDER_ID = 'REG-DO-000000661407';
     private const RATE_CATEGORIES = ['sms' => 'SMS', 'waba' => 'WABA'];
@@ -267,6 +268,7 @@ class OneSynergyReportController extends Controller
         try {
             return DB::connection('kam_myads')
                 ->table('merchant_campaign_mappings as m')
+                ->whereIn('m.merchant_id', self::MERCHANT_WHITELIST)
                 ->leftJoin('users as u', 'u.merchant_id', '=', 'm.merchant_id')
                 ->when($usersOnly, fn ($query) => $query->where('u.role', 'user'))
                 ->select('m.merchant_id', DB::raw('MAX(u.name) as merchant_name'))
@@ -290,13 +292,15 @@ class OneSynergyReportController extends Controller
 
     private function campaignIdsForMerchant(string $merchantId): array
     {
-        if ($merchantId === '') {
+        if ($merchantId !== '' && !in_array($merchantId, self::MERCHANT_WHITELIST, true)) {
             return [];
         }
 
         return DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
-            ->where('merchant_id', $merchantId)
+            ->whereIn('merchant_id', self::MERCHANT_WHITELIST)
+            ->when($merchantId !== '', fn ($query) => $query->where('merchant_id', $merchantId))
+            ->distinct()
             ->pluck('campaign_id')
             ->map(fn ($id) => (string) $id)
             ->all();
@@ -304,7 +308,7 @@ class OneSynergyReportController extends Controller
 
     private function merchantSummaryRows(string $month): array
     {
-        $date = Carbon::createFromFormat('Y-m', $month);
+        $date = Carbon::createFromFormat('!Y-m', $month);
         $merchants = collect($this->merchantOptions(true));
 
         if ($merchants->isEmpty()) {
@@ -314,6 +318,7 @@ class OneSynergyReportController extends Controller
         $mappings = DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
             ->whereIn('merchant_id', $merchants->pluck('id')->all())
+            ->distinct()
             ->get(['merchant_id', 'campaign_id'])
             ->groupBy(fn ($row) => (string) $row->campaign_id);
 
@@ -323,7 +328,8 @@ class OneSynergyReportController extends Controller
                 $date->copy()->endOfMonth()->format('Y-m-d'),
             ])
             ->whereIn('id_iklan', $mappings->keys()->all())
-            ->get(['id_iklan', 'tgl_tayang', 'total_harga']);
+            ->get(['id_iklan', 'tgl_tayang', 'sukses', 'kategori_iklan', 'tipe_kanal']);
+        $rates = DB::table('one_synergy_monthly_multipliers')->where('month', $month)->first();
 
         $daily = [];
         $totals = [];
@@ -333,12 +339,16 @@ class OneSynergyReportController extends Controller
 
         foreach ($reports as $report) {
             $day = Carbon::parse($report->tgl_tayang)->format('Y-m-d');
+            $balance = $this->reportBalance($report, $rates);
             foreach ($mappings->get((string) $report->id_iklan, collect()) as $mapping) {
                 $merchantId = (string) $mapping->merchant_id;
+                $daily[$day][$merchantId] ??= ['campaign' => 0, 'balance' => 0];
                 $daily[$day][$merchantId]['campaign'] = ($daily[$day][$merchantId]['campaign'] ?? 0) + 1;
-                $daily[$day][$merchantId]['balance'] = ($daily[$day][$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+                $daily[$day][$merchantId]['balance'] = $balance === null || $daily[$day][$merchantId]['balance'] === null
+                    ? null : $daily[$day][$merchantId]['balance'] + $balance;
                 $totals[$merchantId]['campaign'] = ($totals[$merchantId]['campaign'] ?? 0) + 1;
-                $totals[$merchantId]['balance'] = ($totals[$merchantId]['balance'] ?? 0) + (float) $report->total_harga;
+                $totals[$merchantId]['balance'] = $balance === null || $totals[$merchantId]['balance'] === null
+                    ? null : $totals[$merchantId]['balance'] + $balance;
             }
         }
 
@@ -354,11 +364,12 @@ class OneSynergyReportController extends Controller
             foreach ($merchants as $merchant) {
                 $values = $merchantValues[$merchant['id']] ?? ['campaign' => 0, 'balance' => 0];
                 $row[$merchant['key'] . '_campaign'] = $values['campaign'];
-                $row[$merchant['key'] . '_balance'] = number_format($values['balance'], 0, ',', '.');
+                $row[$merchant['key'] . '_balance'] = $values['balance'] === null ? null : number_format($values['balance'], 0, ',', '.');
                 $row['total_campaign'] += $values['campaign'];
-                $row['total_balance'] += $values['balance'];
+                $row['total_balance'] = $row['total_balance'] === null || $values['balance'] === null
+                    ? null : $row['total_balance'] + $values['balance'];
             }
-            $row['total_balance'] = number_format($row['total_balance'], 0, ',', '.');
+            $row['total_balance'] = $row['total_balance'] === null ? null : number_format($row['total_balance'], 0, ',', '.');
             $rows[] = $row;
         }
 
@@ -366,14 +377,33 @@ class OneSynergyReportController extends Controller
         foreach ($merchants as $merchant) {
             $values = $totals[$merchant['id']] ?? ['campaign' => 0, 'balance' => 0];
             $totalRow[$merchant['key'] . '_campaign'] = $values['campaign'];
-            $totalRow[$merchant['key'] . '_balance'] = number_format($values['balance'], 0, ',', '.');
+            $totalRow[$merchant['key'] . '_balance'] = $values['balance'] === null ? null : number_format($values['balance'], 0, ',', '.');
             $totalRow['total_campaign'] += $values['campaign'];
-            $totalRow['total_balance'] += $values['balance'];
+            $totalRow['total_balance'] = $totalRow['total_balance'] === null || $values['balance'] === null
+                ? null : $totalRow['total_balance'] + $values['balance'];
         }
-        $totalRow['total_balance'] = number_format($totalRow['total_balance'], 0, ',', '.');
+        $totalRow['total_balance'] = $totalRow['total_balance'] === null ? null : number_format($totalRow['total_balance'], 0, ',', '.');
         $rows[] = $totalRow;
 
         return $rows;
+    }
+
+    private function reportBalance(OneSynergyCampaignReport $report, ?object $rates): ?float
+    {
+        if ((int) $report->sukses === 0) {
+            return 0;
+        }
+        $category = strtolower(trim((string) $report->kategori_iklan));
+        $channel = strtolower(trim((string) $report->tipe_kanal));
+        if (!isset(self::RATE_CATEGORIES[$category]) && isset(self::RATE_CATEGORIES[$channel])) {
+            [$category, $channel] = [$channel, $category];
+        }
+        $field = $category . '_' . $channel . '_multiplier';
+        if (!isset(self::RATE_CATEGORIES[$category], self::RATE_CHANNELS[$channel]) || !isset($rates->{$field})) {
+            return null;
+        }
+
+        return (int) $report->sukses * (float) $rates->{$field};
     }
 
     private function baseQuery(Carbon $startDate, Carbon $endDate, string $merchantId = '')
@@ -389,9 +419,7 @@ class OneSynergyReportController extends Controller
                 $endDate->format('Y-m-d'),
             ]);
 
-        if ($merchantId !== '') {
-            $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
-        }
+        $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
 
         return $query;
     }
@@ -732,7 +760,7 @@ class OneSynergyReportController extends Controller
 
     private function monitoringSaldoHistory(string $month): array
     {
-        $monthDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        $monthDate = Carbon::createFromFormat('!Y-m', $month);
         $incoming = DB::table('transaksi_balance_transfer')->select([
             DB::raw("'Masuk' as transaction_type"),
             DB::raw("'Balance Transfer' as source"),
@@ -743,28 +771,36 @@ class OneSynergyReportController extends Controller
         ])->whereRaw('LOWER(TRIM(email_penerima)) = ?', [strtolower(self::MONITORING_EMAIL)]);
 
         // 1Synergy receives transfers and spends balance on reported campaigns.
-        $outgoing = OneSynergyCampaignReport::query()->select([
-                DB::raw("'Keluar' as transaction_type"),
-                DB::raw("'Balance Terpakai Report 1Synergy' as source"),
-                'tgl_tayang as transaction_datetime',
-                DB::raw("'-' as reference_email"),
-                DB::raw('0 as amount_in'),
-                DB::raw('COALESCE(total_harga, 0) as amount_out'),
-            ])->toBase();
+        $reports = OneSynergyCampaignReport::query()
+            ->whereIn('id_iklan', $this->campaignIdsForMerchant(''))
+            ->whereNotNull('tgl_tayang')
+            ->get(['tgl_tayang', 'sukses', 'kategori_iklan', 'tipe_kanal']);
+        $ratesByMonth = DB::table('one_synergy_monthly_multipliers')
+            ->whereIn('month', $reports->map(fn ($report) => $report->tgl_tayang->format('Y-m'))->unique()->all())
+            ->get()->keyBy('month');
+        $outgoingHistory = $reports->map(fn ($report) => (object) [
+            'transaction_type' => 'Keluar',
+            'source' => 'Balance Terpakai Report 1Synergy',
+            'transaction_datetime' => $report->tgl_tayang->format('Y-m-d'),
+            'reference_email' => '-',
+            'amount_in' => 0,
+            'amount_out' => $this->reportBalance($report, $ratesByMonth->get($report->tgl_tayang->format('Y-m'))),
+        ]);
+        $sumOutgoing = fn ($rows) => $rows->contains(fn ($row) => $row->amount_out === null)
+            ? null : (float) $rows->sum('amount_out');
 
         $incomingHistory = DB::query()->fromSub($incoming, 'incoming_history');
-        $outgoingHistory = DB::query()->fromSub($outgoing, 'outgoing_history');
         $periodStart = $monthDate->format('Y-m-d');
         $periodEnd = $monthDate->copy()->addMonth()->format('Y-m-d');
         $openingIn = (float) (clone $incomingHistory)->where('transaction_datetime', '<', $periodStart)->sum('amount_in');
-        $openingOut = (float) (clone $outgoingHistory)->where('transaction_datetime', '<', $periodStart)->sum('amount_out');
-        $openingBalance = $openingIn - $openingOut;
+        $openingOut = $sumOutgoing($outgoingHistory->where('transaction_datetime', '<', $periodStart));
+        $openingBalance = $openingOut === null ? null : $openingIn - $openingOut;
         $remainingIn = (float) (clone $incomingHistory)->sum('amount_in');
-        $remainingOut = (float) (clone $outgoingHistory)->sum('amount_out');
+        $remainingOut = $sumOutgoing($outgoingHistory);
         $incomingRows = $incomingHistory->where('transaction_datetime', '>=', $periodStart)
             ->where('transaction_datetime', '<', $periodEnd)->get();
         $outgoingRows = $outgoingHistory->where('transaction_datetime', '>=', $periodStart)
-            ->where('transaction_datetime', '<', $periodEnd)->get();
+            ->where('transaction_datetime', '<', $periodEnd);
 
         $runningBalance = $openingBalance;
         $totalIn = 0;
@@ -774,10 +810,10 @@ class OneSynergyReportController extends Controller
             ->values()
             ->map(function ($row) use (&$runningBalance, &$totalIn, &$totalOut) {
                 $amountIn = (float) $row->amount_in;
-                $amountOut = (float) $row->amount_out;
+                $amountOut = $row->amount_out === null ? null : (float) $row->amount_out;
                 $totalIn += $amountIn;
-                $totalOut += $amountOut;
-                $runningBalance += $amountIn - $amountOut;
+                $totalOut = $totalOut === null || $amountOut === null ? null : $totalOut + $amountOut;
+                $runningBalance = $runningBalance === null || $amountOut === null ? null : $runningBalance + $amountIn - $amountOut;
 
                 return [
                     'transaction_date' => $row->transaction_datetime
@@ -792,11 +828,11 @@ class OneSynergyReportController extends Controller
             })->all();
 
         return [
-            'remaining_balance' => $remainingIn - $remainingOut,
+            'remaining_balance' => $remainingOut === null ? null : $remainingIn - $remainingOut,
             'opening_balance' => $openingBalance,
             'total_in' => $totalIn,
             'total_out' => $totalOut,
-            'ending_balance' => $openingBalance + $totalIn - $totalOut,
+            'ending_balance' => $openingBalance === null || $totalOut === null ? null : $openingBalance + $totalIn - $totalOut,
             'rows' => $rows,
         ];
     }
