@@ -15,6 +15,16 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         parent::setUp();
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
         DB::purge('sqlite');
+        config(['database.connections.kam_myads' => config('database.connections.sqlite')]);
+        DB::purge('kam_myads');
+        Schema::connection('kam_myads')->create('merchant_campaign_mappings', function (Blueprint $table) {
+            $table->string('merchant_id'); $table->string('campaign_id');
+        });
+        foreach (['1', '2', '3', '4', '5', '6', '1849001', '1849002'] as $campaignId) {
+            DB::connection('kam_myads')->table('merchant_campaign_mappings')->insert([
+                'merchant_id' => 'CH778899', 'campaign_id' => $campaignId,
+            ]);
+        }
         (require database_path('migrations/2026_09_02_000000_create_one_synergy_reports_table.php'))->up();
         (require database_path('migrations/2026_09_16_100000_create_one_synergy_monthly_multipliers_table.php'))->up();
         (require database_path('migrations/2026_09_16_110000_split_one_synergy_monthly_multipliers.php'))->up();
@@ -157,9 +167,9 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
             $table->string('merchant_id');
             $table->string('campaign_id');
         });
-        DB::connection('kam_myads')->table('merchant_campaign_mappings')->insert(['merchant_id' => 'merchant-a', 'campaign_id' => '2']);
+        DB::connection('kam_myads')->table('merchant_campaign_mappings')->insert(['merchant_id' => 'CH778899', 'campaign_id' => '2']);
         DB::table('one_synergy_monthly_multipliers')->insert(['month' => '2026-09', 'waba_broadcast_multiplier' => 300, 'sms_lba_multiplier' => 150]);
-        $this->getJson(route('one-synergy.report.data', ['month' => '2026-09', 'merchant' => 'merchant-a']))
+        $this->getJson(route('one-synergy.report.data', ['month' => '2026-09', 'merchant' => 'CH778899']))
             ->assertOk()->assertJsonPath('summary.total_harga', 6000)->assertJsonPath('summary.total_campaign', 1);
     }
 
@@ -234,12 +244,12 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
             $table->string('role');
         });
         DB::connection('kam_myads')->table('users')->insert([
-            ['merchant_id' => 'customer', 'name' => 'Customer', 'role' => 'user'],
-            ['merchant_id' => 'customer', 'name' => 'Z Admin', 'role' => 'admin'],
+            ['merchant_id' => 'CH778899', 'name' => 'ICE', 'role' => 'user'],
+            ['merchant_id' => 'CH778899', 'name' => 'Z Admin', 'role' => 'admin'],
             ['merchant_id' => 'staff', 'name' => 'Staff', 'role' => 'admin'],
         ]);
         DB::connection('kam_myads')->table('merchant_campaign_mappings')->insert([
-            ['merchant_id' => 'customer', 'campaign_id' => '1'],
+            ['merchant_id' => 'CH778899', 'campaign_id' => '1'],
             ['merchant_id' => 'staff', 'campaign_id' => '2'],
             ['merchant_id' => 'orphan', 'campaign_id' => '2'],
         ]);
@@ -247,13 +257,14 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         $optionsMethod = new \ReflectionMethod($controller, 'merchantOptions');
         $options = $optionsMethod->invoke($controller, true);
         $this->assertCount(1, $options);
-        $this->assertSame('customer', $options[0]['id']);
-        $this->assertSame('Customer (customer)', $options[0]['label']);
-        $this->assertCount(3, $optionsMethod->invoke($controller));
+        $this->assertSame('CH778899', $options[0]['id']);
+        $this->assertSame('ICE (CH778899)', $options[0]['label']);
+        $this->assertCount(1, $optionsMethod->invoke($controller));
+        DB::table('one_synergy_monthly_multipliers')->insert(['month' => '2026-09', 'sms_lba_multiplier' => 150.25]);
         $rows = (new \ReflectionMethod($controller, 'merchantSummaryRows'))->invoke($controller, '2026-09');
         $total = end($rows);
         $this->assertSame(1, $total['total_campaign']);
-        $this->assertSame('999.999', $total['total_balance']);
+        $this->assertSame('1.503', $total['total_balance']);
         $this->assertArrayNotHasKey('merchant_' . md5('staff') . '_campaign', $total);
         $this->assertArrayNotHasKey('merchant_' . md5('orphan') . '_campaign', $total);
     }

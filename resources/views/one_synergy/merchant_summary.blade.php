@@ -74,16 +74,16 @@ $(function () {
         columns.push({ data: merchant.key + '_campaign', defaultContent: 0 });
         columns.push({
             data: merchant.key + '_balance',
-            defaultContent: '0',
-            render: function (value) { return '<div class="text-right">Rp ' + (value || '0') + '</div>'; }
+            defaultContent: '-',
+            render: function (value) { return '<div class="text-right">' + (value == null ? '-' : 'Rp ' + value) + '</div>'; }
         });
     });
 
     columns.push({ data: 'total_campaign', defaultContent: 0, className: 'font-weight-bold' });
     columns.push({
         data: 'total_balance',
-        defaultContent: '0',
-        render: function (value) { return '<div class="text-right font-weight-bold">Rp ' + (value || '0') + '</div>'; }
+        defaultContent: '-',
+        render: function (value) { return '<div class="text-right font-weight-bold">' + (value == null ? '-' : 'Rp ' + value) + '</div>'; }
     });
 
     const table = $('#merchantSummaryTable').DataTable({
