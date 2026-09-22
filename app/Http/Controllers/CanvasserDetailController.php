@@ -30,6 +30,7 @@ class CanvasserDetailController extends Controller
         return view('report.topup-canvasser-detail', [
             'canvasser' => $user, 'month' => $month,
             'periodLabel' => $period->translatedFormat('F Y'), 'source' => $source,
+            'canDownloadTopLeads' => $this->canDownloadTopLeads($request, $user->id),
         ]);
     }
 
@@ -140,6 +141,98 @@ class CanvasserDetailController extends Controller
             'total'=>(float)($trendRows[$m]->total??0),
             'user_count'=>(int)($trendRows[$m]->user_count??0),
         ])->values()]);
+    }
+
+    public function topLeads(Request $request)
+    {
+        [$user, $period, , $source] = $this->context($request);
+
+        return response()->json($this->topLeadsData($user->id, $period, $source));
+    }
+
+    private function canDownloadTopLeads(Request $request, int $userId): bool
+    {
+        return $request->user()->role === 'Admin'
+            || (string) $request->user()->getAuthIdentifier() === (string) $userId;
+    }
+
+    public function downloadTopLeads(Request $request)
+    {
+        [$user, $period, $month, $source] = $this->context($request);
+        abort_unless($this->canDownloadTopLeads($request, $user->id), 403,
+            'CSV hanya dapat diunduh oleh admin atau pemilik akun.');
+
+        $report = $this->topLeadsData($user->id, $period, $source, includeEmail: true);
+
+        return response()->streamDownload(function () use ($report) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['Peringkat', 'Pelanggan', 'Email',
+                'Top Up '.$report['current_label'], 'Top Up '.$report['previous_label'], 'Selisih', 'MoM (%)']);
+            foreach ($report['data'] as $row) {
+                // Prevent spreadsheet formulas in customer-controlled text cells.
+                $text = static fn ($value) => preg_match('/^[\s]*[=+@-]|^[\t\r\n]/u', $value) ? "'".$value : $value;
+                fputcsv($output, [$row['rank'], $text($row['company_name']), $text($row['email']),
+                    $row['current_total'], $row['previous_total'], $row['difference'],
+                    $row['mom_percent'] === null ? 'Baru' : $row['mom_percent']]);
+            }
+            fclose($output);
+        }, "top-10-leads-{$user->id}-{$month}.csv", ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    private function topLeadsData(int $userId, Carbon $period, string $source, bool $includeEmail = false): array
+    {
+        $dateExpr = $source === 'mpcc' ? 'COALESCE(rp.paid_date, rp.tgl_transaksi)' : 'rp.tgl_transaksi';
+        $amountExpr = $source === 'mpcc' ? 'rp.amount' : 'rp.total_settlement_klien';
+        $currentStart = $period->copy()->startOfMonth();
+        $previousStart = $currentStart->copy()->subMonthNoOverflow();
+        $isCurrentMonth = $period->isSameMonth(Carbon::today());
+        $currentEnd = $isCurrentMonth ? Carbon::today()->endOfDay() : $period->copy()->endOfMonth();
+        $previousEnd = $isCurrentMonth
+            ? $previousStart->copy()->day(min($currentEnd->day, $previousStart->daysInMonth))->endOfDay()
+            : $previousStart->copy()->endOfMonth();
+
+        // One account per normalized email, so duplicate leads never multiply top ups.
+        $leads = DB::table('leads_master')->where('user_id', $userId)
+            ->whereNotNull('email')->whereRaw("TRIM(email) <> ''")
+            ->groupByRaw('LOWER(TRIM(email))')
+            ->selectRaw('LOWER(TRIM(email)) normalized_email, MAX(company_name) company_name');
+        $totals = DB::table('report_balance_top_up as rp')
+            ->joinSub($leads, 'lm', fn ($join) => $join->on(DB::raw('LOWER(TRIM(rp.email_client))'), '=', 'lm.normalized_email'))
+            ->where('rp.payment_method_name', '!=', 'Voucher Bonus')
+            ->where(function ($query) use ($dateExpr, $currentStart, $currentEnd, $previousStart, $previousEnd) {
+                $query->whereBetween(DB::raw($dateExpr), [$currentStart, $currentEnd])
+                    ->orWhereBetween(DB::raw($dateExpr), [$previousStart, $previousEnd]);
+            })
+            ->groupBy('lm.normalized_email', 'lm.company_name')
+            ->select('lm.normalized_email', 'lm.company_name')
+            ->selectRaw("SUM(CASE WHEN {$dateExpr} BETWEEN ? AND ? THEN CAST({$amountExpr} AS DECIMAL(15,2)) ELSE 0 END) current_total,
+                SUM(CASE WHEN {$dateExpr} BETWEEN ? AND ? THEN CAST({$amountExpr} AS DECIMAL(15,2)) ELSE 0 END) previous_total",
+                [$currentStart, $currentEnd, $previousStart, $previousEnd]);
+        $rows = DB::query()->fromSub($totals, 'totals')->where('current_total', '>', 0)
+            ->orderByDesc('current_total')->orderBy('normalized_email')->limit(10)->get();
+
+        return [
+            'current_label' => $currentStart->translatedFormat('d M').' - '.$currentEnd->translatedFormat('d M Y'),
+            'previous_label' => $previousStart->translatedFormat('d M').' - '.$previousEnd->translatedFormat('d M Y'),
+            'data' => $rows->map(function ($row, $index) use ($includeEmail) {
+                $current = (float) $row->current_total;
+                $previous = (float) $row->previous_total;
+                $email = $row->normalized_email;
+                $visible = min(5, max(1, strpos($email, '@') ?: 1));
+
+                return [
+                    'rank' => $index + 1,
+                    'company_name' => $row->company_name ?: '-',
+                    'masked_email' => substr($email, 0, $visible).str_repeat('*', max(3, strlen($email) - $visible)),
+                    ...($includeEmail ? ['email' => $email] : []),
+                    'current_total' => $current,
+                    'previous_total' => $previous,
+                    'difference' => $current - $previous,
+                    'mom_percent' => $previous > 0 ? round(($current - $previous) / $previous * 100, 2) : null,
+                ];
+            })->all(),
+        ];
     }
 
     public function transactions(Request $request)

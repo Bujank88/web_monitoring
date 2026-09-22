@@ -298,6 +298,8 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('topup-canvasser/detail/mom', [CanvasserDetailController::class, 'mom'])->name('topup-canvasser.detail.mom');
     Route::get('topup-canvasser/detail/trend', [CanvasserDetailController::class, 'trend'])->name('topup-canvasser.detail.trend');
     Route::get('topup-canvasser/detail/transactions', [CanvasserDetailController::class, 'transactions'])->name('topup-canvasser.detail.transactions');
+    Route::get('topup-canvasser/detail/top-leads', [CanvasserDetailController::class, 'topLeads'])->name('topup-canvasser.detail.top-leads');
+    Route::get('topup-canvasser/detail/top-leads/csv', [CanvasserDetailController::class, 'downloadTopLeads'])->name('topup-canvasser.detail.top-leads.csv');
     Route::get('topup-canvasser/data', [ReportController::class, 'topupCanvasserData']);
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
