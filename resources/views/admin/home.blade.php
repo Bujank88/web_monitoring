@@ -1288,10 +1288,10 @@
         // NOTE: Chart akan di-load setelah DataTable selesai (lazy loading)
 
         const locationsByArea = {
-            '1': ['Medan', 'Padang', 'Pekanbaru', 'Palembang'],
-            '2': ['Jakarta', 'Bogor', 'Bandung', 'Depok'],
-            '3': ['Semarang', 'Surabaya', 'Yogyakarta'],
-            '4': ['Makassar', 'Manado', 'Samarinda']
+            '1': ['Medan', 'Padang', 'Pekanbaru', 'Palembang', 'Jambi'],
+            '2': ['Jakarta', 'Bogor', 'Bandung', 'Depok', 'Tangerang', 'Bekasi'],
+            '3': ['Semarang', 'Surabaya', 'Yogyakarta', 'Denpasar'],
+            '4': ['Makassar', 'Manado', 'Samarinda', 'Banjarmasin']
         };
 
         let availableCanvasserRows = [];
