@@ -523,25 +523,68 @@
         background-color: #ffffff;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(3),
-    #powerHousePerformanceTable tbody td:nth-child(4) {
+    #powerHousePerformanceTable tbody td:nth-child(4),
+    #powerHousePerformanceTable tbody td:nth-child(5) {
         background-color: #d1e7dd;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(5),
     #powerHousePerformanceTable tbody td:nth-child(6),
-    #powerHousePerformanceTable tbody td:nth-child(7) {
+    #powerHousePerformanceTable tbody td:nth-child(7),
+    #powerHousePerformanceTable tbody td:nth-child(9),
+    #powerHousePerformanceTable tbody td:nth-child(10) {
         background-color: #f8d7da;
         font-weight: 600;
     }
 
-    #powerHousePerformanceTable tbody td:nth-child(8),
-    #powerHousePerformanceTable tbody td:nth-child(9),
-    #powerHousePerformanceTable tbody td:nth-child(10),
-    #powerHousePerformanceTable tbody td:nth-child(11) {
+    #powerHousePerformanceTable tbody td:nth-child(8) {
+        background: linear-gradient(135deg, #d6f5ff 0%, #a8e6ff 100%);
+        color: #055160;
+        font-weight: 700;
+    }
+
+    #powerHousePerformanceTable tbody td:nth-child(11),
+    #powerHousePerformanceTable tbody td:nth-child(12),
+    #powerHousePerformanceTable tbody td:nth-child(13),
+    #powerHousePerformanceTable tbody td:nth-child(14) {
         background-color: #d3ffcd;
         font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable {
+        border: 0.5px solid #ccc;
+        box-shadow: none;
+    }
+
+    #powerHouseSaldoTransferTable th,
+    #powerHouseSaldoTransferTable td {
+        border: 0.5px solid #ccc !important;
+    }
+
+    #powerHouseSaldoTransferTable tbody tr:nth-child(odd) {
+        background-color: #f2f2f2;
+    }
+
+    #powerHouseSaldoTransferTable tbody tr:nth-child(even) {
+        background-color: #ffffff;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(2) {
+        background-color: #e8f5e9;
+        color: #1b5e20;
+        font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(5) {
+        background-color: #fff3cd;
+        color: #7a5d00;
+        font-weight: 600;
+    }
+
+    #powerHouseSaldoTransferTable tbody td:nth-child(6) {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        font-weight: 700;
     }
 </style>
 @endsection
@@ -581,8 +624,9 @@
 @php
     use Carbon\Carbon;
 
-    $startDate = request('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-    $endDate   = request('end_date', Carbon::now()->format('Y-m-d'));
+    $defaultReferenceDate = Carbon::yesterday();
+    $startDate = request('start_date', $defaultReferenceDate->copy()->startOfMonth()->format('Y-m-d'));
+    $endDate   = request('end_date', $defaultReferenceDate->copy()->format('Y-m-d'));
     $momRefDate = Carbon::today();
     $prevSameDay = $momRefDate->copy()->subMonthNoOverflow();
     $prevMonthEndDay = $momRefDate->copy()->subMonthNoOverflow()->endOfMonth()->day;
@@ -636,7 +680,7 @@
             <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="9" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Report PowerHouse Referral | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th style="text-align: center; width: 5%;">No</th>
@@ -645,6 +689,8 @@
                                 <th style="text-align: center;">Jumlah Visit</th>
                                 <th style="text-align: center;">Jumlah Leads</th>
                                 <th style="text-align: center;">Jumlah Akun</th>
+                                <th style="text-align: center;">leads to visit (%)</th>
+                                <th style="text-align: center;">new akun to leads (%)</th>
                                 <th style="text-align: center;">Top Up</th>
                                 <th style="text-align: center;">Poin</th>
                                 <th style="text-align: center;">Tgl Transaksi Terakhir</th>
@@ -658,6 +704,8 @@
                                 <td id="totalJumlahVisit" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahLeads" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalJumlahAkun" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalPercentageLeadToVisit" style="text-align: center; padding: 12px;">0%</td>
+                                <td id="totalPercentageNewAkunToLead" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalTopUp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalPoin" style="text-align: center; padding: 12px;">0</td>
                                 <td style="text-align: center; padding: 12px;">-</td>
@@ -682,13 +730,14 @@
                     <table class="table table-sm w-100 table-bordered table-hover" id="powerHousePerformanceTable" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr style="background-color: #e8eaf6; font-weight: bold;">
-                                <th colspan="11" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                                <th colspan="14" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Data Topup & MOM PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
                             </tr>
                             <tr>
                                 <th rowspan="2" style="text-align: center; width: 5%;">No</th>
                                 <th rowspan="2" style="text-align: center;">Team PowerHouse</th>
+                                <th rowspan="2" style="text-align: center; background-color: #ffe8a1;">Target (Rp.)</th>
                                 <th colspan="2" style="text-align: center; background-color: #d1e7dd;">Deal Top Up (New Akun & Eksisting Akun)</th>
-                                <th colspan="3" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
+                                <th colspan="5" style="text-align: center; background-color: #f8d7da;">Top Up (Rp.)</th>
                                 <th colspan="4" style="text-align: center; background-color: #d3ffcd;">MOM</th>
                             </tr>
                             <tr>
@@ -696,7 +745,9 @@
                                 <th style="text-align: center; background-color: #d1e7dd;">Eksisting Akun</th>
                                 <th style="text-align: center; background-color: #f8d7da;">New Akun(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Eksisting Akun(Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Transfer Saldo(Rp.)</th>
                                 <th style="text-align: center; background-color: #f8d7da;">Total (Rp.)</th>
+                                <th style="text-align: center; background-color: #f8d7da;">Acv (%)</th>
                                 <th id="momHeaderPrevPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $prevSameDay->day }} {{ $prevSameDay->translatedFormat('M') }}</th>
                                 <th id="momHeaderCurrentPartial" style="text-align: center; background-color: #d3ffcd;">1 &ndash; {{ $momRefDate->day }} {{ $momRefDate->translatedFormat('M') }}</th>
                                 <th id="momHeaderPrevRemaining" style="text-align: center; background-color: #d3ffcd;">{{ $prevRemainingStartDay }} &ndash; {{ $prevMonthEndDay }} {{ $prevSameDay->translatedFormat('M') }}</th>
@@ -707,15 +758,56 @@
                         <tfoot>
                             <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
                                 <td colspan="2" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td id="totalTargetPerformance" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupNewAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalDealTopupExistingAkun" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpNewAkunRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpExistingAkunRp" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalTransferSaldoRp" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalTopUpPerformance" style="text-align: center; padding: 12px;">0</td>
+                                <td id="totalAcvPerformance" style="text-align: center; padding: 12px;">0%</td>
                                 <td id="totalMomPrevPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomCurrentPartial" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomPrevRemaining" style="text-align: center; padding: 12px;">0</td>
                                 <td id="totalMomGap" style="text-align: center; padding: 12px;">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card" id="powerHouseSaldoTransferCard">
+            <div class="card-header bg-gradient-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> Detail Transfer Saldo</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm w-100 table-bordered table-hover" id="powerHouseSaldoTransferTable" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr style="background-color: #e8eaf6; font-weight: bold;">
+                                <th colspan="7" style="text-align: center; padding: 10px; border-bottom: 2px solid #667eea;">Detail Transfer Saldo PowerHouse | <span class="displayedStartDatePH">{{ $startDate }}</span> s/d <span class="displayedEndDatePH">{{ $endDate }}</span></th>
+                            </tr>
+                            <tr>
+                                <th style="text-align: center; width: 5%;">No</th>
+                                <th style="text-align: center;">Team PowerHouse</th>
+                                <th style="text-align: center;">Company Name</th>
+                                <th style="text-align: center;">Email Client</th>
+                                <th style="text-align: center;">Parent Email</th>
+                                <th style="text-align: center;">Amount</th>
+                                <th style="text-align: center;">Tgl Transaksi</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr style="background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%); color: white; font-weight: 600;">
+                                <td colspan="5" style="text-align: right; padding: 12px;">TOTAL</td>
+                                <td id="totalSaldoTransferAmount" style="text-align: center; padding: 12px;">Rp 0</td>
+                                <td id="totalSaldoTransferCount" style="text-align: center; padding: 12px;">0 Transfer</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -756,6 +848,7 @@
             paging: false,
             searching: false,
             info: false,
+            ordering: false,
             ajax: {
                 url: "{{ route('powerhouse_voucher_data') }}",
                 type: 'GET',
@@ -772,14 +865,18 @@
                 { data: 'jumlah_visit', name: 'jumlah_visit', className: 'text-center' },
                 { data: 'jumlah_leads', name: 'jumlah_leads', className: 'text-center' },
                 { data: 'jumlah_akun', name: 'jumlah_akun', className: 'text-center' },
+                { data: 'percentage_lead_to_visit', name: 'percentage_lead_to_visit', className: 'text-center' },
+                { data: 'percentage_new_akun_to_lead', name: 'percentage_new_akun_to_lead', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
                 { data: 'poin', name: 'poin', className: 'text-center' },
                 { data: 'tgl_transaksi_terakhir', name: 'tgl_transaksi_terakhir', className: 'text-center' }
             ],
-            order: [[1, 'asc']],
             rowCallback: function(row, data, index) {
+                applyPercentageCellStyle($('td', row).eq(6), data.percentage_lead_to_visit);
+                applyPercentageCellStyle($('td', row).eq(7), data.percentage_new_akun_to_lead);
+
                 // Highlight poin cells dengan warna biru gradient untuk nilai > 0
-                var poinCell = $('td', row).eq(7);
+                var poinCell = $('td', row).eq(9);
                 var poinValue = parseInt(poinCell.text().trim());
                 
                 if (poinValue > 0) {
@@ -812,6 +909,7 @@
             paging: false,
             searching: false,
             info: false,
+            ordering: false,
             ajax: {
                 url: "{{ route('powerhouse_deal_topup_mom_data') }}",
                 type: 'GET',
@@ -823,19 +921,61 @@
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
+                { data: 'target', name: 'target', className: 'text-center' },
                 { data: 'deal_topup_new_akun', name: 'deal_topup_new_akun', className: 'text-center' },
                 { data: 'deal_topup_existing_akun', name: 'deal_topup_existing_akun', className: 'text-center' },
                 { data: 'top_up_new_akun_rp', name: 'top_up_new_akun_rp', className: 'text-center' },
                 { data: 'top_up_existing_akun_rp', name: 'top_up_existing_akun_rp', className: 'text-center' },
+                { data: 'total_transfer_saldo_rp', name: 'total_transfer_saldo_rp', className: 'text-center' },
                 { data: 'total_topup', name: 'total_topup', className: 'text-center' },
+                { data: 'acv', name: 'acv', className: 'text-center' },
                 { data: 'mom_prev_partial', name: 'mom_prev_partial', className: 'text-center' },
                 { data: 'mom_current_partial', name: 'mom_current_partial', className: 'text-center' },
                 { data: 'mom_prev_remaining', name: 'mom_prev_remaining', className: 'text-center' },
                 { data: 'mom_gap', name: 'mom_gap', className: 'text-center' }
             ],
-            order: [[1, 'asc']],
+            createdRow: function(row) {
+                $('td', row).eq(2).css({
+                    'background': 'linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%)',
+                    'color': '#7a5d00',
+                    'font-weight': '600'
+                });
+            },
+            rowCallback: function(row, data) {
+                applyPercentageCellStyle($('td', row).eq(9), data.acv);
+            },
             drawCallback: function() {
                 calculatePerformanceTotals();
+            }
+        });
+
+        var saldoTransferTable = $('#powerHouseSaldoTransferTable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: false,
+            ajax: {
+                url: "{{ route('powerhouse_saldo_transfer_detail_data') }}",
+                type: 'GET',
+                data: function(d) {
+                    d.start_date = $('#startDatePH').val();
+                    d.end_date = $('#endDatePH').val();
+                }
+            },
+            columns: [
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false, className: 'text-center' },
+                { data: 'team_powerhouse', name: 'team_powerhouse', className: 'text-center' },
+                { data: 'company_name', name: 'company_name', className: 'text-center' },
+                { data: 'email_client', name: 'email_client', className: 'text-center' },
+                { data: 'parent_email', name: 'parent_email', className: 'text-center' },
+                { data: 'amount', name: 'amount', className: 'text-center' },
+                { data: 'tgl_transaksi', name: 'tgl_transaksi', className: 'text-center' }
+            ],
+            drawCallback: function() {
+                calculateSaldoTransferTotals();
             }
         });
 
@@ -860,6 +1000,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            saldoTransferTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -877,6 +1018,7 @@
 
             table.ajax.reload();
             performanceTable.ajax.reload();
+            saldoTransferTable.ajax.reload();
             updateMomHeaders();
             updateFilterPeriodHeader();
         });
@@ -899,11 +1041,33 @@
 
             window.location.href = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
         });
+
+        function getPercentageStyle(percent) {
+            let backgroundColor = percent >= 100 ? '#2e7d32' : (percent >= 75 ? '#f9a825' : '#c62828');
+            let textColor = percent >= 75 && percent < 100 ? '#1f2937' : '#ffffff';
+
+            return {
+                'background': `linear-gradient(135deg, ${backgroundColor} 0%, ${backgroundColor}cc 100%)`,
+                'color': textColor,
+                'font-weight': '700'
+            };
+        }
+
+        function applyPercentageCellStyle(cell, rawValue) {
+            const percent = typeof rawValue === 'number'
+                ? rawValue
+                : parseFloat(String(rawValue || '0').replace('%', '').replace(/\./g, '').replace(',', '.')) || 0;
+
+            cell.css(getPercentageStyle(percent));
+        }
+
         // Function to calculate totals
         function calculateTotals() {
             let totalAkun = 0;
             let totalLeads = 0;
             let totalVisit = 0;
+            let totalPercentageLeadToVisit = 0;
+            let totalPercentageNewAkunToLead = 0;
             let totalTopup = 0;
             let totalPoin = 0;
 
@@ -920,22 +1084,35 @@
                 // Column 6: Jumlah Visit
                 totalVisit += parseInt(cells.eq(3).text().trim()) || 0;
 
-                // Column 7: Top Up (extract number from Rp text)
-                const topupText = cells.eq(6).text().trim();
+                // Column 9: Top Up (extract number from Rp text)
+                const topupText = cells.eq(8).text().trim();
                 const topupMatch = topupText.match(/[\d.,]+/);
                 if (topupMatch) {
                     let topupValue = topupMatch[0].replace(/\./g, '').replace(/,/g, '.');
                     totalTopup += parseFloat(topupValue) || 0;
                 }
                 
-                // Column 8: Poin
-                totalPoin += parseInt(cells.eq(7).text().trim()) || 0;
+                // Column 10: Poin
+                totalPoin += parseInt(cells.eq(9).text().trim()) || 0;
             });
+
+            totalPercentageLeadToVisit = totalVisit > 0 ? (totalLeads / totalVisit) * 100 : 0;
+            totalPercentageNewAkunToLead = totalLeads > 0 ? (totalAkun / totalLeads) * 100 : 0;
 
             // Update total row
             $('#totalJumlahAkun').text(totalAkun);
             $('#totalJumlahLeads').text(totalLeads);
             $('#totalJumlahVisit').text(totalVisit);
+            $('#totalPercentageLeadToVisit').text(totalPercentageLeadToVisit.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + '%');
+            $('#totalPercentageNewAkunToLead').text(totalPercentageNewAkunToLead.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + '%');
+            applyPercentageCellStyle($('#totalPercentageLeadToVisit'), totalPercentageLeadToVisit);
+            applyPercentageCellStyle($('#totalPercentageNewAkunToLead'), totalPercentageNewAkunToLead);
             
             // Format total topup as currency
             if (totalTopup > 0) {
@@ -953,7 +1130,10 @@
             let totalDealTopupExistingAkun = 0;
             let totalTopUpNewAkunRp = 0;
             let totalTopUpExistingAkunRp = 0;
+            let totalTransferSaldoRp = 0;
             let totalTopup = 0;
+            let totalTarget = 0;
+            let totalAcv = 0;
             let totalMomPrevPartial = 0;
             let totalMomCurrentPartial = 0;
             let totalMomPrevRemaining = 0;
@@ -968,28 +1148,55 @@
             $('#powerHousePerformanceTable tbody tr').each(function() {
                 const cells = $(this).find('td');
 
-                totalDealTopupNewAkun += parseInt(cells.eq(2).text().trim()) || 0;
-                totalDealTopupExistingAkun += parseInt(cells.eq(3).text().trim()) || 0;
+                totalTarget += parseNumber(cells.eq(2).text().trim());
+                totalDealTopupNewAkun += parseInt(cells.eq(3).text().trim()) || 0;
+                totalDealTopupExistingAkun += parseInt(cells.eq(4).text().trim()) || 0;
 
-                totalTopUpNewAkunRp += parseNumber(cells.eq(4).text().trim());
-                totalTopUpExistingAkunRp += parseNumber(cells.eq(5).text().trim());
-                totalTopup += parseNumber(cells.eq(6).text().trim());
+                totalTopUpNewAkunRp += parseNumber(cells.eq(5).text().trim());
+                totalTopUpExistingAkunRp += parseNumber(cells.eq(6).text().trim());
+                totalTransferSaldoRp += parseNumber(cells.eq(7).text().trim());
+                totalTopup += parseNumber(cells.eq(8).text().trim());
 
-                totalMomPrevPartial += parseNumber(cells.eq(7).text().trim());
-                totalMomCurrentPartial += parseNumber(cells.eq(8).text().trim());
-                totalMomPrevRemaining += parseNumber(cells.eq(9).text().trim());
-                totalMomGap += parseNumber(cells.eq(10).text().trim());
+                totalMomPrevPartial += parseNumber(cells.eq(10).text().trim());
+                totalMomCurrentPartial += parseNumber(cells.eq(11).text().trim());
+                totalMomPrevRemaining += parseNumber(cells.eq(12).text().trim());
+                totalMomGap += parseNumber(cells.eq(13).text().trim());
             });
 
             $('#totalDealTopupNewAkun').text(totalDealTopupNewAkun);
             $('#totalDealTopupExistingAkun').text(totalDealTopupExistingAkun);
+            $('#totalTargetPerformance').text('Rp ' + Math.floor(totalTarget).toLocaleString('id-ID'));
             $('#totalTopUpNewAkunRp').text(Math.floor(totalTopUpNewAkunRp).toLocaleString('id-ID'));
             $('#totalTopUpExistingAkunRp').text(Math.floor(totalTopUpExistingAkunRp).toLocaleString('id-ID'));
+            $('#totalTransferSaldoRp').text(Math.floor(totalTransferSaldoRp).toLocaleString('id-ID'));
             $('#totalTopUpPerformance').text('Rp ' + Math.floor(totalTopup).toLocaleString('id-ID'));
+            totalAcv = totalTarget > 0 ? (totalTopup / totalTarget) * 100 : 0;
+            $('#totalAcvPerformance').text(totalAcv.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%');
+            applyPercentageCellStyle($('#totalAcvPerformance'), totalAcv);
             $('#totalMomPrevPartial').text(Math.floor(totalMomPrevPartial).toLocaleString('id-ID'));
             $('#totalMomCurrentPartial').text(Math.floor(totalMomCurrentPartial).toLocaleString('id-ID'));
             $('#totalMomPrevRemaining').text(Math.floor(totalMomPrevRemaining).toLocaleString('id-ID'));
             $('#totalMomGap').text(Math.floor(totalMomGap).toLocaleString('id-ID'));
+        }
+
+        function calculateSaldoTransferTotals() {
+            let totalAmount = 0;
+            let totalCount = 0;
+
+            const parseNumber = (text) => {
+                if (!text) return 0;
+                const normalized = text.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.-]/g, '');
+                return parseFloat(normalized) || 0;
+            };
+
+            $('#powerHouseSaldoTransferTable tbody tr').each(function() {
+                const cells = $(this).find('td');
+                totalAmount += parseNumber(cells.eq(5).text().trim());
+                totalCount += 1;
+            });
+
+            $('#totalSaldoTransferAmount').text('Rp ' + Math.floor(totalAmount).toLocaleString('id-ID'));
+            $('#totalSaldoTransferCount').text(totalCount.toLocaleString('id-ID') + ' Transfer');
         }
 
         function getSubMonthNoOverflow(dateObj) {

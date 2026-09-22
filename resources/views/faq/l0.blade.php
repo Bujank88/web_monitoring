@@ -74,6 +74,48 @@
         color: #1d4ed8;
         margin-bottom: 12px;
     }
+
+    .faq-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+    }
+
+    .btn-faq-download {
+        border: 0;
+        background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+        color: #fff;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, .2);
+    }
+
+    .btn-faq-download:disabled {
+        opacity: .7;
+        cursor: wait;
+    }
+
+    .faq-pdf-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 6px 0;
+    }
+
+    .faq-pdf-subtitle {
+        font-size: 12px;
+        color: #475569;
+        margin: 0 0 14px 0;
+    }
+
+    @media print {
+        .faq-card {
+            page-break-inside: avoid;
+        }
+    }
 </style>
 @endsection
 
@@ -83,9 +125,18 @@
     <p>Panduan jawaban cepat untuk pertanyaan user yang paling sering muncul (Canvasser, PowerHouse).</p>
 </div>
 
-<div class="faq-badge">SOP Operasional L0</div>
+<div class="faq-actions">
+    <div class="faq-badge">SOP Operasional L0</div>
+    <button type="button" id="btnDownloadFaqPdf" class="btn-faq-download">
+        <i class="fas fa-file-pdf mr-2"></i>Download PDF
+    </button>
+</div>
 
-<div id="faqAccordion">
+<div id="faqContent">
+    <div class="faq-pdf-title">FAQ L0 Support</div>
+    <div class="faq-pdf-subtitle">Dokumen panduan jawaban cepat untuk pertanyaan user yang sering muncul.</div>
+
+    <div id="faqAccordion">
     <div class="faq-card">
         <button class="faq-question" data-toggle="collapse" data-target="#faq1" aria-expanded="true">
             1. Kapan campaign direfund?
@@ -284,4 +335,67 @@
         </div>
     </div>
 </div>
+</div>
+@endsection
+
+@section('js')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    (function () {
+        const btn = document.getElementById('btnDownloadFaqPdf');
+        const faqContent = document.getElementById('faqContent');
+
+        if (!btn || !faqContent) return;
+
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+
+            const collapses = Array.from(document.querySelectorAll('#faqAccordion .collapse'));
+            const wasOpen = collapses.map(el => el.classList.contains('show'));
+            collapses.forEach(el => {
+                el.classList.add('show');
+            });
+
+            try {
+                const prevWidth = faqContent.style.width;
+                const prevMaxWidth = faqContent.style.maxWidth;
+                const prevMargin = faqContent.style.margin;
+                const prevTransform = faqContent.style.transform;
+                const prevTransformOrigin = faqContent.style.transformOrigin;
+                faqContent.style.width = '100%';
+                faqContent.style.maxWidth = '100%';
+                faqContent.style.margin = '0';
+                faqContent.style.transform = 'scale(0.9)';
+                faqContent.style.transformOrigin = 'top left';
+
+                const opt = {
+                    margin: [10, 12, 10, 12],
+                    filename: 'FAQ_L0_Support.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['avoid-all', 'css'] }
+                };
+
+                await html2pdf().set(opt).from(faqContent).save();
+
+                faqContent.style.width = prevWidth;
+                faqContent.style.maxWidth = prevMaxWidth;
+                faqContent.style.margin = prevMargin;
+                faqContent.style.transform = prevTransform;
+                faqContent.style.transformOrigin = prevTransformOrigin;
+            } finally {
+                collapses.forEach((el, idx) => {
+                    if (!wasOpen[idx]) {
+                        el.classList.remove('show');
+                    }
+                });
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    })();
+</script>
 @endsection

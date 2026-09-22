@@ -23,7 +23,11 @@ class User extends Authenticatable
         'password',
         'nohp',
         'status',
-        'role'
+        'role',
+        'area',
+        'branch',
+        'regional',
+        'referral_code',
     ];
 
     /**

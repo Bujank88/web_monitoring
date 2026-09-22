@@ -236,6 +236,12 @@ class LogbookDailyController extends Controller
         }
         public function refreshLogbookDaily()
         {
+            $this->refreshLogbookDailyToday();
+            $this->refreshLogbookDailyPast();
+        }
+
+        public function refreshLogbookDailyToday()
+        {
             $today = Carbon::today()->toDateString(); // YYYY-MM-DD
             $month = now()->month;
             $year  = now()->year;
@@ -270,6 +276,13 @@ class LogbookDailyController extends Controller
                     ]);
                 print($data->leads_master_id . '    ');
             }
+        }
+
+        public function refreshLogbookDailyPast()
+        {
+            $today = Carbon::today()->toDateString(); // YYYY-MM-DD
+            $month = now()->month;
+            $year  = now()->year;
 
             // --------------------------------
             // 2️⃣ Hari sebelumnya → pakai report_balance_top_up saja

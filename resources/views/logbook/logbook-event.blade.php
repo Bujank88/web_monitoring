@@ -1,5 +1,5 @@
 @extends('master')
-@section('title') Logbook Ramadhan 2026 @endsection
+@section('title') Logbook April 2026 @endsection
 
 @section('css')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
@@ -111,7 +111,7 @@
 
 <!-- Filter Card -->
 <div class="filter-card">
-    <h5><i class="fas fa-filter"></i> FILTER DATA LOGBOOK RAMADHAN 2026</h5>
+    <h5><i class="fas fa-filter"></i> FILTER DATA LOGBOOK APRIL 2026</h5>
     
     <div class="filter-row">
         @if(Auth::user()->role === 'Admin')
@@ -160,9 +160,9 @@
                 <strong>(Existing vs Topup) & (Leads vs New Akun)</strong>
             </div>
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between"><span>Jumlah Existing Ramadhan 2026</span><strong id="sumExistingCount">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Jumlah Eksisting April 2026</span><strong id="sumExistingCount">0</strong></div>
                 <div class="d-flex justify-content-between"><span>Existing yang Realisasi Topup</span><strong id="sumExistingRealisasiCount">0</strong></div>
-                <div class="d-flex justify-content-between"><span>Jumlah Leads Ramadhan 2026</span><strong id="sumLeadsCount">0</strong></div>
+                <div class="d-flex justify-content-between"><span>Jumlah Leads April 2026</span><strong id="sumLeadsCount">0</strong></div>
                 <div class="d-flex justify-content-between"><span>Leads Jadi New Akun</span><strong id="sumLeadsToEksistingCount">0</strong></div>
             </div>
         </div>
@@ -197,7 +197,7 @@
 {{-- TABLE --}}
 <div class="card">
     <div class="card-header bg-danger text-white">
-        <h4 class="font-weight-bold">Logbook Ramadhan 2026</h4>
+        <h4 class="font-weight-bold">Logbook April 2026</h4>
     </div>
 
     <div class="card-body table-responsive">

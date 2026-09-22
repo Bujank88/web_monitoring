@@ -227,13 +227,15 @@
                         <p>Topup & Client Canvasser</p>
                     </a>
                 </li>          
+                @if($isAdmin)
                 <li class="nav-item">
                     <a href="{{ route('region-target') }}"
                         class="nav-link waves-effect {{ request()->routeIs('region-target') ? 'active' : '' }}">
                         <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
                         <p>Region Target Topup</p>
                     </a>
-                </li>   
+                </li>
+                @endif
                 {{-- <li class="nav-item">
                     <a href="{{ route('logbook.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('logbook.index') ? 'active' : '' }}">
