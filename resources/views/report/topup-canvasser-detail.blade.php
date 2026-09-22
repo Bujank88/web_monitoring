@@ -19,6 +19,26 @@
   <div class="col-xl-4 mb-4"><div class="card shadow-sm chart-card"><div class="card-header bg-white font-weight-bold">Tren #User Topup {{ $canvasser->name }} — {{ \Carbon\Carbon::createFromFormat('Y-m-d',$month.'-01')->year }}</div><div class="card-body"><div class="chart-wrap"><div class="ajax-loading" id="userTrendLoading"><span><i class="fas fa-spinner fa-spin"></i> Memuat tren user...</span></div><canvas id="userTrendChart"></canvas></div></div></div></div>
  </div>
  <div class="card shadow-sm mb-4"><div class="card-header bg-white"><h5 class="mb-0">Detail Transaksi — {{ $canvasser->name }} — {{ $periodLabel }}</h5></div><div class="card-body"><div id="transactionLoading" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Memuat transaksi...</div><div class="table-responsive"><table id="transactionTable" class="table table-bordered table-striped table-sm w-100"><thead class="thead-dark"><tr><th>Tanggal</th><th>Invoice</th><th>Pelanggan</th><th>Email</th><th>Status Akun</th><th>Nominal</th><th>Payment Method</th><th>Voucher Code</th></tr></thead><tbody></tbody></table></div></div></div>
+ <div class="card shadow-sm mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap">
+   <h5 class="mb-0">Top 10 Leads Master &mdash; {{ $periodLabel }}</h5>
+   @if($canDownloadTopLeads ?? false)
+    <a class="btn btn-sm btn-success ml-auto" href="{{ route('topup-canvasser.detail.top-leads.csv', ['user_id' => $canvasser->id, 'month' => $month, 'source' => $source]) }}"><i class="fas fa-download mr-1"></i> Download CSV</a>
+   @endif
+  </div>
+  <div class="card-body">
+   <p class="text-muted small mb-2">Diurutkan berdasarkan total top up terbesar. Voucher Bonus tidak dihitung. Email disensor pada tabel; CSV memuat email lengkap.</p>
+   <p id="topLeadsPeriod" class="text-muted small"></p>
+   <div id="topLeadsLoading" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Memuat top leads...</div>
+   <div class="table-responsive">
+    <table id="topLeadsTable" class="table table-bordered table-striped table-sm w-100">
+     <thead class="thead-dark"><tr><th>Peringkat</th><th>Pelanggan</th><th>Email</th><th>Top Up Bulan Dipilih</th><th>Top Up Bulan Lalu</th><th>Selisih</th><th>MoM</th></tr></thead>
+     <tbody></tbody>
+    </table>
+   </div>
+   <p class="text-muted small mb-0">Bulan berjalan dibandingkan hingga tanggal yang setara di bulan lalu; bulan selesai dibandingkan satu bulan penuh. MoM "Baru" berarti belum ada top up pada periode pembanding.</p>
+  </div>
+ </div>
 </div>
 @endsection
 @section('js')
@@ -30,6 +50,21 @@ document.addEventListener('DOMContentLoaded',()=>{
  const money=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(v||0), num=v=>new Intl.NumberFormat('id-ID').format(v||0), pct=v=>new Intl.NumberFormat('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0)+'%';
  const request=url=>$.ajax({url,data:params});
  const fail=id=>{$('#'+id).html('<span class="text-danger">Gagal memuat data</span>')};
+ request(@json(route('topup-canvasser.detail.top-leads'))).done(report=>{
+  $('#topLeadsLoading').remove();
+  $('#topLeadsPeriod').text(`${report.current_label} dibandingkan ${report.previous_label}`);
+  const tbody=$('#topLeadsTable tbody').empty();
+  if(!report.data.length){
+   $('<tr>').append($('<td>',{colspan:7,class:'text-center text-muted',text:'Belum ada top up leads pada periode ini.'})).appendTo(tbody);
+  }
+  report.data.forEach(row=>{
+   const tr=$('<tr>').appendTo(tbody);
+   [row.rank,row.company_name,row.masked_email,money(row.current_total),money(row.previous_total)].forEach(value=>$('<td>').text(value).appendTo(tr));
+   const color=row.difference>0?'text-success':row.difference<0?'text-danger':'text-muted';
+   $('<td>').addClass(color).text((row.difference>0?'+':'')+money(row.difference)).appendTo(tr);
+   $('<td>').addClass(color).text(row.mom_percent===null?'Baru':(row.mom_percent>0?'+':'')+pct(row.mom_percent)).appendTo(tr);
+  });
+ }).fail(()=>fail('topLeadsLoading'));
  const donut=(id,labels,values,title,fmt=num,colors=['#4e73df','#1cc88a'])=>new Chart(document.getElementById(id),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:colors,borderWidth:2}]},options:{maintainAspectRatio:false,cutout:'65%',plugins:{title:{display:true,text:title},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.raw)}`}}}}});
 
  request(urls.overview).done(d=>{
