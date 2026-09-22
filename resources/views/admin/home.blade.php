@@ -1291,7 +1291,7 @@
             '1': ['Medan', 'Padang', 'Pekanbaru', 'Palembang', 'Jambi', 'Batam'],
             '2': ['Jakarta', 'Bogor', 'Bandung', 'Depok', 'Tangerang', 'Bekasi'],
             '3': ['Semarang', 'Surabaya', 'Yogyakarta', 'Denpasar'],
-            '4': ['Makassar', 'Manado', 'Samarinda', 'Banjarmasin']
+            '4': ['Makassar', 'Manado', 'Samarinda', 'Banjarmasin', 'Balikpapan']
         };
 
         let availableCanvasserRows = [];
