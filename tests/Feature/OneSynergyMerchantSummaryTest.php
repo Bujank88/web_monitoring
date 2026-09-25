@@ -112,22 +112,31 @@ class OneSynergyMerchantSummaryTest extends TestCase
         $this->assertSame('5.860', end($rows)['total_balance']);
     }
 
-    public function test_whitelist_applies_to_options_report_and_export_for_both_roles(): void
+    public function test_report_includes_all_merchants_and_unmapped_campaigns_for_both_roles(): void
     {
         $this->campaign('1', 'CH778899', '2026-09-15', 'WABA', 'BROADCAST', 10);
         $this->campaign('2', '808982JJ', '2026-09-15', 'WABA', 'BROADCAST', 5304);
+        DB::table('one_synergy_reports')->insert([
+            ['id_iklan' => '3', 'tgl_tayang' => '2026-09-16', 'sukses' => 0],
+            ['id_iklan' => '4', 'tgl_tayang' => '2026-09-17', 'sukses' => 0],
+            ['id_iklan' => '5', 'tgl_tayang' => '2026-10-01', 'sukses' => 0],
+        ]);
         $controller = new OneSynergyReportController();
         $options = (new \ReflectionMethod($controller, 'merchantOptions'))->invoke($controller, true);
         $this->assertSame(['CH778899'], array_column($options, 'id'));
         $this->assertSame('ICE (CH778899)', $options[0]['label']);
+        $reportOptions = (new \ReflectionMethod($controller, 'merchantOptions'))->invoke($controller, false, false);
+        $this->assertEqualsCanonicalizing(['CH778899', '808982JJ'], array_column($reportOptions, 'id'));
         foreach (['Admin', '1Synergy'] as $role) {
             $this->actingAs(new User(['id' => 1, 'role' => $role]));
             $this->getJson(route('one-synergy.report.data', ['month' => '2026-09']))->assertOk()
-                ->assertJsonPath('recordsTotal', 1)->assertJsonPath('data.0.id_iklan', '1');
+                ->assertJsonPath('recordsTotal', 4)->assertJsonPath('summary.total_campaign', 4);
             $this->getJson(route('one-synergy.report.data', ['month' => '2026-09', 'merchant' => '808982JJ']))
-                ->assertOk()->assertJsonPath('recordsTotal', 0);
+                ->assertOk()->assertJsonPath('recordsTotal', 1)->assertJsonPath('data.0.id_iklan', '2');
             $this->get(route('one-synergy.report.export', ['month' => '2026-09', 'merchant' => '808982JJ']))
-                ->assertRedirect()->assertSessionHas('error');
+                ->assertOk()->assertDownload('Report_1Synergy_2026-09.xlsx');
+            $this->get(route('one-synergy.report.export', ['month' => '2026-09']))
+                ->assertOk()->assertDownload('Report_1Synergy_2026-09.xlsx');
         }
     }
 }

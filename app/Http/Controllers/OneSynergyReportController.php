@@ -258,17 +258,17 @@ class OneSynergyReportController extends Controller
             'dataUrl' => route('one-synergy.report.data'),
             'exportUrl' => route('one-synergy.report.export'),
             'showMerchantFilter' => true,
-            'merchants' => $this->merchantOptions(),
+            'merchants' => $this->merchantOptions(false, false),
             'selectedMerchant' => $selectedMerchant,
         ]);
     }
 
-    private function merchantOptions(bool $usersOnly = false): array
+    private function merchantOptions(bool $usersOnly = false, bool $restrictMerchants = true): array
     {
         try {
             return DB::connection('kam_myads')
                 ->table('merchant_campaign_mappings as m')
-                ->whereIn('m.merchant_id', self::MERCHANT_WHITELIST)
+                ->when($restrictMerchants, fn ($query) => $query->whereIn('m.merchant_id', self::MERCHANT_WHITELIST))
                 ->leftJoin('users as u', 'u.merchant_id', '=', 'm.merchant_id')
                 ->when($usersOnly, fn ($query) => $query->where('u.role', 'user'))
                 ->select('m.merchant_id', DB::raw('MAX(u.name) as merchant_name'))
@@ -290,15 +290,15 @@ class OneSynergyReportController extends Controller
         }
     }
 
-    private function campaignIdsForMerchant(string $merchantId): array
+    private function campaignIdsForMerchant(string $merchantId, bool $restrictMerchants = true): array
     {
-        if ($merchantId !== '' && !in_array($merchantId, self::MERCHANT_WHITELIST, true)) {
+        if ($restrictMerchants && $merchantId !== '' && !in_array($merchantId, self::MERCHANT_WHITELIST, true)) {
             return [];
         }
 
         return DB::connection('kam_myads')
             ->table('merchant_campaign_mappings')
-            ->whereIn('merchant_id', self::MERCHANT_WHITELIST)
+            ->when($restrictMerchants, fn ($query) => $query->whereIn('merchant_id', self::MERCHANT_WHITELIST))
             ->when($merchantId !== '', fn ($query) => $query->where('merchant_id', $merchantId))
             ->distinct()
             ->pluck('campaign_id')
@@ -419,7 +419,9 @@ class OneSynergyReportController extends Controller
                 $endDate->format('Y-m-d'),
             ]);
 
-        $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId));
+        if ($merchantId !== '') {
+            $query->whereIn('cr.id_iklan', $this->campaignIdsForMerchant($merchantId, false));
+        }
 
         return $query;
     }
