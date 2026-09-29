@@ -72,6 +72,32 @@
         padding: 12px 15px !important;
     }
 
+    #modalBooking .select2-container .select2-selection--single {
+        height: 45px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+    }
+
+    #modalBooking .select2-selection--single .select2-selection__rendered {
+        line-height: 41px;
+        padding-left: 12px;
+        font-size: 14px;
+    }
+
+    #modalBooking .select2-selection--single .select2-selection__arrow {
+        height: 41px;
+    }
+
+    #modalBooking .select2-container--open .select2-selection--single,
+    #modalBooking .select2-container--focus .select2-selection--single {
+        border-color: #17a2b8;
+    }
+
+    #modalBooking .select2-results__group {
+        color: #138496;
+        background: #f0f7f8;
+    }
+
     .form-group label {
         font-weight: 600;
         font-size: 14px;
@@ -202,18 +228,13 @@
                         <select name="nama" class="form-control" id="namaSelect" required>
                             <option value="">-- Pilih Nama --</option>
 
-                            <option value="Robert J. Nandjong" data-color="#e74c3c">Robert J. Nandjong</option>
-                            <option value="Luky Ghazali" data-color="#3498db">Luky Ghazali</option>
-                            <option value="Fauzia Noviyanti" data-color="#9b59b6">Fauzia Noviyanti</option>
-                            <option value="Nopranda Dirzan" data-color="#1abc9c">Nopranda Dirzan</option>
-                            <option value="Angga Satria Gusti" data-color="#f39c12">Angga Satria Gusti</option>
-                            <option value="Abdul Halim" data-color="#2ecc71">Abdul Halim</option>
-                            <option value="Raden Agie Satria Akbar" data-color="#e84393">Raden Agie Satria Akbar</option>
-                            <option value="Sony Widjaya" data-color="#34495e">Sony Widjaya</option>
-                            <option value="Deni Setiawan" data-color="#16a085">Deni Setiawan</option>
-                            <option value="Muhammad Arief Syahbana" data-color="#d35400">Muhammad Arief Syahbana</option>
-                            <option value="Naqsyabandi" data-color="#7f8c8d">Naqsyabandi</option>
-                            <option value="Ikrar Dharmawan" data-color="#2980b9">Ikrar Dharmawan</option>
+                            @foreach($participantGroups as $role => $members)
+                                <optgroup label="{{ $role === 'PH' ? 'PH (Powerhouse)' : $role }}">
+                                    @foreach($members as $name => $color)
+                                        <option value="{{ $name }}" data-color="{{ $color }}">{{ $name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
                         </select>
 
                         <!-- hidden untuk kirim warna -->
@@ -269,6 +290,7 @@
 @endsection
 
 @section('js')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
 
@@ -278,6 +300,22 @@ let calendar;
 let selectedEventId = null;
 
 document.addEventListener('DOMContentLoaded', function () {
+
+    $('#namaSelect').select2({
+        placeholder: '-- Pilih Nama --',
+        width: '100%',
+        dropdownParent: $('#modalBooking'),
+        minimumResultsForSearch: 0,
+        language: {
+            noResults: function () { return 'Nama tidak ditemukan'; }
+        }
+    }).on('select2:open', function () {
+        const search = document.querySelector('#modalBooking .select2-search__field');
+        if (search) {
+            search.placeholder = 'Cari nama...';
+            search.focus();
+        }
+    });
 
     calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
@@ -437,7 +475,14 @@ $('#btnEdit').on('click', function () {
 
     // Fill form with event data
     $('#booking-id').val(selectedEventId);
-    $('#namaSelect').val(extendedProps.nama);
+    const nameSelect = $('#namaSelect');
+    nameSelect.find('option[data-booking-only]').remove();
+    if (!Array.from(nameSelect[0].options).some(option => option.value === extendedProps.nama)) {
+        const option = new Option(extendedProps.nama, extendedProps.nama);
+        $(option).attr('data-booking-only', 'true').attr('data-color', event.backgroundColor);
+        nameSelect.append(option);
+    }
+    nameSelect.val(extendedProps.nama).trigger('change');
     $('input[name="lokasi"]').val(extendedProps.lokasi);
     $('input[name="tanggal"]').val(extendedProps.tanggal);
     $('input[name="start"]').val(event.start.toLocaleTimeString('sv-SE').slice(0, 5));
@@ -510,17 +555,18 @@ $('#btnDownload').on('click', function () {
     window.location.href = "{{ url('/calendar/download') }}";
 });
 $('#namaSelect').on('change', function () {
-    // let color = $(this).find(':selected').data('color') || '#3788d8';
+    const color = $(this).find(':selected').data('color') || '#3788d8';
     $('#colorInput').val(color);
+});
 
-    // optional: ubah warna select biar kelihatan
-    // $(this).css({
-    //     'background-color': color,
-    //     'color': '#fff'
-    // });
+$('#modalBooking').on('hidden.bs.modal', function () {
+    $('#namaSelect option[data-booking-only]').remove();
+    $('#formBooking')[0].reset();
+    $('#namaSelect').val('').trigger('change');
+    $('#booking-id').val('');
+    $('#colorInput').val('');
+    $('#modalTitle').text('Tambah Booking');
 });
 
 </script>
 @endsection
-
-
