@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\CalendarParticipant;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -12,28 +13,20 @@ class CalendarController extends Controller
 {
     public function index()
     {
-        return view('calendar.index');
+        $participantGroups = CalendarParticipant::groupedOptions();
+
+        return view('calendar.index', [
+            'participantGroups' => $participantGroups,
+            'participants' => $participantGroups->collapse(),
+        ]);
     }
 
     public function events()
     {
-        $colorMap = [
-            'Robert J. Nandjong' => '#20c997', // teal
-            'Luky Ghazali' => '#0d6efd',   // blue
-            'Fauzia Noviyanti' => '#6610f2',   // purple
-            'Nopranda Dirzan' => '#fd7e14',
-            'Angga Satria Gusti' => '#198754',
-            'Abdul Halim' => '#dc3545',
-            'Raden Agie Satria Akbar' => '#6f42c1',
-            'Sony Widjaya' => '#17a2b8',
-            'Deni Setiawan' => '#e83e8c',
-            'Muhammad Arief Syahbana' => '#0dcaf0',
-            'Naqsyabandi' => '#adb5bd',
-            'Ikrar Dharmawan' => '#795548',
-        ];
+        $colorMap = CalendarParticipant::options();
         return Booking::all()->map(function ($e) use ($colorMap) {
 
-            $color = $colorMap[$e->nama] ?? '#000000';
+            $color = $colorMap->get($e->nama) ?? $e->warna ?? CalendarParticipant::defaultColor($e->nama);
 
             return [
                 'id'    => $e->id,
