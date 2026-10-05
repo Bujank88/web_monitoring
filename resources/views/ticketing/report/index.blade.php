@@ -4,7 +4,10 @@
 @section('content')
 <div class="container-fluid">
     <div class="card card-info">
-        <div class="card-header"><h3 class="card-title">Report Ticketing</h3></div>
+        <div class="card-header">
+            <h3 class="card-title">Report Ticketing</h3>
+            <a href="{{ route('ticketing.report.export', array_merge($filters, ['reportType' => 'all'])) }}" class="btn btn-sm btn-light float-right"><i class="fas fa-file-excel mr-1"></i> Export semua report</a>
+        </div>
         <div class="card-body">
             @if($errors->any())
                 <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
@@ -72,7 +75,12 @@
     <div class="tab-content">
         @foreach(['channel', 'complaint', 'summary'] as $key)
         <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="report-{{ $key }}" role="tabpanel" aria-labelledby="tab-{{ $key }}">
-            @foreach($report[$key] as $pivot)@include('ticketing.report.pivot', ['pivot' => $pivot])@endforeach
+            <div class="text-right mb-3">
+                <a href="{{ route('ticketing.report.export', array_merge($filters, ['reportType' => $key])) }}" class="btn btn-success"><i class="fas fa-file-excel mr-1"></i> Export Excel tab ini</a>
+            </div>
+            @foreach($report[$key] as $pivot)
+                @include('ticketing.report.pivot', ['pivot' => $pivot, 'reportType' => $key, 'pivotIndex' => $loop->index])
+            @endforeach
         </div>
         @endforeach
     </div>
