@@ -18,6 +18,20 @@ use App\Http\Controllers\LeadProgramController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\LocationPresensiController;
 use App\Http\Controllers\MitraSbpController;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketReportController;
+
+Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_ROLES)])
+    ->prefix('ticketing')->name('ticketing.')->group(function () {
+        Route::get('/', [TicketController::class, 'index'])->name('index');
+        Route::get('/input', [TicketController::class, 'create'])->name('create');
+        Route::get('/report', [TicketReportController::class, 'index'])->name('report');
+        Route::post('/', [TicketController::class, 'store'])->name('store');
+        Route::patch('/{ticket}/close', [TicketController::class, 'close'])->whereNumber('ticket')->name('close');
+        Route::get('/{ticket}/edit', [TicketController::class, 'edit'])->whereNumber('ticket')->name('edit');
+        Route::patch('/{ticket}', [TicketController::class, 'update'])->whereNumber('ticket')->name('update');
+        Route::delete('/{ticket}', [TicketController::class, 'destroy'])->whereNumber('ticket')->name('destroy');
+    });
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/login', [FrontController::class, 'index']);

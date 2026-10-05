@@ -620,6 +620,25 @@
                 </li>
                 @endif
                 @if($isAdmin)
+                <li class="nav-header">Ticket</li>
+                <li class="nav-item">
+                    <a href="{{ route('ticketing.create') }}" class="nav-link {{ request()->routeIs('ticketing.create') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-ticket-alt" style="color:#17a2b8;"></i>
+                        <p>Input Ticketing</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('ticketing.index') }}" class="nav-link {{ request()->routeIs('ticketing.index', 'ticketing.edit') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-list-alt" style="color:#17a2b8;"></i>
+                        <p>List Ticketing</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('ticketing.report') }}" class="nav-link {{ request()->routeIs('ticketing.report') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-chart-bar" style="color:#17a2b8;"></i>
+                        <p>Report Ticketing</p>
+                    </a>
+                </li>
                 <li class="nav-header">Configuration</li>
                 <li class="nav-item">
                     <a href="{{ route('configuration.mitra-sbp.index') }}"
