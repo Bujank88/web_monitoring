@@ -18,6 +18,7 @@
                 $isTsel = $roleUpper === 'TSEL';
                 $isTreg = $roleUpper === 'TREG';
                 $isCanv = $roleValue === 'cvsr';
+                $isSupervisor = $roleUpper === 'SUPERVISOR';
                 $isPH = $roleUpper === 'PH';
                 $isAM = $roleUpper === 'AM';
                 $isAMLeader = $roleUpper === 'AM LEADER';
@@ -97,7 +98,24 @@
         <!-- Sidebar Menu -->
         <nav class="mt-2">
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
-                @if($isTcd)
+                @if($user->role === 'Supervisor')
+                <li class="nav-item"><a href="{{ route('supervisor.index') }}" class="nav-link {{ request()->routeIs('supervisor.index') ? 'active' : '' }}"><i class="nav-icon fas fa-users" style="color:#17a2b8;"></i><p>Monitoring Tim</p></a></li>
+                @endif
+                @if($isSupervisor)
+                @include('supervisor.menu')
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ route('change-password') }}" class="nav-link {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:#adb056;"></i><p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ route('logout') }}" class="nav-link">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:#ef1515;"></i><p>Logout</p>
+                    </a>
+                </li>
+                @elseif($isTcd)
                 <li class="nav-header">AGENCY ADVERTISING</li>
                 <li class="nav-item {{ request()->routeIs('report-agency-advertising') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}">
@@ -1762,6 +1780,11 @@
                 </li>
                 <li class="nav-header">Configuration</li>
                 <li class="nav-item">
+                    <a href="{{ route('supervisor.team') }}" class="nav-link {{ request()->routeIs('supervisor.team*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-user-group"></i><p>Tim Canvasser</p>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="{{ route('configuration.mitra-sbp.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('configuration.mitra-sbp.*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-database" style="color:#17a2b8;"></i>
@@ -1798,7 +1821,7 @@
                 
             
                 
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc || $isSbp || $isCanvasserSbp)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor)
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
                         class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -1811,7 +1834,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc || $isSbp || $isCanvasserSbp)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"

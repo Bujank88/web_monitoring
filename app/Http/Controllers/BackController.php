@@ -429,6 +429,8 @@ class BackController extends Controller
                     return redirect()->route('admin.home');
                 case 'Treg':
                     return redirect()->route('race_summary_treg');
+                case 'Supervisor':
+                    return redirect()->route('supervisor.index');
                 case 'cvsr':
                     return redirect()->route('presensi.index');
                 case 'MPCC':

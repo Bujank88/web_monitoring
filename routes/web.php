@@ -55,6 +55,21 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('sales-analysis')->name('
 });
 
 Route::get('/', [FrontController::class, 'index'])->name('home');
+Route::middleware(['auth', 'checkrole:Supervisor'])->get('/supervisor', [\App\Http\Controllers\SupervisorController::class, 'index'])->name('supervisor.index');
+Route::middleware(['auth', 'checkrole:Supervisor'])->prefix('supervisor')->name('supervisor.')->group(function () {
+    Route::get('/daily-topup', [\App\Http\Controllers\SupervisorReportController::class, 'daily'])->name('daily');
+    Route::get('/report-canvasser', [\App\Http\Controllers\SupervisorReportController::class, 'canvassers'])->name('canvassers');
+    Route::get('/leads', [\App\Http\Controllers\SupervisorController::class, 'index'])->name('leads');
+    Route::get('/logbook/{period}', [\App\Http\Controllers\SupervisorReportController::class, 'logbook'])->whereIn('period', ['monthly', 'daily'])->name('logbook');
+    Route::get('/referral-champion', [\App\Http\Controllers\SupervisorReportController::class, 'referral'])->name('referral');
+    Route::get('/sof', [\App\Http\Controllers\SupervisorReportController::class, 'sof'])->name('sof');
+    Route::get('/sof/create', [\App\Http\Controllers\SupervisorReportController::class, 'createSof'])->name('sof.create');
+    Route::post('/sof', [\App\Http\Controllers\SupervisorReportController::class, 'storeSof'])->name('sof.store');
+});
+Route::middleware(['auth', 'checkrole:Admin'])->group(function () {
+    Route::get('/supervisor/team', [\App\Http\Controllers\SupervisorController::class, 'team'])->name('supervisor.team');
+    Route::post('/supervisor/team', [\App\Http\Controllers\SupervisorController::class, 'assign'])->name('supervisor.team.assign');
+});
 Route::get('/login', [FrontController::class, 'index']);
 Route::post('/login', [BackController::class, 'login'])->name('login');
 Route::get('/register', [FrontController::class, 'register'])->name('register');
@@ -115,7 +130,7 @@ Route::middleware(['auth', 'checkrole:Admin,Treg'])->group(function (){
     ->name('download.format.voucher.treg');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,AM,AM Leader,MPCC,Regional'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,AM,AM Leader,MPCC,Regional,Supervisor'])->group(function () {
     Route::get('/daily-topup-channel', [FrontController::class, 'dailyTopupChannel'])->name('daily.topup.channel');
     Route::get('/get-daily-topup-data', [LeadProgramController::class, 'getDailyTopupDataTable'])->name('daily_topup_data');
     Route::get('/get-daily-topup-by-province-data', [LeadProgramController::class, 'getDailyTopupByProvinceDataTable'])->name('daily_topup_by_province_data');
@@ -135,12 +150,6 @@ Route::middleware(['auth', 'checkrole:Admin,Regional'])->group(function () {
 });
 
 Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function () {
-    Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
-    Route::get('/export-regional', [BackController::class, 'exportRegional'])->name('export.regional');
-    Route::get('/get-leads-data-api', [LeadProgramController::class, 'getLeadsDataApi'])->name('leads_data_api');
-    Route::get('/get-regional-data', [LeadProgramController::class, 'getRegionalDataTable'])->name('regional_data');
-    Route::get('/get-regional-chart-data', [LeadProgramController::class, 'getRegionalChartData'])->name('regional_chart_data');
-    Route::get('/get-regional-chart-data-for-ph', [LeadProgramController::class, 'getRegionalChartDataForPH'])->name('regional_chart_data_for_ph');
 
     Route::get('/upload-file-myads', [FrontController::class, 'uploadMyAds'])->name('admin.upload');
     Route::post('/store-csv-myads', [BackController::class, 'storeUploadMyAds'])->name('upload.myads.store');
@@ -186,11 +195,6 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function
     Route::get('/monitoring-referral-champion-tele-am', [FrontController::class, 'monitoringReferralChampionTeleAm'])->name('admin.monitoring.referral_tele_am');
 
     // Referral Champion Canvasser
-    Route::get('/referral-champion-canvasser', [FrontController::class, 'monitoringCanvasserVoucher'])->name('admin.monitoring.canvasser_voucher');
-    Route::get('/get-canvasser-voucher-data', [BackController::class, 'getCanvasserVoucher'])->name('canvasser_voucher_data');
-    Route::get('/get-canvasser-voucher-summary', [BackController::class, 'getCanvasserVoucherSummary'])->name('canvasser_voucher_summary');
-    Route::get('/export-canvasser-voucher', [BackController::class, 'exportCanvasserVoucher'])->name('export.canvasser_voucher');
-    Route::get('/export-canvasser-voucher-summary', [BackController::class, 'exportCanvasserVoucherSummary'])->name('export.canvasser_voucher_summary');
 
     // PowerHouse Referral
     Route::get('/powerhouse-referral', [FrontController::class, 'monitoringPowerHouseReferral'])->name('admin.monitoring.powerhouse_referral');
@@ -276,9 +280,6 @@ Route::middleware(['auth', 'checkrole:Admin,AM,AM Leader'])->prefix('am')->name(
 Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     Route::get('leads-master/create-enterprise', [LeadsMasterController::class, 'createEnterprise'])->name('leads-master.create-enterprise');
     Route::post('leads-master/store-enterprise', [LeadsMasterController::class, 'storeEnterprise'])->name('leads-master.store-enterprise');
-    Route::view('faq-l0', 'faq.l0')->name('faq-l0');
-    Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
-    Route::get('tips-sales/pdf', [FrontController::class, 'downloadTipsSalesPdf'])->name('tips-sales.pdf');
 
     Route::get('fbm/pengajuan-sof', [FbmSofController::class, 'create'])->name('fbm.sof.create');
     Route::post('fbm/pengajuan-sof', [FbmSofController::class, 'store'])->name('fbm.sof.store');
@@ -309,13 +310,6 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 
     // Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
     Route::get('topup-canvasser', [ReportController::class, 'topupCanvasser'])->name('topup-canvasser');
-    Route::get('topup-canvasser/detail', [CanvasserDetailController::class, 'page'])->name('topup-canvasser.detail');
-    Route::get('topup-canvasser/detail/overview', [CanvasserDetailController::class, 'overview'])->name('topup-canvasser.detail.overview');
-    Route::get('topup-canvasser/detail/mom', [CanvasserDetailController::class, 'mom'])->name('topup-canvasser.detail.mom');
-    Route::get('topup-canvasser/detail/trend', [CanvasserDetailController::class, 'trend'])->name('topup-canvasser.detail.trend');
-    Route::get('topup-canvasser/detail/transactions', [CanvasserDetailController::class, 'transactions'])->name('topup-canvasser.detail.transactions');
-    Route::get('topup-canvasser/detail/top-leads', [CanvasserDetailController::class, 'topLeads'])->name('topup-canvasser.detail.top-leads');
-    Route::get('topup-canvasser/detail/top-leads/csv', [CanvasserDetailController::class, 'downloadTopLeads'])->name('topup-canvasser.detail.top-leads.csv');
     Route::get('topup-canvasser/data', [ReportController::class, 'topupCanvasserData']);
     Route::get('topup-canvasser/excel', [ReportController::class, 'exportTopupCanvasserExcel'])->name('topup-canvasser.excel');
     Route::get('topup-canvasser/pdf', [ReportController::class, 'exportTopupCanvasserPdf'])->name('topup-canvasser.pdf');
@@ -351,30 +345,16 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
     // Panen Poin V3 Routes
     Route::get('panen-poin-v3/input', [PanenPoinV3Controller::class, 'index'])->name('panenpoinv3.index');
     Route::post('panen-poin-v3/store', [PanenPoinV3Controller::class, 'store'])->name('panenpoinv3.store');
-    Route::get('panen-poin-v3/report', [PanenPoinV3Controller::class, 'report'])->name('panenpoinv3.report');
-    Route::get('panen-poin-v3/report-data', [PanenPoinV3Controller::class, 'getReportData'])->name('panenpoinv3.report-data');
-    Route::get('panen-poin-v3/report-canvasser', [PanenPoinV3Controller::class, 'reportCanvasser'])->name('panenpoinv3.report-canvasser');
-    Route::get('panen-poin-v3/report-canvasser-data', [PanenPoinV3Controller::class, 'getReportCanvasserData'])->name('panenpoinv3.report-canvasser-data');
     Route::get('panen-poin-v3/report-ph', [PanenPoinV3Controller::class, 'reportPowerhouse'])->name('panenpoinv3.report-ph');
     Route::get('panen-poin-v3/report-ph-data', [PanenPoinV3Controller::class, 'getReportPowerhouseData'])->name('panenpoinv3.report-ph-data');
-    Route::get('panen-poin-v3/export', [PanenPoinV3Controller::class, 'export'])->name('panenpoinv3.export');
     Route::get('panen-poin-v3/refresh-summary', [PanenPoinV3Controller::class, 'refreshSummaryPanenPoinV3'])->name('panenpoinv3.refresh');
-    Route::get('panen-poin-v3/list-akun', [PanenPoinV3Controller::class, 'listAkun'])->name('panenpoinv3.list-akun');
-    Route::get('panen-poin-v3/akun-data', [PanenPoinV3Controller::class, 'getAkunData'])->name('panenpoinv3.akun-data');
 
     // Panen Poin V4 Routes
     Route::get('panen-poin-v4/input', [PanenPoinV4Controller::class, 'index'])->name('panenpoinv4.index');
     Route::post('panen-poin-v4/store', [PanenPoinV4Controller::class, 'store'])->name('panenpoinv4.store');
-    Route::get('panen-poin-v4/report', [PanenPoinV4Controller::class, 'report'])->name('panenpoinv4.report');
-    Route::get('panen-poin-v4/report-data', [PanenPoinV4Controller::class, 'getReportData'])->name('panenpoinv4.report-data');
-    Route::get('panen-poin-v4/report-canvasser', [PanenPoinV4Controller::class, 'reportCanvasser'])->name('panenpoinv4.report-canvasser');
-    Route::get('panen-poin-v4/report-canvasser-data', [PanenPoinV4Controller::class, 'getReportCanvasserData'])->name('panenpoinv4.report-canvasser-data');
     Route::get('panen-poin-v4/report-ph', [PanenPoinV4Controller::class, 'reportPowerhouse'])->name('panenpoinv4.report-ph');
     Route::get('panen-poin-v4/report-ph-data', [PanenPoinV4Controller::class, 'getReportPowerhouseData'])->name('panenpoinv4.report-ph-data');
-    Route::get('panen-poin-v4/export', [PanenPoinV4Controller::class, 'export'])->name('panenpoinv4.export');
     Route::get('panen-poin-v4/refresh-summary', [PanenPoinV4Controller::class, 'refreshSummaryPanenPoinV4'])->name('panenpoinv4.refresh');
-    Route::get('panen-poin-v4/list-akun', [PanenPoinV4Controller::class, 'listAkun'])->name('panenpoinv4.list-akun');
-    Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
 
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
@@ -596,4 +576,49 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
     Route::get('/mitra-sbp/{id}/edit', [MitraSbpController::class, 'edit'])->name('mitra-sbp.edit');
     Route::put('/mitra-sbp/{id}', [MitraSbpController::class, 'update'])->name('mitra-sbp.update');
     Route::delete('/mitra-sbp/{id}', [MitraSbpController::class, 'destroy'])->name('mitra-sbp.destroy');
+});
+
+// Materi umum dan laporan campaign global baca-saja untuk Supervisor.
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor'])->group(function () {
+    Route::view('faq-l0', 'faq.l0')->name('faq-l0');
+    Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
+    Route::get('tips-sales/pdf', [FrontController::class, 'downloadTipsSalesPdf'])->name('tips-sales.pdf');
+    Route::get('panen-poin-v3/report', [PanenPoinV3Controller::class, 'report'])->name('panenpoinv3.report');
+    Route::get('panen-poin-v3/report-data', [PanenPoinV3Controller::class, 'getReportData'])->name('panenpoinv3.report-data');
+    Route::get('panen-poin-v3/report-canvasser', [PanenPoinV3Controller::class, 'reportCanvasser'])->name('panenpoinv3.report-canvasser');
+    Route::get('panen-poin-v3/report-canvasser-data', [PanenPoinV3Controller::class, 'getReportCanvasserData'])->name('panenpoinv3.report-canvasser-data');
+    Route::get('panen-poin-v3/export', [PanenPoinV3Controller::class, 'export'])->name('panenpoinv3.export');
+    Route::get('panen-poin-v3/list-akun', [PanenPoinV3Controller::class, 'listAkun'])->name('panenpoinv3.list-akun');
+    Route::get('panen-poin-v3/akun-data', [PanenPoinV3Controller::class, 'getAkunData'])->name('panenpoinv3.akun-data');
+    Route::get('panen-poin-v4/report', [PanenPoinV4Controller::class, 'report'])->name('panenpoinv4.report');
+    Route::get('panen-poin-v4/report-data', [PanenPoinV4Controller::class, 'getReportData'])->name('panenpoinv4.report-data');
+    Route::get('panen-poin-v4/report-canvasser', [PanenPoinV4Controller::class, 'reportCanvasser'])->name('panenpoinv4.report-canvasser');
+    Route::get('panen-poin-v4/report-canvasser-data', [PanenPoinV4Controller::class, 'getReportCanvasserData'])->name('panenpoinv4.report-canvasser-data');
+    Route::get('panen-poin-v4/export', [PanenPoinV4Controller::class, 'export'])->name('panenpoinv4.export');
+    Route::get('panen-poin-v4/list-akun', [PanenPoinV4Controller::class, 'listAkun'])->name('panenpoinv4.list-akun');
+    Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor'])->group(function () {
+    Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
+    Route::get('/export-regional', [BackController::class, 'exportRegional'])->name('export.regional');
+    Route::get('/get-leads-data-api', [LeadProgramController::class, 'getLeadsDataApi'])->name('leads_data_api');
+    Route::get('/get-regional-data', [LeadProgramController::class, 'getRegionalDataTable'])->name('regional_data');
+    Route::get('/get-regional-chart-data', [LeadProgramController::class, 'getRegionalChartData'])->name('regional_chart_data');
+    Route::get('/get-regional-chart-data-for-ph', [LeadProgramController::class, 'getRegionalChartDataForPH'])->name('regional_chart_data_for_ph');
+    Route::get('/referral-champion-canvasser', [FrontController::class, 'monitoringCanvasserVoucher'])->name('admin.monitoring.canvasser_voucher');
+    Route::get('/get-canvasser-voucher-data', [BackController::class, 'getCanvasserVoucher'])->name('canvasser_voucher_data');
+    Route::get('/get-canvasser-voucher-summary', [BackController::class, 'getCanvasserVoucherSummary'])->name('canvasser_voucher_summary');
+    Route::get('/export-canvasser-voucher', [BackController::class, 'exportCanvasserVoucher'])->name('export.canvasser_voucher');
+    Route::get('/export-canvasser-voucher-summary', [BackController::class, 'exportCanvasserVoucherSummary'])->name('export.canvasser_voucher_summary');
+});
+
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor'])->group(function () {
+    Route::get('topup-canvasser/detail', [CanvasserDetailController::class, 'page'])->name('topup-canvasser.detail');
+    Route::get('topup-canvasser/detail/overview', [CanvasserDetailController::class, 'overview'])->name('topup-canvasser.detail.overview');
+    Route::get('topup-canvasser/detail/mom', [CanvasserDetailController::class, 'mom'])->name('topup-canvasser.detail.mom');
+    Route::get('topup-canvasser/detail/trend', [CanvasserDetailController::class, 'trend'])->name('topup-canvasser.detail.trend');
+    Route::get('topup-canvasser/detail/transactions', [CanvasserDetailController::class, 'transactions'])->name('topup-canvasser.detail.transactions');
+    Route::get('topup-canvasser/detail/top-leads', [CanvasserDetailController::class, 'topLeads'])->name('topup-canvasser.detail.top-leads');
+    Route::get('topup-canvasser/detail/top-leads/csv', [CanvasserDetailController::class, 'downloadTopLeads'])->name('topup-canvasser.detail.top-leads.csv');
 });
