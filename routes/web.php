@@ -38,6 +38,8 @@ Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_R
         Route::get('/', [TicketController::class, 'index'])->name('index');
         Route::get('/input', [TicketController::class, 'create'])->name('create');
         Route::get('/report', [TicketReportController::class, 'index'])->name('report');
+        Route::get('/report/export/{reportType}', [TicketReportController::class, 'export'])
+            ->whereIn('reportType', ['channel', 'complaint', 'summary', 'all'])->name('report.export');
         Route::post('/', [TicketController::class, 'store'])->name('store');
         Route::patch('/{ticket}/close', [TicketController::class, 'close'])->whereNumber('ticket')->name('close');
         Route::get('/{ticket}/edit', [TicketController::class, 'edit'])->whereNumber('ticket')->name('edit');

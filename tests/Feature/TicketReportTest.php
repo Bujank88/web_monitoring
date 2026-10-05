@@ -9,6 +9,10 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Testing\TestResponse;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class TicketReportTest extends TestCase
@@ -175,6 +179,108 @@ class TicketReportTest extends TestCase
             ->assertViewHas('report', fn ($report) => $report['year_total'] === 1
                 && $report['filtered_total'] === 0 && $report['closed'] === 0 && $report['ongoing'] === 0
                 && $report['resolution_rate'] === null && $report['average_minutes'] === null);
+    }
+
+    public function test_excel_exports_each_tab_and_individual_report_with_applied_filters(): void
+    {
+        $this->ticket('2026-01-01 09:00:00', 900);
+        $this->ticket('2026-09-01 09:00:00', 10);
+        $this->ticket('2026-09-05 23:59:59', null, 'Open');
+        $this->ticket('2026-09-06 09:00:00', 600);
+        $filters = ['year' => 2026, 'month' => 9, 'date_from' => '2026-09-01', 'date_to' => '2026-09-05'];
+        $expected = app(TicketReportService::class)->build(2026, 9, $filters['date_from'], $filters['date_to']);
+        $this->actingAs($this->user('Admin'));
+        foreach (['channel', 'complaint', 'summary'] as $type) {
+            $response = $this->get(route('ticketing.report.export', $filters + ['reportType' => $type]))
+                ->assertOk()->assertDownload('ticketing-'.$type.'-2026-09.xlsx')
+                ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            $book = $this->exportWorkbook($response);
+            $this->assertSame(count($expected[$type]), $book->getSheetCount());
+            foreach ($expected[$type] as $index => $pivot) {
+                $sheet = $book->getSheet($index);
+                $this->assertSame($pivot['title'], $sheet->getCell('A1')->getValue());
+                $this->assertStringContainsString('2026-09-05', $sheet->getCell('A2')->getValue());
+                $this->assertSame('B7', $sheet->getFreezePane());
+                foreach ($pivot['rows'] as $rowIndex => $row) {
+                    $this->assertSame($row['label'], $sheet->getCell([1, $rowIndex + 7])->getValue());
+                    foreach ($row['cells'] as $column => $value) {
+                        $actual = $sheet->getCell([$column + 2, $rowIndex + 7])->getValue();
+                        if ($value === null) {
+                            $this->assertNull($actual);
+                        } else {
+                            $this->assertEqualsWithDelta($pivot['metric'] === 'rate' ? $value / 100 : $value, $actual, 0.000001);
+                        }
+                    }
+                }
+                $single = $this->get(route('ticketing.report.export', $filters + ['reportType' => $type, 'pivot' => $index]))->assertOk();
+                $singleBook = $this->exportWorkbook($single);
+                $this->assertSame(1, $singleBook->getSheetCount());
+                $this->assertSame($pivot['title'], $singleBook->getActiveSheet()->getCell('A1')->getValue());
+                $singleBook->disconnectWorksheets();
+            }
+            $book->disconnectWorksheets();
+        }
+    }
+
+    public function test_export_all_includes_cards_and_trend_and_preserves_zero_values(): void
+    {
+        $this->ticket('2026-09-01 09:00:00', 0);
+        $this->actingAs($this->user('Admin'));
+        $response = $this->get(route('ticketing.report.export', ['reportType' => 'all', 'year' => 2026, 'month' => 9]))->assertOk();
+        $book = $this->exportWorkbook($response);
+        $this->assertSame(12, $book->getSheetCount());
+        $overview = $book->getSheetByName('Ringkasan');
+        $this->assertEquals(1, $overview->getCell('B7')->getValue());
+        $this->assertEquals(0, $overview->getCell('B9')->getValue());
+        $this->assertEquals(1, $overview->getCell('B10')->getValue());
+        $this->assertSame('0.00%', $overview->getStyle('B10')->getNumberFormat()->getFormatCode());
+        $this->assertEquals(0, $overview->getCell('B11')->getValue());
+        $this->assertEquals(0, $book->getSheetByName('Tren Bulanan')->getCell('B7')->getValue());
+        $book->disconnectWorksheets();
+        $empty = $this->get(route('ticketing.report.export', ['reportType' => 'all', 'year' => 2026, 'month' => 10]))->assertOk();
+        $book = $this->exportWorkbook($empty);
+        $this->assertEquals(0, $book->getSheetByName('Ringkasan')->getCell('B7')->getValue());
+        $this->assertNull($book->getSheetByName('Ringkasan')->getCell('B10')->getValue());
+        $this->assertNull($book->getSheetByName('Ringkasan')->getCell('B11')->getValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_export_treats_database_labels_as_literal_text(): void
+    {
+        $this->ticket('2026-09-01 09:00:00', 10, 'Closed', '=1+1');
+        $this->actingAs($this->user('Admin'));
+        $response = $this->get(route('ticketing.report.export', ['reportType' => 'channel', 'pivot' => 1, 'year' => 2026, 'month' => 9]))->assertOk();
+        $book = $this->exportWorkbook($response);
+        $this->assertSame('=1+1', $book->getActiveSheet()->getCell('A7')->getValue());
+        $this->assertSame(DataType::TYPE_STRING, $book->getActiveSheet()->getCell('A7')->getDataType());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_export_is_admin_only_and_rejects_invalid_selections(): void
+    {
+        $url = route('ticketing.report.export', ['reportType' => 'channel']);
+        $this->get($url)->assertRedirect('/login');
+        foreach (['Tsel', 'Treg', 'cvsr', 'PH', 'Internal', 'TCD', 'b2b'] as $role) {
+            $this->actingAs($this->user($role))->get($url)->assertRedirect('/');
+        }
+        $this->actingAs($this->user('Admin'));
+        $this->get('/ticketing/report/export/invalid')->assertNotFound();
+        $this->get($url.'?pivot=3')->assertNotFound();
+        $this->get($url.'?pivot=99')->assertSessionHasErrors('pivot');
+        $this->get($url.'?month=13')->assertSessionHasErrors('month');
+        $this->get($url.'?date_from=2026-10-05&date_to=2026-10-01')->assertSessionHasErrors('date_to');
+    }
+
+    private function exportWorkbook(TestResponse $response): Spreadsheet
+    {
+        $file = tempnam(sys_get_temp_dir(), 'ticket_export_');
+        try {
+            file_put_contents($file, $response->streamedContent());
+
+            return (new Xlsx)->load($file);
+        } finally {
+            unlink($file);
+        }
     }
 
     private function ticket(string $requestedAt, ?int $minutes, string $status = 'Closed', ?string $channel = 'WABA', ?string $complaint = 'Campaign Creation'): Ticket

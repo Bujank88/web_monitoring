@@ -1,5 +1,8 @@
 <div class="card card-outline card-info">
-    <div class="card-header"><h3 class="card-title">{{ $pivot['title'] }}</h3></div>
+    <div class="card-header">
+        <h3 class="card-title">{{ $pivot['title'] }}</h3>
+        <a href="{{ route('ticketing.report.export', array_merge($filters, ['reportType' => $reportType, 'pivot' => $pivotIndex])) }}" class="btn btn-sm btn-outline-success float-right"><i class="fas fa-file-excel mr-1"></i> Export Excel</a>
+    </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-bordered table-hover table-sm mb-0">
             <thead class="bg-light"><tr>
