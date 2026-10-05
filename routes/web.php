@@ -30,6 +30,20 @@ use App\Http\Controllers\FbmSofController;
 use App\Http\Controllers\CanvasserDetailController;
 use App\Http\Controllers\Area2LeadsController;
 use App\Http\Controllers\OneSynergyReportController;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketReportController;
+
+Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_ROLES)])
+    ->prefix('ticketing')->name('ticketing.')->group(function () {
+        Route::get('/', [TicketController::class, 'index'])->name('index');
+        Route::get('/input', [TicketController::class, 'create'])->name('create');
+        Route::get('/report', [TicketReportController::class, 'index'])->name('report');
+        Route::post('/', [TicketController::class, 'store'])->name('store');
+        Route::patch('/{ticket}/close', [TicketController::class, 'close'])->whereNumber('ticket')->name('close');
+        Route::get('/{ticket}/edit', [TicketController::class, 'edit'])->whereNumber('ticket')->name('edit');
+        Route::patch('/{ticket}', [TicketController::class, 'update'])->whereNumber('ticket')->name('update');
+        Route::delete('/{ticket}', [TicketController::class, 'destroy'])->whereNumber('ticket')->name('destroy');
+    });
 
 Route::middleware(['auth', 'checkrole:Admin'])->prefix('sales-analysis')->name('sales-analysis.')->group(function () {
     Route::get('/', [\App\Http\Controllers\SalesAnalysisController::class, 'index'])->name('index');
