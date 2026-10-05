@@ -202,6 +202,7 @@
                             <option value="Tsel">Tsel</option>
                             {{-- <option value="Treg">Treg</option> --}}
                             <option value="cvsr">Canvasser</option>
+                            <option value="Supervisor">Supervisor</option>
                             <option value="PH">PowerHouse</option>
                             <option value="TCD">TCD</option>
                             <option value="Internal">Internal</option>
