@@ -38,7 +38,7 @@
                     <a href="{{ route('ticketing.report') }}" class="btn btn-outline-secondary">Reset</a>
                 </div>
             </form>
-            <p class="text-muted mb-0">Kartu ringkasan, Channel, dan Complaint Type mengikuti tahun, bulan, serta rentang tanggal terpilih ({{ $report['filtered_total'] }} tiket). Tabel ringkasan bulanan dan tren menampilkan tahun terpilih dengan batas rentang tanggal yang sama.</p>
+            <p class="text-muted mb-0">Kartu ringkasan, Channel, Complaint Type, dan Ringkasan Harian mengikuti tahun, bulan, serta rentang tanggal terpilih ({{ $report['filtered_total'] }} tiket). Jumlah komplain harian dihitung berdasarkan tanggal pengajuan. Tabel ringkasan bulanan dan tren menampilkan tahun terpilih dengan batas rentang tanggal yang sama.</p>
         </div>
     </div>
     <div class="row">
@@ -68,12 +68,12 @@
         </div>
     </div>
     <ul class="nav nav-tabs mb-3" role="tablist">
-        @foreach(['channel' => 'PVT Channel', 'complaint' => 'PVT Complaint Type', 'summary' => 'Ringkasan Bulanan'] as $key => $label)
+        @foreach(['channel' => 'PVT Channel', 'complaint' => 'PVT Complaint Type', 'summary' => 'Ringkasan Bulanan', 'daily' => 'Ringkasan Harian'] as $key => $label)
         <li class="nav-item"><a class="nav-link {{ $loop->first ? 'active' : '' }}" id="tab-{{ $key }}" data-toggle="tab" href="#report-{{ $key }}" role="tab" aria-controls="report-{{ $key }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}">{{ $label }}</a></li>
         @endforeach
     </ul>
     <div class="tab-content">
-        @foreach(['channel', 'complaint', 'summary'] as $key)
+        @foreach(['channel', 'complaint', 'summary', 'daily'] as $key)
         <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="report-{{ $key }}" role="tabpanel" aria-labelledby="tab-{{ $key }}">
             <div class="text-right mb-3">
                 <a href="{{ route('ticketing.report.export', array_merge($filters, ['reportType' => $key])) }}" class="btn btn-success"><i class="fas fa-file-excel mr-1"></i> Export Excel tab ini</a>

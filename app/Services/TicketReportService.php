@@ -29,6 +29,7 @@ class TicketReportService
                 ? ($ticket->resolved_at->getTimestamp() - $ticket->requested_at->getTimestamp()) / 60 : null;
 
             return [
+                'date' => $ticket->requested_at->format('Y-m-d'),
                 'month' => $ticket->requested_at->month,
                 'week' => min(4, (int) ceil($ticket->requested_at->day / 7)),
                 'status' => $ticket->status,
@@ -64,6 +65,7 @@ class TicketReportService
             'invalid_times' => $weekly->where('category', 'Periksa Waktu')->count(),
             'resolution_rate' => $this->value($weekly->where('status', 'Closed'), $weekly, 'rate'),
             'average_minutes' => $this->value($weekly, $weekly, 'average'),
+            'daily' => [$this->daily($weekly, $year, $month, $from, $to)],
             'channel' => [
                 $this->pivot('Jumlah tiket per status dan channel', $weekly, $weeklyPeriods, ['status', 'channel']),
                 $this->pivot('Rata-rata penyelesaian per channel (menit)', $weekly, $weeklyPeriods, ['channel'], 'average'),
@@ -89,6 +91,28 @@ class TicketReportService
                 ];
             })->all(),
         ];
+    }
+
+    private function daily(Collection $records, int $year, int $month, ?string $from, ?string $to): array
+    {
+        $start = Carbon::create($year, $month, 1)->startOfDay();
+        $end = $start->copy()->endOfMonth()->startOfDay();
+        if ($from && Carbon::parse($from)->gt($start)) {
+            $start = Carbon::parse($from)->startOfDay();
+        }
+        if ($to && Carbon::parse($to)->lt($end)) {
+            $end = Carbon::parse($to)->startOfDay();
+        }
+        $counts = $records->countBy('date');
+        $rows = [];
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            $rows[] = ['label' => $date->format('d-m-Y'), 'depth' => 0, 'subtotal' => false,
+                'cells' => [$counts->get($date->format('Y-m-d'), 0)]];
+        }
+        $rows[] = ['label' => 'Grand Total', 'depth' => 0, 'subtotal' => true, 'cells' => [$records->count()]];
+
+        return ['title' => 'Jumlah komplain harian', 'metric' => 'count', 'columns' => [],
+            'label_header' => 'Tanggal pengajuan', 'total_header' => 'Jumlah komplain', 'rows' => $rows];
     }
 
     private function category(string $status, ?float $minutes): string
