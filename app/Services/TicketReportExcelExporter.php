@@ -11,6 +11,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class TicketReportExcelExporter
 {
     private const SHEETS = [
+        'daily' => ['Ringkasan Harian'],
         'channel' => ['Channel - Jumlah', 'Channel - Rata-rata', 'Channel - Penanganan'],
         'complaint' => ['Complaint - Jumlah', 'Complaint - Rata-rata', 'Complaint - Penanganan'],
         'summary' => ['Bulanan - Kategori', 'Bulanan - Rata-rata', 'Bulanan - Status', 'Bulanan - Persentase'],
@@ -33,7 +34,7 @@ class TicketReportExcelExporter
                 $sheet->setCellValue('A4', $group === 'summary'
                     ? 'Cakupan: tahun dan rentang tanggal; bulan terpilih diperinci per minggu.'
                     : 'Cakupan: tahun, bulan, dan rentang tanggal terpilih.');
-                $headers = ['Kategori', ...$table['columns'], 'Grand Total'];
+                $headers = [$table['label_header'] ?? 'Kategori', ...$table['columns'], $table['total_header'] ?? 'Grand Total'];
                 $sheet->fromArray($headers, null, 'A6');
                 $lastColumn = Coordinate::stringFromColumnIndex(count($headers));
                 foreach ($table['rows'] as $offset => $row) {

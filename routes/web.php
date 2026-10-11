@@ -32,6 +32,13 @@ use App\Http\Controllers\Area2LeadsController;
 use App\Http\Controllers\OneSynergyReportController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketReportController;
+use App\Http\Controllers\SpectrumController;
+
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('spectrum')->name('spectrum.')->group(function () {
+    Route::get('/leads/input', [SpectrumController::class, 'create'])->name('leads.create');
+    Route::get('/leads', [SpectrumController::class, 'index'])->name('leads.index');
+    Route::post('/leads', [SpectrumController::class, 'store'])->name('leads.store');
+});
 
 Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_ROLES)])
     ->prefix('ticketing')->name('ticketing.')->group(function () {
@@ -39,7 +46,7 @@ Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_R
         Route::get('/input', [TicketController::class, 'create'])->name('create');
         Route::get('/report', [TicketReportController::class, 'index'])->name('report');
         Route::get('/report/export/{reportType}', [TicketReportController::class, 'export'])
-            ->whereIn('reportType', ['channel', 'complaint', 'summary', 'all'])->name('report.export');
+            ->whereIn('reportType', ['channel', 'complaint', 'summary', 'daily', 'all'])->name('report.export');
         Route::post('/', [TicketController::class, 'store'])->name('store');
         Route::patch('/{ticket}/close', [TicketController::class, 'close'])->whereNumber('ticket')->name('close');
         Route::get('/{ticket}/edit', [TicketController::class, 'edit'])->whereNumber('ticket')->name('edit');

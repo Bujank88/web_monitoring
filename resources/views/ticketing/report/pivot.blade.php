@@ -6,9 +6,9 @@
     <div class="card-body p-0 table-responsive">
         <table class="table table-bordered table-hover table-sm mb-0">
             <thead class="bg-light"><tr>
-                <th style="min-width:240px;">Kategori</th>
+                <th style="min-width:240px;">{{ $pivot['label_header'] ?? 'Kategori' }}</th>
                 @foreach($pivot['columns'] as $column)<th class="text-right text-nowrap">{{ $column }}</th>@endforeach
-                <th class="text-right text-nowrap">Grand Total</th>
+                <th class="text-right text-nowrap">{{ $pivot['total_header'] ?? 'Grand Total' }}</th>
             </tr></thead>
             <tbody>
                 @foreach($pivot['rows'] as $row)

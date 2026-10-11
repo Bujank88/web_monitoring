@@ -28,7 +28,8 @@ class TicketReportController extends Controller
     {
         $selection = $request->validate(['pivot' => ['nullable', 'integer', 'between:0,3']]);
         $pivot = isset($selection['pivot']) ? (int) $selection['pivot'] : null;
-        abort_if($pivot !== null && ($reportType === 'all' || $pivot >= ($reportType === 'summary' ? 4 : 3)), 404);
+        $pivotCount = match ($reportType) { 'summary' => 4, 'daily' => 1, default => 3 };
+        abort_if($pivot !== null && ($reportType === 'all' || $pivot >= $pivotCount), 404);
         [, $filters] = $this->context($request);
         $report = $reports->build($filters['year'], $filters['month'], $filters['date_from'] ?? null, $filters['date_to'] ?? null);
         $book = $exporter->build($report, $filters, $reportType, $pivot);

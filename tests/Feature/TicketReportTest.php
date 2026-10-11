@@ -33,7 +33,7 @@ class TicketReportTest extends TestCase
         (require database_path('migrations/2026_10_05_000000_create_tickets_table.php'))->up();
     }
 
-    public function test_report_is_admin_only_and_renders_all_three_report_tabs(): void
+    public function test_report_is_admin_only_and_renders_all_four_report_tabs(): void
     {
         $this->get(route('ticketing.report'))->assertRedirect('/login');
         foreach (['Tsel', 'Treg', 'cvsr', 'PH', 'Internal', 'TCD', 'b2b'] as $role) {
@@ -41,6 +41,7 @@ class TicketReportTest extends TestCase
         }
         $this->actingAs($this->user('Admin'))->get(route('ticketing.report'))->assertOk()
             ->assertSee('PVT Channel')->assertSee('PVT Complaint Type')->assertSee('Ringkasan Bulanan')
+            ->assertSee('Ringkasan Harian')->assertSee('Jumlah komplain')
             ->assertSee('Tidak ada tiket pada periode ini');
     }
 
@@ -190,7 +191,7 @@ class TicketReportTest extends TestCase
         $filters = ['year' => 2026, 'month' => 9, 'date_from' => '2026-09-01', 'date_to' => '2026-09-05'];
         $expected = app(TicketReportService::class)->build(2026, 9, $filters['date_from'], $filters['date_to']);
         $this->actingAs($this->user('Admin'));
-        foreach (['channel', 'complaint', 'summary'] as $type) {
+        foreach (['channel', 'complaint', 'summary', 'daily'] as $type) {
             $response = $this->get(route('ticketing.report.export', $filters + ['reportType' => $type]))
                 ->assertOk()->assertDownload('ticketing-'.$type.'-2026-09.xlsx')
                 ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -228,7 +229,7 @@ class TicketReportTest extends TestCase
         $this->actingAs($this->user('Admin'));
         $response = $this->get(route('ticketing.report.export', ['reportType' => 'all', 'year' => 2026, 'month' => 9]))->assertOk();
         $book = $this->exportWorkbook($response);
-        $this->assertSame(12, $book->getSheetCount());
+        $this->assertSame(13, $book->getSheetCount());
         $overview = $book->getSheetByName('Ringkasan');
         $this->assertEquals(1, $overview->getCell('B7')->getValue());
         $this->assertEquals(0, $overview->getCell('B9')->getValue());
@@ -266,9 +267,26 @@ class TicketReportTest extends TestCase
         $this->actingAs($this->user('Admin'));
         $this->get('/ticketing/report/export/invalid')->assertNotFound();
         $this->get($url.'?pivot=3')->assertNotFound();
+        $this->get(route('ticketing.report.export', ['reportType' => 'daily', 'pivot' => 1]))->assertNotFound();
         $this->get($url.'?pivot=99')->assertSessionHasErrors('pivot');
         $this->get($url.'?month=13')->assertSessionHasErrors('month');
         $this->get($url.'?date_from=2026-10-05&date_to=2026-10-01')->assertSessionHasErrors('date_to');
+    }
+
+    public function test_daily_counts_follow_filters_include_zero_days_and_date_boundaries(): void
+    {
+        foreach (['2025-09-01 09:00:00', '2026-08-31 23:59:59', '2026-09-01 00:00:00',
+            '2026-09-01 23:59:59', '2026-09-03 23:59:59', '2026-09-04 00:00:00', '2026-10-01 00:00:00'] as $date) {
+            $this->ticket($date, null, 'Open');
+        }
+        $service = app(TicketReportService::class);
+        $report = $service->build(2026, 9, '2026-08-31', '2026-09-03');
+        $this->assertSame(['01-09-2026', '02-09-2026', '03-09-2026', 'Grand Total'], array_column($report['daily'][0]['rows'], 'label'));
+        $this->assertSame([[2], [0], [1], [3]], array_column($report['daily'][0]['rows'], 'cells'));
+        $this->assertSame(31, count($service->build(2026, 9)['daily'][0]['rows']));
+        $this->assertSame(30, count($service->build(2024, 2)['daily'][0]['rows']));
+        $outside = $service->build(2026, 9, '2026-10-01', '2026-10-02');
+        $this->assertSame([[0]], array_column($outside['daily'][0]['rows'], 'cells'));
     }
 
     private function exportWorkbook(TestResponse $response): Spreadsheet
