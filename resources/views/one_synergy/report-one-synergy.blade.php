@@ -183,6 +183,7 @@
                                 <th>Operator Seluler</th>
                                 <th>Kategori Iklan</th>
                                 <th>Tipe Kanal</th>
+                                <th title="Jumlah nomor yang dikirim berdasarkan file upload">Total</th>
                                 <th>Success</th>
                                 <th>Failed</th>
                                 <th>Read</th>
@@ -237,6 +238,7 @@
                 { data: 'operator_seluler', name: 'cr.operator_seluler' },
                 { data: 'kategori_iklan', name: 'cr.kategori_iklan' },
                 { data: 'tipe_kanal', name: 'cr.tipe_kanal' },
+                { data: 'total', name: 'cr.total', defaultContent: '-' },
                 { data: 'success', name: 'cr.sukses' },
                 { data: 'failed', name: 'cr.gagal' },
                 { data: 'read', name: 'cr.read' },

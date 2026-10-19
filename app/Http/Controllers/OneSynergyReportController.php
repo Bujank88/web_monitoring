@@ -454,6 +454,7 @@ class OneSynergyReportController extends Controller
             'cr.operator_seluler',
             'cr.kategori_iklan',
             'cr.tipe_kanal',
+            'cr.total',
             'cr.sukses as success',
             DB::raw('COALESCE(cr.gagal, 0) as failed'),
             'cr.read',
@@ -564,7 +565,7 @@ class OneSynergyReportController extends Controller
         $data = $baseQuery->select(
             DB::raw('DATE(cr.tgl_tayang) as tanggal_iklan'),
             'cr.id_iklan', 'cr.judul_pesan_iklan', 'cr.operator_seluler',
-            'cr.kategori_iklan', 'cr.tipe_kanal', 'cr.sukses as success',
+            'cr.kategori_iklan', 'cr.tipe_kanal', 'cr.total', 'cr.sukses as success',
             DB::raw('COALESCE(cr.gagal, 0) as failed'),
             'cr.read', 'cr.click', 'cr.detil_status',
             DB::raw('CASE WHEN COALESCE(cr.sukses, 0) > 0 THEN (COALESCE(cr.read, 0) / cr.sukses) * 100 ELSE 0 END as percentage_read'),
@@ -577,13 +578,13 @@ class OneSynergyReportController extends Controller
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setCellValue('A1', 'REPORT 1SYNERGY - ' . $month)->mergeCells('A1:M1');
+        $sheet->setCellValue('A1', 'REPORT 1SYNERGY - ' . $month)->mergeCells('A1:N1');
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $headers = ['Tanggal Tayang', 'ID Iklan', 'Judul Pesan Iklan', 'Operator Seluler', 'Kategori Iklan', 'Tipe Kanal', 'Success', 'Failed', 'Read', 'Click', 'Percentage Read', 'Percentage Click', 'Detil Status'];
+        $headers = ['Tanggal Tayang', 'ID Iklan', 'Judul Pesan Iklan', 'Operator Seluler', 'Kategori Iklan', 'Tipe Kanal', 'Total', 'Success', 'Failed', 'Read', 'Click', 'Percentage Read', 'Percentage Click', 'Detil Status'];
         $sheet->fromArray($headers, null, 'A3');
-        $sheet->getStyle('A3:M3')->applyFromArray([
+        $sheet->getStyle('A3:N3')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -594,14 +595,14 @@ class OneSynergyReportController extends Controller
             $sheet->fromArray([
                 $row->tanggal_iklan, $row->id_iklan, $row->judul_pesan_iklan,
                 $row->operator_seluler, $row->kategori_iklan, $row->tipe_kanal,
-                $row->success, $row->failed, $row->read, $row->click,
+                $row->total ?? '-', $row->success, $row->failed, $row->read, $row->click,
                 round((float) $row->percentage_read, 2) . '%',
                 round((float) $row->percentage_click, 2) . '%',
                 $row->detil_status,
             ], null, 'A' . $rowNum++);
         }
 
-        foreach (range('A', 'M') as $column) {
+        foreach (range('A', 'N') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -632,6 +633,7 @@ class OneSynergyReportController extends Controller
             'brandLabel' => '1Synergy',
             'acceptCsv' => true,
             'csvExample' => asset('examples/report-1synergy.csv'),
+            'uploadNote' => 'Isi kolom TOTAL dengan jumlah nomor yang dikirim. Nilai Total pada report diambil dari file upload. Jika kolom kosong atau tidak tersedia, Total ditampilkan sebagai "-".',
         ]);
     }
 
@@ -640,15 +642,15 @@ class OneSynergyReportController extends Controller
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([
-            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'DETIL STATUS', 'READ', 'CLICK'],
-            ['1849001', '15 Sep 2026', 'Contoh WABA 1Synergy', 'TELKOMSEL', 'WABA', 'BROADCAST', 'Sukses: 5.304 Gagal: 1.131', '2929', '0'],
+            ['ID IKLAN', 'TGL TAYANG', 'JUDUL PESAN IKLAN', 'OPERATOR SELULER', 'KATEGORI IKLAN', 'TIPE KANAL', 'TOTAL', 'DETIL STATUS', 'READ', 'CLICK'],
+            ['1849001', '15 Sep 2026', 'Contoh WABA 1Synergy', 'TELKOMSEL', 'WABA', 'BROADCAST', '6500', 'Sukses: 5.304 Gagal: 1.131', '2929', '0'],
         ], null, 'A1');
-        $sheet->getStyle('A1:I1')->applyFromArray([
+        $sheet->getStyle('A1:J1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
-        foreach (range('A', 'I') as $column) {
+        foreach (range('A', 'J') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -702,6 +704,7 @@ class OneSynergyReportController extends Controller
                 'kategori_iklan' => trim((string) $cell('KATEGORI IKLAN')) ?: null,
                 'tipe_kanal' => trim((string) $cell('TIPE KANAL')) ?: null,
                 'detil_status' => $status ?: null,
+                'total' => trim((string) $cell('TOTAL')) === '' ? null : $this->parseInteger($cell('TOTAL')),
                 'sukses' => $sukses,
                 'gagal' => $gagal,
                 'refunded' => 0,

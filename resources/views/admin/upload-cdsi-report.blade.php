@@ -71,6 +71,9 @@
                     <div class="helper-box mb-4">
                         <h5 class="mb-2" style="font-weight: 700;">Contoh File</h5>
                         <p class="mb-3">Gunakan template berikut sebagai acuan sebelum upload.</p>
+                        @isset($uploadNote)
+                        <p class="mb-3">{{ $uploadNote }}</p>
+                        @endisset
                         <a href="{{ $templateFile }}" class="btn btn-outline-primary" target="_blank">
                             <i class="fas fa-file-excel mr-1"></i>Download Template Laporan {{ $brandLabel }}
                         </a>
