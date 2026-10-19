@@ -23,7 +23,8 @@ class OneSynergyMerchantSummaryTest extends TestCase
         foreach (['2026_09_02_000000_create_one_synergy_reports_table',
             '2026_09_16_100000_create_one_synergy_monthly_multipliers_table',
             '2026_09_16_110000_split_one_synergy_monthly_multipliers',
-            '2026_09_16_120000_add_channel_multipliers_to_one_synergy'] as $migration) {
+            '2026_09_16_120000_add_channel_multipliers_to_one_synergy',
+            '2026_10_19_000000_add_total_to_one_synergy_reports'] as $migration) {
             (require database_path('migrations/' . $migration . '.php'))->up();
         }
         Schema::connection('kam_myads')->create('users', function (Blueprint $table) {

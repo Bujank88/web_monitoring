@@ -26,6 +26,7 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
             ]);
         }
         (require database_path('migrations/2026_09_02_000000_create_one_synergy_reports_table.php'))->up();
+        (require database_path('migrations/2026_10_19_000000_add_total_to_one_synergy_reports.php'))->up();
         (require database_path('migrations/2026_09_16_100000_create_one_synergy_monthly_multipliers_table.php'))->up();
         (require database_path('migrations/2026_09_16_110000_split_one_synergy_monthly_multipliers.php'))->up();
         (require database_path('migrations/2026_09_16_120000_add_channel_multipliers_to_one_synergy.php'))->up();
@@ -181,11 +182,13 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         try {
             file_put_contents($path, $response->streamedContent());
             $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet();
-            $headers = $sheet->rangeToArray('A3:M3')[0];
+            $headers = $sheet->rangeToArray('A3:N3')[0];
             $this->assertNotContains('Total Harga', $headers);
             $this->assertNotContains('Refunded', $headers);
-            $this->assertSame('Detil Status', $headers[12]);
-            $this->assertSame('M', $sheet->getHighestColumn());
+            $this->assertSame('Total', $headers[6]);
+            $this->assertSame('-', $sheet->getCell('G4')->getValue());
+            $this->assertSame('Detil Status', $headers[13]);
+            $this->assertSame('N', $sheet->getHighestColumn());
         } finally {
             unlink($path);
         }
@@ -197,7 +200,7 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         $file = new \Illuminate\Http\UploadedFile(public_path('examples/report-1synergy.csv'), 'example.csv', 'text/csv', null, true);
         $this->post(route('one-synergy.upload.store'), ['report_file' => $file])->assertSessionHasNoErrors()->assertRedirect();
         $this->assertDatabaseHas('one_synergy_reports', [
-            'id_iklan' => '1849001', 'sukses' => 5304, 'gagal' => 1131, 'read' => 2929, 'click' => 0, 'refunded' => 0,
+            'id_iklan' => '1849001', 'total' => 6500, 'sukses' => 5304, 'gagal' => 1131, 'read' => 2929, 'click' => 0, 'refunded' => 0,
         ]);
         // Legacy refund values must not affect Failed in either rows or summary.
         DB::table('one_synergy_reports')->update(['refunded' => 9999]);
@@ -208,6 +211,7 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
             ->assertJsonPath('summary.total_success_waba', 5304)
             ->assertJsonPath('summary.total_harga', 1070800);
         $row = collect($response->json('data'))->firstWhere('id_iklan', '1849001');
+        $this->assertEquals(6500, $row['total']);
         $this->assertEquals(1131, $row['failed']);
         $this->assertEquals(2929, $row['read']);
     }
@@ -219,7 +223,7 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
             . "29,75,3000,Sukses: 105 Gagal: 9,BROADCAST,WABA,TELKOMSEL,Example,15 Sep 2026,1849001\n";
         $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('legacy.csv', $csv);
         $this->post(route('one-synergy.upload.store'), ['report_file' => $file])->assertSessionHasNoErrors()->assertRedirect();
-        $this->assertDatabaseHas('one_synergy_reports', ['id_iklan' => '1849001', 'gagal' => 9, 'refunded' => 0, 'read' => 75, 'click' => 29]);
+        $this->assertDatabaseHas('one_synergy_reports', ['id_iklan' => '1849001', 'total' => null, 'gagal' => 9, 'refunded' => 0, 'read' => 75, 'click' => 29]);
     }
 
     public function test_missing_csv_header_does_not_replace_existing_data(): void
@@ -228,6 +232,36 @@ class OneSynergyMonthlyMultiplierTest extends TestCase
         $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('invalid.csv', "ID IKLAN,READ\n1,10\n");
         $this->post(route('one-synergy.upload.store'), ['report_file' => $file])->assertSessionHasErrors('report_file');
         $this->assertDatabaseCount('one_synergy_reports', 3);
+    }
+
+    public function test_total_comes_only_from_upload_including_zero_and_blank_values(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake(config('filesystems.default'));
+        $csv = "TOTAL,ID IKLAN,TGL TAYANG,JUDUL PESAN IKLAN,OPERATOR SELULER,KATEGORI IKLAN,TIPE KANAL,DETIL STATUS,READ,CLICK\n"
+            . "\"1.234\",1,15 Sep 2026,Example,TELKOMSEL,SMS,LBA,Sukses: 10 Gagal: 5,0,0\n"
+            . "0,2,15 Sep 2026,Example,TELKOMSEL,SMS,LBA,Sukses: 10 Gagal: 5,0,0\n"
+            . ",3,15 Sep 2026,Example,TELKOMSEL,SMS,LBA,Sukses: 10 Gagal: 5,0,0\n";
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('totals.csv', $csv);
+        $this->post(route('one-synergy.upload.store'), ['report_file' => $file])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $rows = collect($this->getJson(route('one-synergy.report.data', ['month' => '2026-09']))
+            ->assertOk()->json('data'))->keyBy('id_iklan');
+        $this->assertSame(1234, $rows['1']['total']);
+        $this->assertSame(0, $rows['2']['total']);
+        $this->assertNull($rows['3']['total']);
+
+        $response = $this->get(route('one-synergy.report.export', ['month' => '2026-09']))->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'synergy-total-');
+        try {
+            file_put_contents($path, $response->streamedContent());
+            $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet();
+            $this->assertSame('Total', $sheet->getCell('G3')->getValue());
+            $this->assertSame('-', $sheet->getCell('G4')->getValue());
+            $this->assertEquals(0, $sheet->getCell('G5')->getValue());
+            $this->assertEquals(1234, $sheet->getCell('G6')->getValue());
+        } finally {
+            unlink($path);
+        }
     }
 
     public function test_merchant_summary_only_includes_user_role(): void
