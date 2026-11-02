@@ -38,6 +38,9 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('spectrum')->name('spectr
     Route::get('/leads/input', [SpectrumController::class, 'create'])->name('leads.create');
     Route::get('/leads', [SpectrumController::class, 'index'])->name('leads.index');
     Route::post('/leads', [SpectrumController::class, 'store'])->name('leads.store');
+    Route::get('/leads/{lead}/edit', [SpectrumController::class, 'edit'])->whereNumber('lead')->name('leads.edit');
+    Route::patch('/leads/{lead}', [SpectrumController::class, 'update'])->whereNumber('lead')->name('leads.update');
+    Route::delete('/leads/{lead}', [SpectrumController::class, 'destroy'])->whereNumber('lead')->name('leads.destroy');
 });
 
 Route::middleware(['auth', 'checkrole:'.implode(',', \App\Models\Ticket::INPUT_ROLES)])

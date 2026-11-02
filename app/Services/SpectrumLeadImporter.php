@@ -33,6 +33,7 @@ class SpectrumLeadImporter
         try {
             $sheet = null;
             $columns = [];
+            $requiredHeaders = array_diff_key(LeadSpectrum::HEADERS, ['utm_source' => true]);
             foreach ($book->getAllSheets() as $candidate) {
                 $found = [];
                 foreach ($candidate->getRowIterator(1, 1)->current()->getCellIterator() as $cell) {
@@ -46,7 +47,7 @@ class SpectrumLeadImporter
                         }
                     }
                 }
-                if (count($found) === count(LeadSpectrum::HEADERS)) {
+                if (array_diff_key($requiredHeaders, $found) === []) {
                     if ($sheet !== null) {
                         $this->fail('Gunakan satu sheet data dengan header Spectrum agar data yang diimpor jelas.');
                     }
@@ -55,7 +56,7 @@ class SpectrumLeadImporter
                 }
             }
             if ($sheet === null) {
-                $this->fail('Header pada baris pertama harus memuat: '.implode(', ', LeadSpectrum::HEADERS).'.');
+                $this->fail('Header pada baris pertama harus memuat: '.implode(', ', $requiredHeaders).'. UTM Source opsional.');
             }
             if ($sheet->getHighestDataRow() > 10001) {
                 $this->fail('Maksimal 10.000 baris leads per upload.');
@@ -64,6 +65,10 @@ class SpectrumLeadImporter
             for ($row = 2; $row <= $sheet->getHighestDataRow(); $row++) {
                 $data = [];
                 foreach (LeadSpectrum::HEADERS as $field => $header) {
+                    if (! isset($columns[$field])) {
+                        $data[$field] = null;
+                        continue;
+                    }
                     $cell = $sheet->getCell($columns[$field].$row);
                     if ($cell->getDataType() === DataType::TYPE_FORMULA || $cell->getDataType() === DataType::TYPE_ERROR) {
                         $this->fail("Baris {$row}, {$header}: gunakan nilai biasa, bukan rumus atau error Excel.");
@@ -105,8 +110,13 @@ class SpectrumLeadImporter
         return DB::transaction(function () use ($rows, $filename, $userId) {
             $created = 0;
             foreach ($rows as $data) {
+                $fingerprint = $data;
+                // Preserve existing fingerprints for the original 15-column workbook.
+                if ($fingerprint['utm_source'] === null) {
+                    unset($fingerprint['utm_source']);
+                }
                 $lead = LeadSpectrum::query()->createOrFirst(
-                    ['import_hash' => hash('sha256', json_encode($data, JSON_THROW_ON_ERROR))],
+                    ['import_hash' => hash('sha256', json_encode($fingerprint, JSON_THROW_ON_ERROR))],
                     $data + ['import_filename' => mb_substr(basename($filename), 0, 255), 'uploaded_by' => $userId],
                 );
                 $created += (int) $lead->wasRecentlyCreated;

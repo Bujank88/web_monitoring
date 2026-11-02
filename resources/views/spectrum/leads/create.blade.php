@@ -22,7 +22,7 @@
                 <div class="alert alert-light border">
                     <strong>Header pada baris pertama:</strong>
                     <p class="mb-2">{{ implode(' · ', \App\Models\LeadSpectrum::HEADERS) }}</p>
-                    <small>Urutan kolom boleh berbeda. Tanggal menggunakan format tanggal Excel, YYYY-MM-DD, atau M/D/YYYY. Simpan nomor telepon sebagai teks agar angka nol di depan tetap tersimpan. File harus berisi satu sheet leads dengan header lengkap.</small>
+                    <small>UTM Source opsional, berupa teks maksimal 255 karakter. File lama tanpa kolom ini tetap dapat diunggah. Urutan kolom boleh berbeda. Tanggal menggunakan format tanggal Excel, YYYY-MM-DD, atau M/D/YYYY. Simpan nomor telepon sebagai teks agar angka nol di depan tetap tersimpan. File harus berisi satu sheet leads dengan 15 header utama lengkap.</small>
                 </div>
                 <button type="submit" class="btn btn-info"><i class="fas fa-upload mr-1" aria-hidden="true"></i> Upload Leads</button>
                 <a href="{{ route('spectrum.leads.index') }}" class="btn btn-outline-secondary ml-1">Data Leads</a>

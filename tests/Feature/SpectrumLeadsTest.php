@@ -33,6 +33,7 @@ class SpectrumLeadsTest extends TestCase
             $table->timestamps();
         });
         (require database_path('migrations/2026_10_06_000001_create_leads_spectrum_table.php'))->up();
+        (require database_path('migrations/2026_10_27_000001_add_utm_source_to_leads_spectrum_table.php'))->up();
     }
 
     protected function tearDown(): void
@@ -137,9 +138,106 @@ class SpectrumLeadsTest extends TestCase
         $this->get(route('spectrum.leads.index', ['page' => 2]))->assertOk()->assertSee('Example Company');
     }
 
+    public function test_admin_can_edit_all_fields_and_reupload_preserves_manual_edits(): void
+    {
+        $file = $this->workbook([$this->row()]);
+        app(SpectrumLeadImporter::class)->import($file, 'leads.xlsx', 1);
+        $lead = LeadSpectrum::firstOrFail();
+        $hash = $lead->import_hash;
+        $data = array_combine(array_keys(LeadSpectrum::HEADERS), $this->row());
+        $data['last_name'] = 'Updated Lead';
+        $data['mobile_phone'] = '00123456789';
+        $data['create_date'] = '2026-10-27';
+        $data['share_date'] = null;
+        $data['fu'] = 'Hubungi kembali';
+        $data['utm_source'] = 'newsletter';
+        $this->actingAs($this->user('Admin'));
+        $this->get(route('spectrum.leads.index'))->assertOk()
+            ->assertSee(route('spectrum.leads.edit', $lead))->assertSee('Delete');
+        $this->get(route('spectrum.leads.edit', $lead))->assertOk()->assertSee('Example Company');
+        $this->patch(route('spectrum.leads.update', $lead), $data + ['import_hash' => 'tampered', 'uploaded_by' => 999])
+            ->assertRedirect(route('spectrum.leads.index'))->assertSessionHasNoErrors();
+        $lead->refresh();
+        foreach ($data as $field => $value) {
+            $actual = $lead->$field;
+            if ($actual instanceof \DateTimeInterface) {
+                $actual = $actual->format('Y-m-d');
+            }
+            $this->assertSame($value, $actual, $field);
+        }
+        $this->assertSame($hash, $lead->import_hash);
+        $this->assertSame(1, (int) $lead->uploaded_by);
+        $this->assertSame(['created' => 0, 'duplicates' => 1], app(SpectrumLeadImporter::class)->import($file, 'leads.xlsx', 1));
+        $this->assertSame('Updated Lead', $lead->fresh()->last_name);
+    }
+
+    public function test_invalid_edit_does_not_change_data_and_admin_can_delete(): void
+    {
+        app(SpectrumLeadImporter::class)->import($this->workbook([$this->row()]), 'leads.xlsx', 1);
+        $lead = LeadSpectrum::firstOrFail();
+        $this->actingAs($this->user('Admin'));
+        $this->from(route('spectrum.leads.edit', $lead))->patch(route('spectrum.leads.update', $lead), [
+            'last_name' => str_repeat('a', 256),
+            'create_date' => '2026-02-30',
+            'description' => str_repeat('a', 65536),
+            'utm_source' => str_repeat('a', 256),
+        ])->assertSessionHasErrors(['last_name', 'create_date', 'description', 'utm_source']);
+        $this->assertSame('Test Lead', $lead->fresh()->last_name);
+        $this->delete(route('spectrum.leads.destroy', $lead))
+            ->assertRedirect(route('spectrum.leads.index'))->assertSessionHas('success');
+        $this->assertDatabaseMissing('leads_spectrum', ['id' => $lead->id]);
+        $this->get(route('spectrum.leads.edit', $lead))->assertNotFound();
+        $this->patch(route('spectrum.leads.update', $lead), [])->assertNotFound();
+        $this->delete(route('spectrum.leads.destroy', $lead))->assertNotFound();
+    }
+
+    public function test_guests_and_non_admins_cannot_edit_or_delete(): void
+    {
+        app(SpectrumLeadImporter::class)->import($this->workbook([$this->row()]), 'leads.xlsx', 1);
+        $lead = LeadSpectrum::firstOrFail();
+        $this->get(route('spectrum.leads.edit', $lead))->assertRedirect('/login');
+        $this->patch(route('spectrum.leads.update', $lead), [])->assertRedirect('/login');
+        $this->delete(route('spectrum.leads.destroy', $lead))->assertRedirect('/login');
+        foreach (['cvsr', 'Tsel', 'PH'] as $role) {
+            $this->actingAs($this->user($role));
+            $this->get(route('spectrum.leads.edit', $lead))->assertRedirect('/');
+            $this->patch(route('spectrum.leads.update', $lead), ['last_name' => 'Forbidden'])->assertRedirect('/');
+            $this->delete(route('spectrum.leads.destroy', $lead))->assertRedirect('/');
+        }
+        $this->assertSame('Test Lead', $lead->fresh()->last_name);
+    }
+
+    public function test_optional_utm_source_import_and_legacy_fingerprints(): void
+    {
+        $importer = app(SpectrumLeadImporter::class);
+        $legacyHeaders = array_values(array_diff_key(LeadSpectrum::HEADERS, ['utm_source' => true]));
+        $legacyRow = array_slice($this->row(), 0, 15);
+        $legacyFile = $this->workbook([$legacyRow], false, $legacyHeaders);
+        $this->assertSame(['created' => 1, 'duplicates' => 0], $importer->import($legacyFile, 'old.xlsx', 1));
+        $lead = LeadSpectrum::firstOrFail();
+        $this->assertNull($lead->utm_source);
+        $legacyData = array_combine(array_keys(array_diff_key(LeadSpectrum::HEADERS, ['utm_source' => true])), $legacyRow);
+        $legacyData['create_date'] = '2026-01-02';
+        $this->assertSame(hash('sha256', json_encode($legacyData, JSON_THROW_ON_ERROR)), $lead->import_hash);
+        $this->assertSame(['created' => 0, 'duplicates' => 1], $importer->import($this->workbook([$this->row()]), 'blank-utm.xlsx', 1));
+
+        $row = $this->row();
+        $row[15] = 'google';
+        $utmFile = $this->workbook([$row], true);
+        $this->assertSame(['created' => 1, 'duplicates' => 0], $importer->import($utmFile, 'utm.xlsx', 1));
+        $this->assertSame(['created' => 0, 'duplicates' => 1], $importer->import($utmFile, 'utm.xlsx', 1));
+        $this->actingAs($this->user('Admin'))->get(route('spectrum.leads.index'))
+            ->assertOk()->assertSee('UTM Source')->assertSee('google');
+        $row[15] = str_repeat('a', 256);
+        $this->post(route('spectrum.leads.store'), [
+            'file' => new UploadedFile($this->workbook([$row]), 'long-utm.xlsx', null, null, true),
+        ])->assertSessionHasErrors('file');
+        $this->assertSame(2, LeadSpectrum::count());
+    }
+
     private function row(): array
     {
-        return ['Tsel', 'Test Lead', 'Example Company', '081234567890', 'lead@example.test', '1 - 9 Karyawan', 'Digital Advertising', 'Web-to-lead', '1/2/2026', null, 'Request', 'Digital Advertising', 'Retail', 'Follow up', 'Tertarik'];
+        return ['Tsel', 'Test Lead', 'Example Company', '081234567890', 'lead@example.test', '1 - 9 Karyawan', 'Digital Advertising', 'Web-to-lead', '1/2/2026', null, 'Request', 'Digital Advertising', 'Retail', 'Follow up', 'Tertarik', null];
     }
 
     private function user(string $role): User
