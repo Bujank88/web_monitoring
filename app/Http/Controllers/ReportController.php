@@ -25,10 +25,10 @@ class ReportController extends Controller
             return;
         }
 
-        if (auth()->user()->hasRole('AM Leader')) {
+        if (auth()->user()->hasRole(['AM Leader', 'KAM'])) {
             $hasAmAccess = DB::table('leads_master as lm')
                 ->join('users as u', 'u.id', '=', 'lm.user_id')
-                ->whereRaw('UPPER(u.role) = ?', ['AM'])
+                ->whereRaw('UPPER(u.role) = ?', [auth()->user()->hasRole('KAM') ? 'CVSR' : 'AM'])
                 ->where(function ($query) use ($normalizedEmail) {
                     $query->whereRaw('LOWER(TRIM(lm.email)) = ?', [$normalizedEmail])
                         ->orWhereRaw('LOWER(TRIM(lm.myads_account)) = ?', [$normalizedEmail]);

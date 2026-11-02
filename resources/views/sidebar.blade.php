@@ -22,6 +22,7 @@
                 $isPH = $roleUpper === 'PH';
                 $isAM = $roleUpper === 'AM';
                 $isAMLeader = $roleUpper === 'AM LEADER';
+                $isKam = $roleUpper === 'KAM';
                 $isTcd = $roleUpper === 'TCD';
                 $isInternal = $roleUpper === 'INTERNAL';
                 $isB2b = strtolower($roleValue) === 'b2b';
@@ -56,6 +57,8 @@
                 <span class="badge badge-primary">AM</span>
                 @elseif($isAMLeader)
                 <span class="badge badge-primary">AM LEADER</span>
+                @elseif($isKam)
+                <span class="badge badge-primary">KAM</span>
                 @elseif($isTcd)
                 <span class="badge badge-secondary">TCD</span>
                 @elseif($isInternal || $isMpcc)
@@ -806,6 +809,8 @@
                         <p>Logout</p>
                     </a>
                 </li>
+                @elseif($isKam)
+                @include('kam.menu')
                 @elseif($isAM || $isAMLeader)
                 <li class="nav-header">AM DASHBOARD</li>
                 <li class="nav-item">

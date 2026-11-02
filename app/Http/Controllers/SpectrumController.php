@@ -40,4 +40,39 @@ class SpectrumController extends Controller
 
         return redirect()->route('spectrum.leads.index')->with('success', "Upload selesai: {$result['created']} leads ditambahkan, {$result['duplicates']} baris duplikat dilewati.");
     }
+
+    public function edit(LeadSpectrum $lead): View
+    {
+        return view('spectrum.leads.edit', compact('lead'));
+    }
+
+    public function update(Request $request, LeadSpectrum $lead): RedirectResponse
+    {
+        $rules = [];
+        foreach (LeadSpectrum::HEADERS as $field => $label) {
+            if (in_array($field, ['create_date', 'share_date'], true)) {
+                $rules[$field] = ['nullable', 'date_format:Y-m-d'];
+            } elseif (in_array($field, ['description', 'fu', 'response'], true)) {
+                $rules[$field] = ['nullable', 'string', function ($attribute, $value, $fail) use ($label) {
+                    if (strlen($value) > 65535) {
+                        $fail("Isi {$label} terlalu panjang.");
+                    }
+                }];
+            } else {
+                $rules[$field] = ['nullable', 'string', 'max:255'];
+            }
+        }
+        $data = $request->validate($rules, [], LeadSpectrum::HEADERS);
+        // Keep the original import fingerprint so reuploads do not undo manual edits.
+        $lead->update($data);
+
+        return redirect()->route('spectrum.leads.index')->with('success', 'Data lead berhasil diperbarui.');
+    }
+
+    public function destroy(LeadSpectrum $lead): RedirectResponse
+    {
+        $lead->delete();
+
+        return redirect()->route('spectrum.leads.index')->with('success', 'Data lead berhasil dihapus.');
+    }
 }

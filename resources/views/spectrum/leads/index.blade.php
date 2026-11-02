@@ -27,6 +27,7 @@
                     <thead><tr>
                         <th>No.</th>
                         @foreach (\App\Models\LeadSpectrum::HEADERS as $label)<th class="text-nowrap">{{ $label }}</th>@endforeach
+                        <th>Action</th>
                     </tr></thead>
                     <tbody>
                         @forelse ($leads as $lead)
@@ -35,9 +36,17 @@
                                 @foreach (\App\Models\LeadSpectrum::HEADERS as $field => $label)
                                     <td style="min-width: 130px; max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere;">{{ in_array($field, ['create_date', 'share_date']) ? ($lead->$field?->format('d/m/Y') ?? '—') : ($lead->$field ?? '—') }}</td>
                                 @endforeach
+                                <td class="text-nowrap">
+                                    <a href="{{ route('spectrum.leads.edit', $lead) }}" class="btn btn-sm btn-warning">Edit</a>
+                                    <form method="POST" action="{{ route('spectrum.leads.destroy', $lead) }}" class="d-inline" onsubmit="return confirm('Hapus lead ini? Data yang dihapus tidak dapat dikembalikan.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="16" class="text-center py-4">{{ $search !== '' ? 'Tidak ada leads yang sesuai pencarian.' : 'Belum ada leads. Upload file melalui menu Input Leads.' }}</td></tr>
+                            <tr><td colspan="{{ count(\App\Models\LeadSpectrum::HEADERS) + 2 }}" class="text-center py-4">{{ $search !== '' ? 'Tidak ada leads yang sesuai pencarian.' : 'Belum ada leads. Upload file melalui menu Input Leads.' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

@@ -22,6 +22,7 @@ class LeadSpectrum extends Model
         'industry_sector' => 'Sektor Industri Company',
         'fu' => 'FU',
         'response' => 'Respon',
+        'utm_source' => 'UTM Source',
     ];
 
     protected $table = 'leads_spectrum';

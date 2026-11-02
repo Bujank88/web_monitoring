@@ -16,6 +16,7 @@ class CanvasserDetailController extends Controller
             'source' => ['nullable', 'in:canvasser,mpcc'],
         ]);
         $source = $data['source'] ?? 'canvasser';
+        abort_if($request->user()->hasRole('KAM') && $source !== 'canvasser', 403);
         $expectedRole = $source === 'mpcc' ? 'MPCC' : 'cvsr';
         $user = DB::table('users')->where('id', $data['user_id'])->where('role', $expectedRole)
             ->select('id', 'name', 'email', 'regional')->first();
