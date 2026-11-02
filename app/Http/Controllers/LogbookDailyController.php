@@ -77,7 +77,9 @@ class LogbookDailyController extends Controller
         // =======================
         // 🔐 FILTER ROLE
         // =======================
-        if (!auth()->user()->hasRole('Admin')) {
+        if (auth()->user()->hasRole('KAM')) {
+            $query->where('users.role', 'cvsr');
+        } elseif (!auth()->user()->hasRole('Admin')) {
             $query->where('leads_master.user_id', auth()->id());
         }
 
@@ -214,6 +216,9 @@ class LogbookDailyController extends Controller
             }
 
             // BELUM REALISASI
+            if (auth()->user()->hasRole('KAM')) {
+                return '';
+            }
             return '
                 <button 
                     class="btn btn-sm btn-success btn-realisasi"
@@ -325,7 +330,12 @@ class LogbookDailyController extends Controller
                 ->join('users', 'users.id', '=', 'leads_master.user_id');
 
             // 🔐 Role filter
-            if (auth()->user()->role === 'cvsr') {
+            if (auth()->user()->hasRole('KAM')) {
+                $query->where('users.role', 'cvsr');
+                if ($request->canvasser) {
+                    $query->where('users.id', $request->canvasser);
+                }
+            } elseif (auth()->user()->role === 'cvsr') {
                 $query->where('users.id', auth()->id());
             } elseif ($request->canvasser && auth()->user()->role == 'Admin') {
                 $query->where('users.id', $request->canvasser);
@@ -615,6 +625,13 @@ class LogbookDailyController extends Controller
     {
         // Normalize path - replace URL-encoded slashes with actual slashes
         $filePath = str_replace(['%2F', '%5C'], '/', $filePath);
+        if (auth()->user()->hasRole('KAM')) {
+            abort_unless(DB::table('logbook_daily')
+                ->join('leads_master', 'leads_master.id', '=', 'logbook_daily.leads_master_id')
+                ->join('users', 'users.id', '=', 'leads_master.user_id')
+                ->where('users.role', 'cvsr')
+                ->where('logbook_daily.realisasi_photo', $filePath)->exists(), 403);
+        }
         
         // Security: check if valid selfie-logbook path
         if (!Str::startsWith($filePath, 'selfie-logbook/')) {

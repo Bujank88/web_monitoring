@@ -114,7 +114,7 @@
     <h5><i class="fas fa-filter"></i> FILTER DATA LOGBOOK</h5>
     
     <div class="filter-row">
-        @if(Auth::user()->role === 'Admin')
+        @if(Auth::user()->hasRole(['Admin', 'KAM']))
         <div class="filter-group">
             <label for="filter_canvasser">Canvasser</label>
             <select id="filter_canvasser" class="form-control select2">

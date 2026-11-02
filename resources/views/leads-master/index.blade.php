@@ -153,7 +153,7 @@
     <h5><i class="fas fa-filter"></i> FILTER DATA LEADS</h5>
     
     <div class="filter-row">
-        @if(Auth::user()->hasRole(['Admin', 'AM Leader']))
+        @if(Auth::user()->hasRole(['Admin', 'AM Leader', 'KAM']))
         <div class="filter-group">
             <label for="filter_canvasser">User / Role</label>
             <select id="filter_canvasser" class="form-control select2">

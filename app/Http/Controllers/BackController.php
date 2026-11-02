@@ -438,6 +438,7 @@ class BackController extends Controller
                 case 'AM':
                 case 'AM Leader':
                     return redirect()->route('am.referral.index');
+                case 'KAM':
                 case 'Regional':
                     return redirect()->route('daily.topup.channel');
                 case 'Dormant':

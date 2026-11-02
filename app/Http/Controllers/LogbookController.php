@@ -88,7 +88,9 @@ class LogbookController extends Controller
         // =======================
         // 🔐 FILTER ROLE
         // =======================
-        if (!auth()->user()->hasRole('Admin')) {
+        if (auth()->user()->hasRole('KAM')) {
+            $query->where('users.role', 'cvsr');
+        } elseif (!auth()->user()->hasRole('Admin')) {
             $query->where('leads_master.user_id', auth()->id());
         }
 
@@ -179,6 +181,9 @@ class LogbookController extends Controller
                 return $row->status ?? '-';
             })
              ->addColumn('action', function ($row) {
+                if (auth()->user()->hasRole('KAM')) {
+                    return '';
+                }
                 return '
                 <button 
                     class="btn btn-sm btn-primary btn-edit"
