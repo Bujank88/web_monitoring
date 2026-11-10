@@ -77,7 +77,9 @@
         </div>
 
         <a href="{{ route('powerhouse.2m.summary') }}" class="btn btn-secondary">Kembali</a>
-        <a href="{{ route('powerhouse.2m.edit', $lead) }}" class="btn btn-primary">Update</a>
+        @unless(Auth::user()->hasRole('product'))
+            <a href="{{ route('powerhouse.2m.edit', $lead) }}" class="btn btn-primary">Update</a>
+        @endunless
     </div>
 </div>
 @endsection

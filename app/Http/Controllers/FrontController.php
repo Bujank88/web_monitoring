@@ -28,7 +28,7 @@ class FrontController extends Controller
                 return redirect()->route('race_summary_treg');
             } else if (in_array(Auth::user()->role, ['Admin', 'Tsel'])) {
                 return redirect('/admin/home');
-            } else if ('KAM' == Auth::user()->role) {
+            } else if (in_array(Auth::user()->role, ['KAM', 'product'], true)) {
                 return redirect()->route('daily.topup.channel');
             } else if ('Supervisor' == Auth::user()->role) {
                 return redirect()->route('supervisor.index');

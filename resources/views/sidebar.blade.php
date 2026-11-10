@@ -15,6 +15,7 @@
                 $roleValue = trim((string) $user->role);
                 $roleUpper = strtoupper($roleValue);
                 $isAdmin = $roleUpper === 'ADMIN';
+                $isProduct = $roleValue === 'product';
                 $isTsel = $roleUpper === 'TSEL';
                 $isTreg = $roleUpper === 'TREG';
                 $isCanv = $roleValue === 'cvsr';
@@ -49,6 +50,8 @@
                 <span class="badge badge-warning">SUPER ADMIN</span>
                 @elseif($isAdmin)
                 <span class="badge badge-warning">ADMIN</span>
+                @elseif($isProduct)
+                <span class="badge badge-info">PRODUCT</span>
                 @elseif($isTsel)
                 <span class="badge badge-success">TSEL</span>
                 @elseif($isPH)
@@ -104,7 +107,9 @@
                 @if($user->role === 'Supervisor')
                 <li class="nav-item"><a href="{{ route('supervisor.index') }}" class="nav-link {{ request()->routeIs('supervisor.index') ? 'active' : '' }}"><i class="nav-icon fas fa-users" style="color:#17a2b8;"></i><p>Monitoring Tim</p></a></li>
                 @endif
-                @if($isSupervisor)
+                @if($isProduct)
+                @include('product.menu')
+                @elseif($isSupervisor)
                 @include('supervisor.menu')
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">

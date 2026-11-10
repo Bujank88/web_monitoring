@@ -22,6 +22,13 @@ class CheckRole
 
         $user = Auth::user();
 
+        // Product uses a report allowlist, including data and export endpoints.
+        if ($user->hasRole('product')) {
+            abort_unless(\App\Support\ProductAccess::allows($request), 403);
+
+            return $next($request);
+        }
+
         // cek role
         if (in_array($user->role, $roles)) {
             return $next($request);
