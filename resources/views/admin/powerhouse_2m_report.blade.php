@@ -163,6 +163,9 @@
                                     >
                                         Lihat Usecase
                                     </button>
+                                    @if(Auth::user()->hasRole('product'))
+                                        <span>{{ $lead['solusi'] ?? '-' }}</span>
+                                    @else
                                     <button
                                         type="button"
                                         class="btn btn-warning btn-sm btn-edit-solusi"
@@ -174,6 +177,7 @@
                                     >
                                         Isi Solusi
                                     </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -216,6 +220,7 @@
     </div>
 </div>
 
+@unless(Auth::user()->hasRole('product'))
 <div class="modal fade" id="modalSolusi" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -242,6 +247,7 @@
         </div>
     </div>
 </div>
+@endunless
 @endsection
 
 @section('js')

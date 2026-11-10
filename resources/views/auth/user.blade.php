@@ -221,6 +221,7 @@
                             <option value="AM">AM</option>
                             <option value="AM Leader">AM Leader</option>
                             <option value="KAM">KAM</option>
+                            <option value="product">Product</option>
                             <option value="Dormant">Dormant</option>
                         </select>
                     </div>
