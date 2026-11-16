@@ -131,7 +131,7 @@ Route::middleware(['auth', 'checkrole:Admin,SBP'])->group(function () {
     Route::get('/pilot-sbp-to-sme/report-campaign/export', [PilotSbpController::class, 'exportReportCampaign'])->name('pilot-sbp-sme.report-campaign.export');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Treg,Area3'])->group(function (){
+Route::middleware(['auth', 'checkrole:Admin,Treg'])->group(function (){
     Route::get('/monitoring-akuisisi-treg', [FrontController::class, 'akuisisiVoucherTreg'])->name('monitoring_akuisisi_treg');
     Route::get('/race-summary-treg', [FrontController::class, 'raceSummaryTreg'])->name('race_summary_treg');
     Route::get('/get-akuisisi-data', [TregController::class, 'getDetailAkuisisi'])->name('akuisisi_data');
@@ -141,7 +141,7 @@ Route::middleware(['auth', 'checkrole:Admin,Treg,Area3'])->group(function (){
     ->name('download.format.voucher.treg');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,AM,AM Leader,MPCC,Regional,Supervisor,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,AM,AM Leader,MPCC,Regional,Supervisor,KAM,Area 3'])->group(function () {
     Route::get('/daily-topup-channel', [FrontController::class, 'dailyTopupChannel'])->name('daily.topup.channel');
     Route::get('/get-daily-topup-data', [LeadProgramController::class, 'getDailyTopupDataTable'])->name('daily_topup_data');
     Route::get('/get-daily-topup-by-province-data', [LeadProgramController::class, 'getDailyTopupByProvinceDataTable'])->name('daily_topup_by_province_data');
@@ -304,26 +304,26 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function (){
 
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,KAM'])->group(function () {
     Route::get('logbook', [LogbookController::class, 'index'])->name('logbook.index');
     Route::get('logbook/data', [LogbookController::class, 'data'])->name('logbook.data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function () {
     Route::post('/logbook/update', [LogbookController::class, 'update'])->name('logbook.update');
     Route::post('/logbook/insert', [LogbookController::class, 'insert'])->name('logbook.insert');
     Route::post('/logbook/day', [LogbookController::class, 'insertDaily'])->name('logbook.day');
     
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,KAM'])->group(function () {
     Route::get('/logbook-daily', [LogbookDailyController::class, 'index'])->name('logbook-daily.index');
     Route::get('logbook-daily/data', [LogbookDailyController::class, 'data'])->name('logbook-daily.data');
     Route::get('/logbook-daily/summary', [LogbookDailyController::class, 'summary'])->name('logbook-daily.summary');
     Route::get('/logbook-daily/foto/{filePath}', [LogbookDailyController::class, 'getFoto'])->name('logbook-daily.foto')->where('filePath', '.*');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH, Area 3'])->group(function () {
     Route::get('/logbook-daily/refresh', [LogbookDailyController::class, 'refreshLogbookDaily']);
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
@@ -391,19 +391,19 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Area3'])->group(function () 
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,KAM,Area 3'])->group(function () {
     Route::get('transaction-detail', [ReportController::class, 'transactionDetailByEmail'])->name('transaction-detail');
     Route::get('transaction-detail/data', [ReportController::class, 'transactionDetailByEmailData'])->name('transaction-detail.data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,MPCC,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,MPCC,KAM'])->group(function () {
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/data', [LeadsMasterController::class, 'data'])->name('leads-master.data');
     Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show')->whereNumber('id');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,MPCC,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,MPCC'])->group(function () {
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
     Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
     Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
@@ -412,7 +412,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,MPCC,Area3'])->group(func
     Route::put('leads-master/{lead}', [LeadsMasterController::class, 'update'])->name('leads-master.update')->whereNumber('lead');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,MPCC,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,MPCC,Area 3'])->group(function () {
     Route::get('/mpcc-report', [FrontController::class, 'monitoringMpccReport'])->name('mpcc.report');
     Route::get('/mpcc-report/data', [BackController::class, 'getMpccVoucherReport'])->name('mpcc.report.data');
     Route::get('/mpcc-report/performance-data', [BackController::class, 'getMpccDealTopupMom'])->name('mpcc.report.performance-data');
@@ -429,7 +429,7 @@ Route::middleware(['auth', 'checkrole:Area 2'])->prefix('area2')->name('area2.')
     Route::get('leads-master/export', [Area2LeadsController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master/{id}', [Area2LeadsController::class, 'show'])->name('leads-master.show')->whereNumber('id');
 });
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,b2b'])->group(function () {
     // AM Level UP Routes
     Route::get('am-level-up/input', [AmLevelUpController::class, 'index'])->name('amlevelup.index');
     Route::post('am-level-up/store', [AmLevelUpController::class, 'store'])->name('amlevelup.store');
@@ -508,7 +508,7 @@ Route::middleware(['auth', 'checkrole:Admin,CDSI,KSS,kss,Dormant'])->group(funct
     Route::get('report-cdsi-province/data', [CdsiReportController::class, 'reportCdsiProvinceData'])->name('report-cdsi-province.data');
     Route::get('report-cdsi-province/export', [CdsiReportController::class, 'exportCdsiProvince'])->name('report-cdsi-province.export');
 });
-Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC,Area 3'])->group(function () {
     
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
     Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
@@ -526,7 +526,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC,Area3'])->group(fun
     Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,Area3'])->prefix('project-area-3')->name('project-area3.')->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,Area 3'])->prefix('project-area-3')->name('project-area3.')->group(function () {
     Route::get('/project-ds', [ProjectArea3Controller::class, 'ds'])->name('ds');
     Route::get('/canvasser', [ProjectArea3Controller::class, 'canvasser'])->name('canvasser');
     Route::get('/report-territory', [ProjectArea3Controller::class, 'territory'])->name('territory');
@@ -536,7 +536,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Area3'])->prefix('project-area-3'
     Route::get('/export/{tipe}', [ProjectArea3Controller::class, 'export'])->where('tipe', 'ds|canvasser')->name('export');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,Internal,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,Internal,Area 3'])->group(function () {
     
     Route::get('mitra-sbp', [ReportController::class, 'reportMitraSBP'])->name('mitra-sbp');
     Route::get('report-campaign-sbp', [ReportController::class, 'reportCampaignSbp'])->name('report-campaign-sbp');
@@ -630,7 +630,7 @@ Route::middleware(['auth', 'checkrole:Admin'])->prefix('configuration')->name('c
 });
 
 // Materi umum dan laporan campaign global baca-saja untuk Supervisor.
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor'])->group(function () {
     Route::view('faq-l0', 'faq.l0')->name('faq-l0');
     Route::view('tips-sales', 'admin.template-image')->name('tips-sales');
     Route::get('tips-sales/pdf', [FrontController::class, 'downloadTipsSalesPdf'])->name('tips-sales.pdf');
@@ -650,7 +650,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor,Area3'])->group(f
     Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor,KAM,Area 3'])->group(function () {
     Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
     Route::get('/export-regional', [BackController::class, 'exportRegional'])->name('export.regional');
     Route::get('/get-leads-data-api', [LeadProgramController::class, 'getLeadsDataApi'])->name('leads_data_api');
@@ -667,7 +667,7 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor'])->gro
     Route::get('/export-canvasser-voucher-summary', [BackController::class, 'exportCanvasserVoucherSummary'])->name('export.canvasser_voucher_summary');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor,KAM,Area3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor,KAM,Area 3'])->group(function () {
     Route::get('topup-canvasser/detail', [CanvasserDetailController::class, 'page'])->name('topup-canvasser.detail');
     Route::get('topup-canvasser/detail/overview', [CanvasserDetailController::class, 'overview'])->name('topup-canvasser.detail.overview');
     Route::get('topup-canvasser/detail/mom', [CanvasserDetailController::class, 'mom'])->name('topup-canvasser.detail.mom');
