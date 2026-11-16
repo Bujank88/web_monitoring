@@ -39,7 +39,7 @@
                 $isSbp = $roleUpper === 'SBP';
                 $isCanvasserSbp = $roleUpper === 'CANVASSER SBP';
                 $isOneSynergy = $roleUpper === '1SYNERGY';
-                $isArea3 = $user->role === 'AREA 3';
+                $isArea3 = $roleUpper === 'AREA 3';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
                     'mpcc_area2@telkomsel.co.id',
@@ -1156,43 +1156,39 @@
                     </ul>
                 </li>
 
-                @if($isAdmin || $isTsel || $isCanv || $isPH)
+@if($isAdmin || $isTsel || $isCanv || $isPH || $isArea3)
                 <li class="nav-item">
                     <a href="{{ route('topup-canvasser') }}"
                         class="nav-link waves-effect {{ request()->routeIs('topup-canvasser') ? 'active' : '' }}">
                         <i class="nav-icon fa-solid fa-money-bill" style="color:rgb(80, 255, 80);"></i>
                         <p>History Top Up Canvasser</p>
                     </a>
-                </li>           --}}
-                @if($isAdmin || $isTcd)
                 </li>
                 @endif
-                
+                @if($isAdmin || $isTcd)
                 <li class="nav-item {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
-                                <p>
-                                    Agency Advertising
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
+                    <a href="#" class="nav-link {{ request()->routeIs('report-agency-advertising') || request()->routeIs('report-saldo-advertising') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-network-wired" style="color:#f8a912;"></i>
+                        <p>
+                            Agency Advertising
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
                     <ul class="nav nav-treeview">
-                    
-                    <li class="nav-item">
-                        <a href="{{ route('report-agency-advertising') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
-                            <p>Report Agency Advertising</p>
-                        </a>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a href="{{ route('report-saldo-advertising') }}"
-                            class="nav-link waves-effect {{ request()->routeIs('report-saldo-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
-                            <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
-                            <p>Report Saldo Agency Advertising</p>
-                        </a>
-                    </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-agency-advertising') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-agency-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-bullhorn" style="color:#fd7e14;"></i>
+                                <p>Report Agency Advertising</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('report-saldo-advertising') }}"
+                                class="nav-link waves-effect {{ request()->routeIs('report-saldo-advertising') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fa-solid fa-piggy-bank" style="color:#ffc1cc;"></i>
+                                <p>Report Saldo Agency Advertising</p>
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 @endif
@@ -1521,9 +1517,7 @@
                             <i class="nav-icon fa-solid fa-file-arrow-up" style="color:#7dd3fc;"></i>
                             <p>Upload Report Avalon</p>
                             </a>
-                        </li>
-                    </ul>
-                </li>            
+                        </li>       
             </ul>
         </li>
         @endif
