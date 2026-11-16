@@ -465,6 +465,8 @@ class BackController extends Controller
                     return redirect()->route('one-synergy.report');
                 case 'b2b':
                     return redirect()->route('amlevelup.index');
+                case 'Area 3':
+                     return redirect()->route('admin.home');    
                 default:
                     return redirect()->route('home'); // fallback
             }

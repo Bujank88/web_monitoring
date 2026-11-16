@@ -223,6 +223,7 @@
                             <option value="KAM">KAM</option>
                             <option value="product">Product</option>
                             <option value="Dormant">Dormant</option>
+                            <option value="Area 3">Area 3</option>
                         </select>
                     </div>
 

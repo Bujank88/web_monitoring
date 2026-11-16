@@ -50,6 +50,8 @@ class FrontController extends Controller
                 return redirect()->route('am.referral.index');
             } else if ('b2b' == Auth::user()->role) {
                 return redirect()->route('amlevelup.index');
+            } else if ('Area 3' == Auth::user()->role) {
+                return redirect()->route('admin.home');
             } else {
             return redirect('/admin/home');
             }
