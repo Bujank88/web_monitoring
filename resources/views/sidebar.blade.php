@@ -538,7 +538,7 @@
                         </li>
                     </ul>
                 </li>
-                @if($isAdmin || $isMpccPowerhouse)
+                @if($isAdmin || $isMpccPowerhouse || $isArea3)
                 <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-house-chimney-user"></i>
@@ -990,7 +990,7 @@
                     </ul>
                 </li>
                 @endif
-                @if($isAdmin || $isPH)
+                @if($isAdmin || $isPH || $isArea3)
                 <li class="nav-item has-treeview {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('region-target') || request()->routeIs('admin.monitoring.powerhouse_referral') || request()->routeIs('admin.monitoring.powerhouse_semester') || request()->routeIs('powerhouse.2m.*')) ? 'active' : '' }}">
                         <i class="nav-icon fas fa-house-chimney-user"></i>
