@@ -81,7 +81,7 @@ Edit file `.env`:
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
-DB_PORT=3306
+DB_PORT=3307
 DB_DATABASE=nama_database
 DB_USERNAME=username
 DB_PASSWORD=password
@@ -115,7 +115,7 @@ Database utama untuk menyimpan data aplikasi. Konfigurasi di `.env`:
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
-DB_PORT=3306
+DB_PORT=3307
 DB_DATABASE=your_database
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
