@@ -467,6 +467,8 @@ class BackController extends Controller
                     return redirect()->route('amlevelup.index');
                 case 'Area 3':
                      return redirect()->route('admin.home');    
+                case 'ds':
+                     return redirect()->route('leads-master.index');
                 default:
                     return redirect()->route('home'); // fallback
             }

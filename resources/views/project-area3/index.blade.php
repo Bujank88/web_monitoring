@@ -26,7 +26,7 @@
     background: linear-gradient(135deg, #fff5e1 0%, #ffe0b2 100%);
     color: #e65100; font-weight: 600;
     }
-    #tabelArea3 tbody td:nth-child(9) { color: #2e7d32; font-weight: 600; }
+    #tabel tbody td:nth-child(9) { color: #2e7d32; font-weight: 600; }
     #tabelArea3 tfoot td {
         background: linear-gradient(135deg, #fffb00 0%, #ffee00 100%);
         color: #333; font-weight: 700; text-align: center; padding: 12px;

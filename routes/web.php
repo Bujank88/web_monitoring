@@ -323,7 +323,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,KAM'])->group(function () {
     Route::get('/logbook-daily/foto/{filePath}', [LogbookDailyController::class, 'getFoto'])->name('logbook-daily.foto')->where('filePath', '.*');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH, Area 3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function () {
     Route::get('/logbook-daily/refresh', [LogbookDailyController::class, 'refreshLogbookDaily']);
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
     Route::post('/logbook-daily/realisasi', [LogbookDailyController::class, 'realisasiLogbook'])->name('logbook-daily.realisasiLogbook');
@@ -391,19 +391,19 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH, Area 3'])->group(function (
 // Route::get('/send-manual-notif', [PanenPoinController::class, 'manualNotifyAll']);
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,KAM,Area 3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,KAM,Area 3,ds'])->group(function () {
     Route::get('transaction-detail', [ReportController::class, 'transactionDetailByEmail'])->name('transaction-detail');
     Route::get('transaction-detail/data', [ReportController::class, 'transactionDetailByEmailData'])->name('transaction-detail.data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,MPCC,KAM'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,AM Leader,MPCC,KAM,Area 3,ds'])->group(function () {
     Route::get('leads-master/export', [LeadsMasterController::class, 'export'])->name('leads-master.export');
     Route::get('leads-master', [LeadsMasterController::class, 'index'])->name('leads-master.index');
     Route::get('leads-master/data', [LeadsMasterController::class, 'data'])->name('leads-master.data');
     Route::get('leads-master/{id}', [LeadsMasterController::class, 'show'])->name('leads-master.show')->whereNumber('id');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,MPCC'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,AM,MPCC,Area 3,ds'])->group(function () {
     Route::get('leads-master/create', [LeadsMasterController::class, 'create'])->name('leads-master.create');
     Route::get('leads-master/create-existing', [LeadsMasterController::class, 'createExisting'])->name('leads-master.create-existing');
     Route::post('leads-master/store', [LeadsMasterController::class, 'store'])->name('leads-master.store');
@@ -526,7 +526,7 @@ Route::middleware(['auth', 'checkrole:Admin,PH,Internal,MPCC,Area 3'])->group(fu
     Route::get('export-performance-all', [ReportController::class, 'exportPerformanceAll'])->name('export.performance-all');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,PH,Area 3'])->prefix('project-area-3')->name('project-area3.')->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,PH,Area 3,ds'])->prefix('project-area-3')->name('project-area3.')->group(function () {
     Route::get('/project-ds', [ProjectArea3Controller::class, 'ds'])->name('ds');
     Route::get('/canvasser', [ProjectArea3Controller::class, 'canvasser'])->name('canvasser');
     Route::get('/report-territory', [ProjectArea3Controller::class, 'territory'])->name('territory');
@@ -650,7 +650,7 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor'])->group(functio
     Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
 });
 
-Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor,KAM,Area 3'])->group(function () {
+Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor,KAM,Area 3,ds'])->group(function () {
     Route::get('/admin/home', [HomeController::class, 'index'])->name('admin.home');
     Route::get('/export-regional', [BackController::class, 'exportRegional'])->name('export.regional');
     Route::get('/get-leads-data-api', [LeadProgramController::class, 'getLeadsDataApi'])->name('leads_data_api');
