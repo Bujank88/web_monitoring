@@ -630,6 +630,8 @@
                         <p>Logout</p>
                     </a>
                 </li>
+
+                
                 @elseif($isAutomatech)
                 <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') ? 'active' : '' }}">
@@ -656,6 +658,8 @@
                         </li>
                     </ul>
                 </li>
+
+                
 
                 <li class="nav-header">System Management</li>
                 <li class="nav-item">
@@ -1262,7 +1266,9 @@
                     </ul>
                 </li>
                 @endif
-                @if($isAdmin || $isMaxim)
+
+
+                @if($isMaxim)
                 <li class="nav-item {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-maxim') || request()->routeIs('report-saldo-maxim') || request()->routeIs('admin.upload.maxim-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-car" style="color:#fbff00;"></i>
@@ -1298,7 +1304,8 @@
                     </ul>
                 </li>
                 @endif
-                @if($isAdmin || $isAutomatech)
+                
+                @if($isAutomatech)
                 <li class="nav-item {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-automatech') || request()->routeIs('report-saldo-automatech') || request()->routeIs('admin.upload.automatech-report') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-industry" style="color:#ff6b35;"></i>
@@ -1322,6 +1329,7 @@
                             <p>Report Saldo Automatech</p>
                         </a>
                     </li>
+                    
                     @if($isAdmin)
                     <li class="nav-item">
                         <a href="{{ route('admin.upload.automatech-report') }}"
@@ -1334,6 +1342,7 @@
                     </ul>
                 </li>
                 @endif
+                
                 @if($isAdmin || $isGoto)
                 <li class="nav-item {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') || request()->routeIs('admin.upload.goto-report') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-goto') || request()->routeIs('report-saldo-goto') || request()->routeIs('admin.upload.goto-report') ? 'active' : '' }}">
@@ -1366,10 +1375,12 @@
                             <p>Upload Report GOTO</p>
                         </a>
                     </li>
-                    @endif
+                    
                     </ul>
                 </li>
-                @if($isAdmin)
+                @endif
+                
+                @if($isCdsi)
                 <li class="nav-item {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('report-cdsi*') || request()->routeIs('report-cdsi-dormant*') || request()->routeIs('report-cdsi-province*') || request()->routeIs('admin.upload.cdsi-report') || request()->routeIs('cdsi.referrals*') || request()->routeIs('cdsi.referral-topup-channel*') || request()->routeIs('cdsi.monitoring-deposit*') || request()->routeIs('cdsi.brand-list*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-broadcast-tower" style="color:#ef4444;"></i>
@@ -1439,7 +1450,8 @@
                         </li>
                     </ul>
                 </li>
-
+                @endif
+                @if($isAdmin)
                 <li class="nav-item {{ request()->routeIs('one-synergy.*') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('one-synergy.*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-people-arrows" style="color:#3b82f6;"></i>
@@ -1486,7 +1498,7 @@
                         </li>
                     </ul>
                 </li>
-
+                
                 @endif
                 @endif
                 @if($isAdmin || $isPH || $isMpcc || $isArea3)
@@ -1557,6 +1569,7 @@
                 </ul>
                 </li>  
                 @endif
+ 
                 @if($isAdmin)
                 <li class="nav-item {{ request()->routeIs('report-avalon-kemang-bogor') || request()->routeIs('report-saldo-avalon-kemang-bogor') || request()->routeIs('admin.upload.avalon-kemang-bogor-report') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('report-avalon-kemang-bogor') || request()->routeIs('report-saldo-avalon-kemang-bogor') || request()->routeIs('admin.upload.avalon-kemang-bogor-report') ? 'active' : '' }}">
@@ -1609,6 +1622,7 @@
                     </a>
                 </li>
                 @endif --}}
+                
                 @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc)
                 <li class="nav-item {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('panenpoinv3.*') || request()->routeIs('panenpoinv4.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link waves-effect {{ (request()->routeIs('panenpoinv2.*') || request()->routeIs('panenpoinv3.*') || request()->routeIs('panenpoinv4.*') || request()->routeIs('amlevelup.*') || request()->routeIs('admin.monitoring.canvasser_voucher')) ? 'active' : '' }}">
