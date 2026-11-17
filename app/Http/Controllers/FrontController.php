@@ -52,8 +52,10 @@ class FrontController extends Controller
                 return redirect()->route('amlevelup.index');
             } else if ('Area 3' == Auth::user()->role) {
                 return redirect()->route('admin.home');
+            } else if ('ds' == Auth::user()->role) {
+                return redirect()->route('leads-master.index');
             } else {
-            return redirect('/admin/home');
+                return redirect('/admin/home');
             }
         }
         // return view('errors.503');

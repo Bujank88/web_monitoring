@@ -81,12 +81,18 @@ class LeadsMasterController extends Controller
             ->orderBy('dls.saldo_utama', 'desc');
 
         // 🔐 Filter berdasarkan role
-        if (auth()->user()->hasRole('KAM')) {
-            $query->where('filter_user.role', 'cvsr');
-        } elseif (auth()->user()->hasRole('AM Leader')) {
+        $user = auth()->user();
+        $roleUpper = strtoupper(trim((string) $user->role));
+
+        if ($roleUpper === 'KAM') {
+            $query->whereRaw('UPPER(filter_user.role) = ?', ['CVSR']);
+        } elseif ($roleUpper === 'AM LEADER') {
             $query->whereRaw('UPPER(filter_user.role) = ?', ['AM']);
-        } elseif (!auth()->user()->hasRole('Admin')) {
-            $query->where('dls.user_id', auth()->id());
+        } elseif ($roleUpper === 'ADMIN') {
+            // Admin bebas melihat semua data
+        } else {
+            // User DS (dan role individu lainnya) HANYA melihat data miliknya sendiri
+            $query->where('dls.user_id', $user->id);
         }
 
         // =======================
@@ -646,11 +652,12 @@ class LeadsMasterController extends Controller
     public function show($id)
     {
         logUserLogin();
-        // Load lead beserta relasi
         $lead = LeadsMaster::with(['user', 'source', 'sector'])->findOrFail($id);
-        if (auth()->user()->hasRole('KAM')) {
-            abort_unless($lead->user?->role === 'cvsr', 403);
-        } elseif (auth()->user()->hasRole('AM Leader')) {
+        $roleUpper = strtoupper(trim((string) auth()->user()->role));
+
+        if ($roleUpper === 'KAM') {
+            abort_unless(strtoupper((string) $lead->user?->role) === 'CVSR', 403);
+        } elseif ($roleUpper === 'AM LEADER') {
             abort_unless(strtoupper((string) $lead->user?->role) === 'AM', 403);
         } else {
             $this->authorizeOwnedLead($lead);
@@ -724,8 +731,10 @@ class LeadsMasterController extends Controller
 
     private function authorizeOwnedLead(LeadsMaster $lead): void
     {
-        if (auth()->user()->role !== 'Admin' && (int) $lead->user_id !== (int) auth()->id()) {
-            abort(403);
+        $roleUpper = strtoupper(trim((string) auth()->user()->role));
+
+        if ($roleUpper !== 'ADMIN' && (int) $lead->user_id !== (int) auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses ke data ini.');
         }
     }
 
@@ -1025,7 +1034,8 @@ class LeadsMasterController extends Controller
             'EXTRA36', 'EXTRA37', 'EXTRA38', 'EXTRA39', 'EXTRA40',
             'SUPER1','SUPER2','SUPER3','SUPER4','SUPER5','SUPER6','SUPER7','SUPER8',
             'HEBAT1','HEBAT2','HEBAT3','HEBAT4','HEBAT5','HEBAT6','HEBAT7',
-            'HEBAT8','HEBAT9','HEBAT10','HEBAT11','HEBAT12','HEBAT13',
+            'HEBAT8','HEBAT9','HEBAT10','HEBAT11','HEBAT12','HEBAT13','AREA3DS1','AREA3DS2',
+            'AREA3DS3','AREA3DS4','AREA3DS5','AREA3DS6','AREA3DS7','AREA3DS8','AREA3DS8',
         ];
 
         // 2️⃣ Ambil data top up + referral_code user

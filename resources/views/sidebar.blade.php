@@ -40,6 +40,7 @@
                 $isCanvasserSbp = $roleUpper === 'CANVASSER SBP';
                 $isOneSynergy = $roleUpper === '1SYNERGY';
                 $isArea3 = $roleUpper === 'AREA 3';
+                $isDS = $roleUpper === 'DS';
                 $isMpccPowerhouse = $isMpcc && in_array($user->email, [
                     'mpcc_area1@telkomsel.co.id',
                     'mpcc_area2@telkomsel.co.id',
@@ -95,6 +96,8 @@
                 <span class="badge badge-info">AREA 3</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
+                <span class="badge badge-primary">DS</span>
+                @elseif($isDS)
                 @elseif($isTreg)
                 @php
                 $treg_name = DB::table('treg')->where('id', $user->treg_id)->value('treg_name');
@@ -857,6 +860,71 @@
                 <li class="nav-item"><a href="{{ url('change-password') }}" class="nav-link {{ request()->routeIs('change-password') ? 'active' : '' }}"><i class="nav-icon fas fa-key"></i><p>Change Password</p></a></li>
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item"><a href="{{ url('logout') }}" class="nav-link"><i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i><p>Logout</p></a></li>
+
+                @elseif($isDS)
+                <li class="nav-header">ALL DASHBOARD</li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.index') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
+                        <p>Data Leads & Akun</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-pen" style="color:rgb(1, 240, 172);"></i>
+                        <p>New Leads</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('leads-master.create-existing') }}" class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
+                        <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
+                        <p>New/Eksisting Akun</p>
+                    </a>
+                </li>
+                <li class="nav-item {{ request()->routeIs('project-area3.*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->routeIs('project-area3.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-project-diagram" style="color:#17a2b8;"></i>
+                        <p>
+                            Project Area 3
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('project-area3.ds') }}" class="nav-link waves-effect {{ request()->routeIs('project-area3.ds') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-tasks" style="color:#ffc107;"></i>
+                                <p>Project DS</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('project-area3.canvasser') }}" class="nav-link waves-effect {{ request()->routeIs('project-area3.canvasser') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-user-friends" style="color:#28a745;"></i>
+                                <p>Canvasser Project</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('project-area3.territory') }}" class="nav-link waves-effect {{ request()->routeIs('project-area3.territory') ? 'active' : '' }}" style="padding-left: 45px;">
+                                <i class="nav-icon fas fa-flag" style="color:#fd7e14;"></i>
+                                <p>Report Territory</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                
+                <li class="nav-header">System Management</li>
+                <li class="nav-item">
+                    <a href="{{ url('change-password') }}" class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-key" style="color:rgb(173, 176, 86);"></i>
+                        <p>Change Password</p>
+                    </a>
+                </li>
+                <li class="nav-header">LOGOUT</li>
+                <li class="nav-item">
+                    <a href="{{ url('logout') }}" class="nav-link waves-effect {{ request()->routeIs('logout') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sign-out-alt" style="color:rgb(239,21,21);"></i>
+                        <p>Logout</p>
+                    </a>
+                </li>
                 @else
 
                 {{-- ===== ADMIN: bisa akses semua menu (ALL + TREG) ===== --}}
@@ -1016,6 +1084,7 @@
 
 
                 {{-- <li class="nav-header">Report</li> --}}
+                @if($isDS || $isArea3)
                 <li class="nav-item">
                     <a href="{{ route('leads-master.index') }}"
                         class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
@@ -1036,7 +1105,8 @@
                           <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
                           <p>New/Eksisting Akun</p>
                       </a>
-                  </li>         
+                  </li>
+                  @endif         
                   @if($isAdmin)
                   <li class="nav-item has-treeview {{ request()->routeIs('pilot-sbp-sme*') ? 'menu-open' : '' }}">
                       <a href="#" class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme*') ? 'active' : '' }}">
@@ -1453,7 +1523,7 @@
                     </ul>
             </li>
         @endif
-                @if($isAdmin || $isPH || $isArea3)
+                @if($isAdmin || $isPH || $isArea3 || $isDS)
         <li class="nav-item {{ request()->routeIs('project-area3.*') ? 'menu-open' : '' }}">
             <a href="#" class="nav-link {{ request()->routeIs('project-area3.*') ? 'active' : '' }}">
                 <i class="nav-icon fas fa-project-diagram" style="color:#17a2b8;"></i>
@@ -1769,7 +1839,7 @@
                 @endif
 
                 {{-- ===== PRESENSI: Hanya untuk CVSR dan Admin ===== --}}
-                @if($isCanv || $isAdmin || $isArea3)
+                @if($isCanv || $isAdmin)
                 <li class="nav-header">PRESENSI</li>
                 <li class="nav-item {{ (request()->routeIs('presensi.*') || request()->routeIs('location-presensi.*')) ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ (request()->routeIs('presensi.*') || request()->routeIs('location-presensi.*')) ? 'active' : '' }}">
@@ -1793,7 +1863,7 @@
                                 <p>Riwayat Presensi</p>
                             </a>
                         </li>
-                        @if($isAdmin || $isArea3)
+                        @if($isAdmin)
                         <li class="nav-item">
                             <a href="{{ route('location-presensi.index') }}"
                                 class="nav-link waves-effect {{ request()->routeIs('location-presensi.index') ? 'active' : '' }}">
@@ -1877,7 +1947,7 @@
                     </a>
                 </li>
                 @endif                
-                @if($isAdmin || $isTsel || $isArea3)
+                @if($isAdmin || $isTsel)
                 <li class="nav-item">
                     <a href="{{ route('loglogin') }}"
                         class="nav-link waves-effect {{ request()->routeIs('loglogin') ? 'active' : '' }}">
@@ -1889,7 +1959,7 @@
                 
             
                 
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor || $isArea3)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor || $isArea3 || $isDS)
                 <li class="nav-item">
                     <a href="{{ url('change-password') }}"
                         class="nav-link waves-effect {{ request()->routeIs('change-password') ? 'active' : '' }}">
@@ -1902,7 +1972,7 @@
 
 
                 {{-- ===== Logout untuk semua role yang ditangani di atas ===== --}}
-                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor || $isArea3)
+                @if($isAdmin || $isTreg || $isTsel || $isCanv || $isPH || $isMaxim || $isAutomatech || $isMpcc || $isSbp || $isCanvasserSbp || $isSupervisor || $isArea3 || $isDS)
                 <li class="nav-header">LOGOUT</li>
                 <li class="nav-item">
                     <a href="{{ url('logout') }}"
