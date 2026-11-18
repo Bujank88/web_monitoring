@@ -96,8 +96,8 @@
                 <span class="badge badge-info">AREA 3</span>
                 @elseif($isCanv)
                 <span class="badge badge-primary">CANVASSER</span>
-                <span class="badge badge-primary">DS</span>
                 @elseif($isDS)
+                <span class="badge badge-primary">DS</span>
                 @elseif($isTreg)
                 @php
                 $treg_name = DB::table('treg')->where('id', $user->treg_id)->value('treg_name');
