@@ -1088,29 +1088,29 @@
 
 
                 {{-- <li class="nav-header">Report</li> --}}
-                @if($isDS || $isArea3)
-                <li class="nav-item">
-                    <a href="{{ route('leads-master.index') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
-                        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
-                        <p>Data Leads & Akun</p>
-                    </a>
-                </li>     
-                <li class="nav-item">
-                    <a href="{{ route('leads-master.create') }}"
-                        class="nav-link waves-effect {{ request()->routeIs('leads-master.create') ? 'active' : '' }}">
-                        <i class="nav-icon fa-solid fa-user-pen" style="color:rgb(1, 240, 172);"></i>
-                        <p>New Leads</p>
-                    </a>
-                </li>      
-                  <li class="nav-item">
-                      <a href="{{ route('leads-master.create-existing') }}"
-                          class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
-                          <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
-                          <p>New/Eksisting Akun</p>
-                      </a>
-                  </li>
-                  @endif         
+               @if($isAdmin || $isTsel || $isCanv || $isPH || $isDS || $isArea3)
+<li class="nav-item">
+    <a href="{{ route('leads-master.index') }}"
+        class="nav-link waves-effect {{ request()->routeIs('leads-master.index') ? 'active' : '' }}">
+        <i class="nav-icon fa-solid fa-star" style="color:rgb(240,236,1);"></i>
+        <p>Data Leads & Akun</p>
+    </a>
+</li>     
+<li class="nav-item">
+    <a href="{{ route('leads-master.create') }}"
+        class="nav-link waves-effect {{ request()->routeIs('leads-master.create') ? 'active' : '' }}">
+        <i class="nav-icon fa-solid fa-user-pen" style="color:rgb(1, 240, 172);"></i>
+        <p>New Leads</p>
+    </a>
+</li>      
+<li class="nav-item">
+    <a href="{{ route('leads-master.create-existing') }}"
+        class="nav-link waves-effect {{ request()->routeIs('leads-master.create-existing') ? 'active' : '' }}">
+        <i class="nav-icon fa-solid fa-user-tie" style="color:rgb(143, 142, 142);"></i>
+        <p>New/Eksisting Akun</p>
+    </a>
+</li>
+@endif        
                   @if($isAdmin)
                   <li class="nav-item has-treeview {{ request()->routeIs('pilot-sbp-sme*') ? 'menu-open' : '' }}">
                       <a href="#" class="nav-link waves-effect {{ request()->routeIs('pilot-sbp-sme*') ? 'active' : '' }}">
