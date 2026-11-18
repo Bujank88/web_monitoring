@@ -267,7 +267,7 @@
                 </div>
             </div>
 
-            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC', 'AREA 3']))
+            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC', 'Area 3']))
             <div class="row">
                 <div class="col-md-12">
                     <div class="form-group">
