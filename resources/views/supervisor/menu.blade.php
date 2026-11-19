@@ -16,7 +16,7 @@
     @endforeach
     </ul>
 </li>
-<li class="nav-item {{ request()->routeIs('panenpoinv3.*', 'panenpoinv4.*', 'admin.monitoring.canvasser_voucher') ? 'menu-open' : '' }}">
+<li class="nav-item {{ request()->routeIs('panenpoinv3.*', 'panenpoinv4.*', 'panenpoinv5.*', 'admin.monitoring.canvasser_voucher') ? 'menu-open' : '' }}">
     <a href="#" class="nav-link"><i class="nav-icon fas fa-layer-group" style="color:#b9cd93;"></i><p>Program Campaign<i class="right fas fa-angle-left"></i></p></a>
     <ul class="nav nav-treeview">
     @foreach([4, 3] as $version)

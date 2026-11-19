@@ -286,7 +286,7 @@
                 </div>
             </div>
 
-            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC']))
+            @if(auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC', 'Area 3']))
             <div class="row">
                 <div class="col-md-12">
                     <div class="form-group">
@@ -400,7 +400,7 @@
         $('#modalScheduleDate').attr('min', today);
 
         // Check apakah user wajib mengatur jadwal kunjungan
-        const requiresSchedule = {{ (auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC'])) ? 'true' : 'false' }};
+        const requiresSchedule = {{ (auth()->user()->hasRole('Admin') || in_array(auth()->user()->role, ['PH', 'MPCC', 'Area 3'])) ? 'true' : 'false' }};
         // Ketika modal ditutup dengan X, jangan clear data jika sudah ada
         $('#modalScheduleVisit').on('hidden.bs.modal', function() {
             const hasSchedule = $('#schedule_tanggal').val() && $('#schedule_waktu_mulai').val();
