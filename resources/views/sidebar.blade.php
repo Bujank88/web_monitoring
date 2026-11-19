@@ -1694,7 +1694,7 @@
                             </ul>
                         </li>
 
-
+{{-- 
 
                         <li class="nav-item {{ request()->routeIs('panenpoinv4.*') ? 'menu-open' : '' }} ml-2">
                             <a href="#" class="nav-link {{ request()->routeIs('panenpoinv4.*') ? 'active' : '' }}">
@@ -1752,7 +1752,7 @@
                                 </li>
                             </ul>
                         </li>
-
+ 
                         <li class="nav-item {{ request()->routeIs('panenpoinv3.*') ? 'menu-open' : '' }} ml-2">
                             <a href="#" class="nav-link {{ request()->routeIs('panenpoinv3.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-coins" style="color:#0ea5e9;"></i>
@@ -1809,7 +1809,7 @@
                                 </li>
                             </ul>
                         </li>
-                        
+                        --}}
                         @if($isAdmin)
                         <!-- Program AM Level UP -->
                         <li class="nav-item {{ request()->routeIs('amlevelup.*') ? 'menu-open' : '' }} ml-2">
