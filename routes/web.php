@@ -15,6 +15,7 @@ use App\Http\Controllers\PanenPoinController;
 use App\Http\Controllers\PanenPoinV2Controller;
 use App\Http\Controllers\PanenPoinV3Controller;
 use App\Http\Controllers\PanenPoinV4Controller;
+use App\Http\Controllers\PanenPoinV5Controller;
 use App\Http\Controllers\PilotSbpController;
 use App\Http\Controllers\AmLevelUpController;
 use App\Http\Controllers\CalendarController;
@@ -379,6 +380,13 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH'])->group(function () {
     Route::get('panen-poin-v4/report-ph-data', [PanenPoinV4Controller::class, 'getReportPowerhouseData'])->name('panenpoinv4.report-ph-data');
     Route::get('panen-poin-v4/refresh-summary', [PanenPoinV4Controller::class, 'refreshSummaryPanenPoinV4'])->name('panenpoinv4.refresh');
 
+        // Panen Poin V5 Routes
+    Route::get('panen-poin-v5/input', [PanenPoinV5Controller::class, 'index'])->name('panenpoinv5.index');
+    Route::post('panen-poin-v5/store', [PanenPoinV5Controller::class, 'store'])->name('panenpoinv5.store');
+    Route::get('panen-poin-v5/report-ph', [PanenPoinV5Controller::class, 'reportPowerhouse'])->name('panenpoinv5.report-ph');
+    Route::get('panen-poin-v5/report-ph-data', [PanenPoinV5Controller::class, 'getReportPowerhouseData'])->name('panenpoinv5.report-ph-data');
+    Route::get('panen-poin-v5/refresh-summary', [PanenPoinV5Controller::class, 'refreshSummaryPanenPoinV5'])->name('panenpoinv5.refresh');
+
     Route::get('region-target', [ReportController::class, 'reportRegionTargetVsTopup'])->name('region-target');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
@@ -648,6 +656,13 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,PH,Supervisor'])->group(functio
     Route::get('panen-poin-v4/export', [PanenPoinV4Controller::class, 'export'])->name('panenpoinv4.export');
     Route::get('panen-poin-v4/list-akun', [PanenPoinV4Controller::class, 'listAkun'])->name('panenpoinv4.list-akun');
     Route::get('panen-poin-v4/akun-data', [PanenPoinV4Controller::class, 'getAkunData'])->name('panenpoinv4.akun-data');
+    Route::get('panen-poin-v5/report', [PanenPoinV5Controller::class, 'report'])->name('panenpoinv5.report');
+    Route::get('panen-poin-v5/report-data', [PanenPoinV5Controller::class, 'getReportData'])->name('panenpoinv5.report-data');
+    Route::get('panen-poin-v5/report-canvasser', [PanenPoinV5Controller::class, 'reportCanvasser'])->name('panenpoinv5.report-canvasser');
+    Route::get('panen-poin-v5/report-canvasser-data', [PanenPoinV5Controller::class, 'getReportCanvasserData'])->name('panenpoinv5.report-canvasser-data');
+    Route::get('panen-poin-v5/export', [PanenPoinV5Controller::class, 'export'])->name('panenpoinv5.export');
+    Route::get('panen-poin-v5/list-akun', [PanenPoinV5Controller::class, 'listAkun'])->name('panenpoinv5.list-akun');
+    Route::get('panen-poin-v5/akun-data', [PanenPoinV5Controller::class, 'getAkunData'])->name('panenpoinv5.akun-data');
 });
 
 Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC,Supervisor,KAM,Area 3'])->group(function () {
