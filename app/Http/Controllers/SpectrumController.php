@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\LeadSpectrum;
 use App\Services\SpectrumLeadImporter;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class SpectrumController extends Controller
@@ -34,11 +36,35 @@ class SpectrumController extends Controller
 
     public function store(Request $request, SpectrumLeadImporter $importer): RedirectResponse
     {
-        $request->validate(['file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240']]);
-        $file = $request->file('file');
-        $result = $importer->import($file->getRealPath(), $file->getClientOriginalName(), $request->user()->id);
+        if ($request->input('_mode') === 'manual') {
+            $validated = $this->validateLead($request);
 
-        return redirect()->route('spectrum.leads.index')->with('success', "Upload selesai: {$result['created']} leads ditambahkan, {$result['duplicates']} baris duplikat dilewati.");
+            $validated['import_hash'] = hash(
+                'sha256',
+                uniqid('manual_', true) . '|' . ($validated['mobile_phone'] ?? '') . '|' . ($validated['email'] ?? '')
+            );
+            $validated['import_filename'] = 'Manual Input';
+            $validated['uploaded_by'] = Auth::id();
+
+            if (empty($validated['bulan_dispatch']) && !empty($validated['tgl_dispatch'])) {
+                $validated['bulan_dispatch'] = Carbon::parse($validated['tgl_dispatch'])->translatedFormat('F Y');
+            }
+
+            LeadSpectrum::create($validated);
+
+            return redirect()->route('spectrum.leads.index')
+                ->with('success', 'Data lead berhasil ditambahkan.');
+        }
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ]);
+
+        $file = $request->file('file');
+        $result = $importer->import($file->getRealPath(), $file->getClientOriginalName(), (int) Auth::id());
+
+        return redirect()->route('spectrum.leads.index')
+            ->with('success', "Import selesai: {$result['created']} leads ditambahkan, {$result['duplicates']} duplikat dilewati.");
     }
 
     public function edit(LeadSpectrum $lead): View
@@ -48,31 +74,81 @@ class SpectrumController extends Controller
 
     public function update(Request $request, LeadSpectrum $lead): RedirectResponse
     {
-        $rules = [];
-        foreach (LeadSpectrum::HEADERS as $field => $label) {
-            if (in_array($field, ['create_date', 'share_date'], true)) {
-                $rules[$field] = ['nullable', 'date_format:Y-m-d'];
-            } elseif (in_array($field, ['description', 'fu', 'response'], true)) {
-                $rules[$field] = ['nullable', 'string', function ($attribute, $value, $fail) use ($label) {
-                    if (strlen($value) > 65535) {
-                        $fail("Isi {$label} terlalu panjang.");
-                    }
-                }];
-            } else {
-                $rules[$field] = ['nullable', 'string', 'max:255'];
-            }
-        }
-        $data = $request->validate($rules, [], LeadSpectrum::HEADERS);
-        // Keep the original import fingerprint so reuploads do not undo manual edits.
-        $lead->update($data);
+        $validated = $this->validateLead($request);
 
-        return redirect()->route('spectrum.leads.index')->with('success', 'Data lead berhasil diperbarui.');
+        if (empty($validated['bulan_dispatch']) && !empty($validated['tgl_dispatch'])) {
+            $validated['bulan_dispatch'] = Carbon::parse($validated['tgl_dispatch'])->translatedFormat('F Y');
+        }
+
+        $lead->update($validated);
+
+        return redirect()->route('spectrum.leads.index')
+            ->with('success', 'Data lead berhasil diperbarui.');
     }
 
     public function destroy(LeadSpectrum $lead): RedirectResponse
     {
         $lead->delete();
 
-        return redirect()->route('spectrum.leads.index')->with('success', 'Data lead berhasil dihapus.');
+        return redirect()->route('spectrum.leads.index')
+            ->with('success', 'Data lead berhasil dihapus.');
+    }
+
+    private function validateLead(Request $request): array
+    {
+        return $request->validate([
+            // Blok 1: Data Awal Leads
+            'provider' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'company_account' => 'required|string|max:255',
+            'mobile_phone' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'company_size' => 'nullable|string|max:255',
+            'product' => 'nullable|string|max:255',
+            'lead_source' => 'nullable|string|max:255',
+            'create_date' => 'nullable|date',
+            'share_date' => 'nullable|date',
+            'description' => 'nullable|string',
+            'pillar' => 'nullable|string|max:255',
+            'industry_sector' => 'nullable|string|max:255',
+            'fu' => 'nullable|string',
+            'response' => 'nullable|string',
+            'utm_source' => 'nullable|string|max:255',
+
+            // Blok 2: Call 1st
+            'tgl_call_1st' => 'nullable|string|max:255',
+            'status_call' => 'nullable|string|max:255',
+            'reason_call' => 'nullable|string|max:255',
+            'sub_reason_call' => 'nullable|string|max:255',
+
+            // Blok 3: Call FU
+            'tgl_call_fu' => 'nullable|string|max:255',
+            'status_call_fu' => 'nullable|string|max:255',
+            'reason_call_fu' => 'nullable|string|max:255',
+            'sub_reason_call_fu' => 'nullable|string|max:255',
+
+            // Blok 4: Notes
+            'notes' => 'nullable|string',
+
+            // Blok 5: Kualifikasi PIC, Penawaran & Dispatch
+            'region' => 'nullable|string|max:255',
+            'alamat' => 'nullable|string',
+            'cek_mea' => 'nullable|string|max:255',
+            'nama_pic' => 'nullable|string|max:255',
+            'nomor_pic' => 'nullable|string|max:255',
+            'email_pic' => 'nullable|email|max:255',
+            'karyawan' => 'nullable|string|max:255',
+            'source_leads' => 'nullable|string|max:255',
+            'product_offer' => 'nullable|string|max:255',
+            'est_cb' => 'nullable|string|max:255',
+            'est_revenue' => 'nullable|string|max:255',
+            'revenue' => 'nullable|string|max:255',
+            'detail_kebutuhan' => 'nullable|string',
+            'agent_leads' => 'nullable|string|max:255',
+            'tgl_dispatch' => 'nullable|date',
+            'corp_name_valid' => 'nullable|string|max:255',
+            'bulan_dispatch' => 'nullable|string|max:255',
+            'update_status' => 'nullable|string|max:255',
+        ]);
     }
 }

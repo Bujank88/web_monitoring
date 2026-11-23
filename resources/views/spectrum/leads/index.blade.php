@@ -34,7 +34,7 @@
                             <tr>
                                 <td>{{ $leads->firstItem() + $loop->index }}</td>
                                 @foreach (\App\Models\LeadSpectrum::HEADERS as $field => $label)
-                                    <td style="min-width: 130px; max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere;">{{ in_array($field, ['create_date', 'share_date']) ? ($lead->$field?->format('d/m/Y') ?? '—') : ($lead->$field ?? '—') }}</td>
+                                    <td style="min-width: 130px; max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere;">{{ in_array($field, ['create_date', 'share_date', 'tgl_dispatch']) ? ($lead->$field?->format('d/m/Y') ?? '—') : ($lead->$field ?? '—') }}</td>
                                 @endforeach
                                 <td class="text-nowrap">
                                     <a href="{{ route('spectrum.leads.edit', $lead) }}" class="btn btn-sm btn-warning">Edit</a>
