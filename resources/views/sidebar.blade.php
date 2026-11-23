@@ -1969,6 +1969,7 @@
                         <p>Report Ticketing</p>
                     </a>
                 </li>
+                @if($isAdmin || $isCanv)
                 <li class="nav-header">Leads</li>
                 <li class="nav-item {{ request()->routeIs('spectrum.*') ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ request()->routeIs('spectrum.*') ? 'active' : '' }}">
@@ -1976,12 +1977,14 @@
                         <p>Spectrum <i class="right fas fa-angle-left"></i></p>
                     </a>
                     <ul class="nav nav-treeview">
+                        @if($isAdmin)
                         <li class="nav-item">
                             <a href="{{ route('spectrum.leads.create') }}" class="nav-link {{ request()->routeIs('spectrum.leads.create') ? 'active' : '' }}" style="padding-left:45px;">
                                 <i class="nav-icon fas fa-user-plus" style="color:#17a2b8;"></i>
                                 <p>Input Leads</p>
                             </a>
                         </li>
+                        @endif
                         <li class="nav-item">
                             <a href="{{ route('spectrum.leads.index') }}" class="nav-link {{ request()->routeIs('spectrum.leads.index') ? 'active' : '' }}" style="padding-left:45px;">
                                 <i class="nav-icon fas fa-list" style="color:#17a2b8;"></i>
@@ -1990,6 +1993,7 @@
                         </li>
                     </ul>
                 </li>
+                @endif
                 <li class="nav-header">Configuration</li>
                 <li class="nav-item">
                     <a href="{{ route('supervisor.team') }}" class="nav-link {{ request()->routeIs('supervisor.team*') ? 'active' : '' }}">
