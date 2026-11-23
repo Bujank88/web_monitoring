@@ -17,8 +17,8 @@
                 <div class="row">
                     @foreach (\App\Models\LeadSpectrum::HEADERS as $field => $label)
                         @php
-                            $isDate = in_array($field, ['create_date', 'share_date']);
-                            $isText = in_array($field, ['description', 'fu', 'response']);
+                            $isDate = in_array($field, ['create_date', 'share_date', 'tgl_dispatch']);
+                            $isText = in_array($field, ['description', 'fu', 'response', 'notes', 'alamat', 'detail_kebutuhan']);
                             $value = old($field, $isDate ? $lead->$field?->format('Y-m-d') : $lead->$field);
                         @endphp
                         <div class="form-group col-md-{{ $isText ? '12' : '6' }}">

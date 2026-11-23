@@ -33,11 +33,35 @@ class SpectrumLeadImporter
         try {
             $sheet = null;
             $columns = [];
-            $requiredHeaders = array_diff_key(LeadSpectrum::HEADERS, ['utm_source' => true]);
+            // 13 kolom inti selalu ada di format lama (JAN-SEP 2026) maupun baru (OKT-NOV 2026)
+            $coreHeaders = array_diff_key(LeadSpectrum::REQUIRED_HEADERS, ['fu' => true, 'response' => true]);
+
             foreach ($book->getAllSheets() as $candidate) {
                 $found = [];
                 foreach ($candidate->getRowIterator(1, 1)->current()->getCellIterator() as $cell) {
                     $label = $this->normalize((string) $cell->getValue());
+                    if ($label === '') {
+                        continue;
+                    }
+
+                    // Tangani 2 kolom kembar di Excel: Reason Call & Sub Reason Call
+                    if ($label === 'reason call') {
+                        $targetField = ! isset($found['reason_call']) ? 'reason_call' : 'reason_call_fu';
+                        if (isset($found[$targetField])) {
+                            $this->fail("Header Reason Call tercatat lebih dari dua kali pada sheet {$candidate->getTitle()}.");
+                        }
+                        $found[$targetField] = $cell->getColumn();
+                        continue;
+                    }
+                    if ($label === 'sub reason call') {
+                        $targetField = ! isset($found['sub_reason_call']) ? 'sub_reason_call' : 'sub_reason_call_fu';
+                        if (isset($found[$targetField])) {
+                            $this->fail("Header Sub Reason Call tercatat lebih dari dua kali pada sheet {$candidate->getTitle()}.");
+                        }
+                        $found[$targetField] = $cell->getColumn();
+                        continue;
+                    }
+
                     foreach (LeadSpectrum::HEADERS as $field => $header) {
                         if ($label === $this->normalize($header)) {
                             if (isset($found[$field])) {
@@ -47,7 +71,8 @@ class SpectrumLeadImporter
                         }
                     }
                 }
-                if (array_diff_key($requiredHeaders, $found) === []) {
+
+                if (array_diff_key($coreHeaders, $found) === []) {
                     if ($sheet !== null) {
                         $this->fail('Gunakan satu sheet data dengan header Spectrum agar data yang diimpor jelas.');
                     }
@@ -55,12 +80,17 @@ class SpectrumLeadImporter
                     $columns = $found;
                 }
             }
+
             if ($sheet === null) {
-                $this->fail('Header pada baris pertama harus memuat: '.implode(', ', $requiredHeaders).'. UTM Source opsional.');
+                $this->fail('Header pada baris pertama harus memuat: '.implode(', ', $coreHeaders).'.');
             }
             if ($sheet->getHighestDataRow() > 10001) {
                 $this->fail('Maksimal 10.000 baris leads per upload.');
             }
+
+            $dateFields = ['create_date', 'share_date', 'tgl_dispatch'];
+            $textFields = ['description', 'fu', 'response', 'notes', 'alamat', 'detail_kebutuhan'];
+
             $rows = [];
             for ($row = 2; $row <= $sheet->getHighestDataRow(); $row++) {
                 $data = [];
@@ -77,10 +107,14 @@ class SpectrumLeadImporter
                     $text = trim((string) $value);
                     if ($text === '') {
                         $data[$field] = null;
-                    } elseif (in_array($field, ['create_date', 'share_date'], true)) {
+                    } elseif (in_array($field, $dateFields, true)) {
                         $data[$field] = $this->date($value, $row, $header);
                     } else {
-                        $limit = in_array($field, ['description', 'fu', 'response'], true) ? 65535 : 255;
+                        // Jika Tgl Call 1st / Tgl Call FU di Excel berupa serial tanggal numerik, ubah ke Y-m-d
+                        if (in_array($field, ['tgl_call_1st', 'tgl_call_fu'], true) && is_numeric($value) && (float) $value >= 1 && (float) $value <= 2958465) {
+                            $text = Date::excelToDateTimeObject((float) $value)->format('Y-m-d');
+                        }
+                        $limit = in_array($field, $textFields, true) ? 65535 : 255;
                         if (($limit === 255 ? mb_strlen($text) : strlen($text)) > $limit) {
                             $this->fail("Baris {$row}, {$header}: isi terlalu panjang.");
                         }
@@ -91,6 +125,7 @@ class SpectrumLeadImporter
                     $rows[] = $data;
                 }
             }
+
             if ($rows === []) {
                 $this->fail('File tidak berisi data leads.');
             }
@@ -106,15 +141,19 @@ class SpectrumLeadImporter
     {
         // Validate the whole workbook before saving any row.
         $rows = $this->read($path);
+        $baseKeys = array_keys(LeadSpectrum::REQUIRED_HEADERS);
 
-        return DB::transaction(function () use ($rows, $filename, $userId) {
+        return DB::transaction(function () use ($rows, $filename, $userId, $baseKeys) {
             $created = 0;
             foreach ($rows as $data) {
                 $fingerprint = $data;
-                // Preserve existing fingerprints for the original 15-column workbook.
-                if ($fingerprint['utm_source'] === null) {
-                    unset($fingerprint['utm_source']);
+                // Pertahankan fingerprint identik untuk file lama (15 kolom) agar deteksi duplikat tetap akurat
+                foreach ($fingerprint as $key => $val) {
+                    if (! in_array($key, $baseKeys, true) && $val === null) {
+                        unset($fingerprint[$key]);
+                    }
                 }
+
                 $lead = LeadSpectrum::query()->createOrFirst(
                     ['import_hash' => hash('sha256', json_encode($fingerprint, JSON_THROW_ON_ERROR))],
                     $data + ['import_filename' => mb_substr(basename($filename), 0, 255), 'uploaded_by' => $userId],
