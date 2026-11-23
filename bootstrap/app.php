@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [\App\Http\Middleware\RestrictProductAccess::class]);
+        $middleware->web(append: [
+            \App\Http\Middleware\RestrictProductAccess::class,
+            \App\Http\Middleware\RestrictSpectrumAccess::class,
+        ]);
         $middleware->alias([
             'checkrole' => \App\Http\Middleware\CheckRole::class,
         ]);

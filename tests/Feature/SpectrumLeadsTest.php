@@ -235,6 +235,76 @@ class SpectrumLeadsTest extends TestCase
         $this->assertSame(2, LeadSpectrum::count());
     }
 
+    public function test_month_filter_uses_create_date_and_combines_with_search(): void
+    {
+        foreach ([
+            ['2024-01-31', 'Match'],
+            ['2024-02-01', 'Match'],
+            ['2024-02-29', 'Match'],
+            ['2024-02-15', 'Other'],
+            ['2024-03-01', 'Match'],
+            ['2025-02-01', 'Match'],
+            [null, 'Match'],
+        ] as $index => [$date, $company]) {
+            LeadSpectrum::create([
+                'last_name' => 'Lead '.$index,
+                'company_account' => $company,
+                'create_date' => $date,
+                'share_date' => '2024-02-10',
+                'email' => $company === 'Match' ? 'match@example.test' : 'other@example.test',
+                'import_hash' => hash('sha256', 'month-filter-'.$index),
+                'import_filename' => 'test.xlsx',
+            ]);
+        }
+
+        $this->actingAs($this->user('Admin'));
+        $this->get(route('spectrum.leads.index', ['month' => '2024-02']))
+            ->assertOk()->assertViewHas('month', '2024-02')
+            ->assertViewHas('leads', fn ($leads) => $leads->total() === 3);
+        $this->get(route('spectrum.leads.index', ['month' => '2024-02', 'search' => 'match']))
+            ->assertOk()->assertViewHas('leads', fn ($leads) => $leads->total() === 2
+                && $leads->pluck('last_name')->all() === ['Lead 2', 'Lead 1']);
+        $this->get(route('spectrum.leads.index', ['month' => '']))
+            ->assertOk()->assertViewHas('leads', fn ($leads) => $leads->total() === 7);
+        $this->get(route('spectrum.leads.index', ['month' => '2026-11']))
+            ->assertOk()->assertSee('Tidak ada leads yang sesuai filter.');
+    }
+
+    public function test_month_filter_is_preserved_in_pagination(): void
+    {
+        for ($index = 0; $index < 26; $index++) {
+            LeadSpectrum::create([
+                'last_name' => 'Match '.$index,
+                'company_account' => 'Company',
+                'create_date' => '2026-12-31',
+                'import_hash' => hash('sha256', 'pagination-month-'.$index),
+                'import_filename' => 'test.xlsx',
+            ]);
+        }
+
+        $this->actingAs($this->user('Admin'));
+        $filters = ['month' => '2026-12', 'search' => 'Match'];
+        $this->get(route('spectrum.leads.index', $filters))->assertOk()
+            ->assertSee('name="month"', false)->assertSee('value="2026-12"', false)
+            ->assertViewHas('leads', function ($leads) {
+                parse_str(parse_url($leads->nextPageUrl(), PHP_URL_QUERY), $query);
+
+                return $leads->total() === 26 && $query === ['month' => '2026-12', 'search' => 'Match', 'page' => '2'];
+            });
+        $this->get(route('spectrum.leads.index', $filters + ['page' => 2]))
+            ->assertOk()->assertViewHas('leads', fn ($leads) => $leads->count() === 1 && $leads->total() === 26);
+    }
+
+    public function test_month_filter_rejects_invalid_values(): void
+    {
+        $this->actingAs($this->user('Admin'));
+        foreach (['2026-13', '2026-00', '2026-11-23', 'invalid', ['2026-11']] as $month) {
+            $this->from(route('spectrum.leads.index'))
+                ->get(route('spectrum.leads.index', ['month' => $month]))
+                ->assertRedirect(route('spectrum.leads.index'))->assertSessionHasErrors('month');
+        }
+    }
+
     private function row(): array
     {
         return ['Tsel', 'Test Lead', 'Example Company', '081234567890', 'lead@example.test', '1 - 9 Karyawan', 'Digital Advertising', 'Web-to-lead', '1/2/2026', null, 'Request', 'Digital Advertising', 'Retail', 'Follow up', 'Tertarik', null];

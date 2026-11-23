@@ -16,6 +16,7 @@
                 $roleUpper = strtoupper($roleValue);
                 $isAdmin = $roleUpper === 'ADMIN';
                 $isProduct = $roleValue === 'product';
+                $isSpectrum = $roleValue === 'spectrum';
                 $isTsel = $roleUpper === 'TSEL';
                 $isTreg = $roleUpper === 'TREG';
                 $isCanv = $roleValue === 'cvsr';
@@ -113,7 +114,9 @@
                 @if($user->role === 'Supervisor')
                 <li class="nav-item"><a href="{{ route('supervisor.index') }}" class="nav-link {{ request()->routeIs('supervisor.index') ? 'active' : '' }}"><i class="nav-icon fas fa-users" style="color:#17a2b8;"></i><p>Monitoring Tim</p></a></li>
                 @endif
-                @if($isProduct)
+                @if($isSpectrum)
+                @include('spectrum.menu')
+                @elseif($isProduct)
                 @include('product.menu')
                 @elseif($isSupervisor)
                 @include('supervisor.menu')
