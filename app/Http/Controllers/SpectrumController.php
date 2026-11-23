@@ -74,7 +74,10 @@ class SpectrumController extends Controller
 
     public function update(Request $request, LeadSpectrum $lead): RedirectResponse
     {
-        $validated = $this->validateLead($request);
+        $isCanvasser = strtolower(trim((string) Auth::user()->role)) === 'cvsr';
+        $validated = $isCanvasser
+            ? $this->validateCanvasserFields($request)
+            : $this->validateLead($request);
 
         if (empty($validated['bulan_dispatch']) && !empty($validated['tgl_dispatch'])) {
             $validated['bulan_dispatch'] = Carbon::parse($validated['tgl_dispatch'])->translatedFormat('F Y');
@@ -83,7 +86,7 @@ class SpectrumController extends Controller
         $lead->update($validated);
 
         return redirect()->route('spectrum.leads.index')
-            ->with('success', 'Data lead berhasil diperbarui.');
+            ->with('success', 'Progress lead berhasil diperbarui.');
     }
 
     public function destroy(LeadSpectrum $lead): RedirectResponse

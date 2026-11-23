@@ -36,12 +36,16 @@ use App\Http\Controllers\TicketReportController;
 use App\Http\Controllers\SpectrumController;
 use App\Http\Controllers\ProjectArea3Controller;
 
-Route::middleware(['auth', 'checkrole:Admin'])->prefix('spectrum')->name('spectrum.')->group(function () {
-    Route::get('/leads/input', [SpectrumController::class, 'create'])->name('leads.create');
+Route::middleware(['auth', 'checkrole:Admin,cvsr'])->prefix('spectrum')->name('spectrum.')->group(function () {
     Route::get('/leads', [SpectrumController::class, 'index'])->name('leads.index');
-    Route::post('/leads', [SpectrumController::class, 'store'])->name('leads.store');
     Route::get('/leads/{lead}/edit', [SpectrumController::class, 'edit'])->whereNumber('lead')->name('leads.edit');
     Route::patch('/leads/{lead}', [SpectrumController::class, 'update'])->whereNumber('lead')->name('leads.update');
+});
+
+// Khusus Admin: Input / Upload Excel & Delete Leads
+Route::middleware(['auth', 'checkrole:Admin'])->prefix('spectrum')->name('spectrum.')->group(function () {
+    Route::get('/leads/input', [SpectrumController::class, 'create'])->name('leads.create');
+    Route::post('/leads', [SpectrumController::class, 'store'])->name('leads.store');
     Route::delete('/leads/{lead}', [SpectrumController::class, 'destroy'])->whereNumber('lead')->name('leads.destroy');
 });
 
