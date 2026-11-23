@@ -424,6 +424,8 @@ class BackController extends Controller
 
             // 5. Arahkan sesuai role
             switch ($user->role) {
+                case 'spectrum':
+                    return redirect()->route('spectrum.leads.index');
                 case 'Admin':
                 case 'Tsel':
                     return redirect()->route('admin.home');

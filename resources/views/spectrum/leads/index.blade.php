@@ -4,7 +4,7 @@
 @section('content')
 @php
     $roleUpper = strtoupper(trim((string) Auth::user()->role));
-    $isAdmin = $roleUpper === 'ADMIN';
+    $canManageLeads = in_array($roleUpper, ['ADMIN', 'SPECTRUM'], true);
     $isCanvasser = $roleUpper === 'CVSR';
 
     $summaryFields = [
@@ -36,16 +36,18 @@
                 <form method="GET" action="{{ route('spectrum.leads.index') }}" class="form-inline mb-2">
                     <label for="search" class="sr-only">Cari leads</label>
                     <input type="search" class="form-control mr-2" id="search" name="search" value="{{ $search }}" maxlength="255" placeholder="Nama, company, email, telepon">
-                    <button class="btn btn-info" type="submit">Cari</button>
+                    <label for="month" class="mr-2">Bulan Create Date</label>
+                    <input type="month" class="form-control mr-2" id="month" name="month" value="{{ $month }}">
+                    <button class="btn btn-info" type="submit">Filter</button>
                     <a href="{{ route('spectrum.leads.index') }}" class="btn btn-outline-secondary ml-2">Reset</a>
                 </form>
-                @if ($isAdmin)
+                @if ($canManageLeads)
                     <a href="{{ route('spectrum.leads.create') }}" class="btn btn-info mb-2">
                         <i class="fas fa-plus mr-1" aria-hidden="true"></i> Input / Upload Leads
                     </a>
                 @endif
             </div>
-            <p class="text-muted">{{ number_format($leads->total(), 0, ',', '.') }} leads{{ $search !== '' ? ' ditemukan' : ' tersimpan' }}.</p>
+            <p class="text-muted">{{ number_format($leads->total(), 0, ',', '.') }} leads{{ $search !== '' || $month !== '' ? ' ditemukan' : ' tersimpan' }}.</p>
             <div class="table-responsive">
                 <table class="table table-bordered table-striped table-sm">
                     <thead>
@@ -95,7 +97,7 @@
                                     <a href="{{ route('spectrum.leads.edit', $lead) }}" class="btn btn-sm btn-warning">
                                         {{ $isCanvasser ? 'Update Progress' : 'Edit' }}
                                     </a>
-                                    @if ($isAdmin)
+                                    @if ($canManageLeads)
                                         <form method="POST" action="{{ route('spectrum.leads.destroy', $lead) }}" class="d-inline" onsubmit="return confirm('Hapus lead ini? Data yang dihapus tidak dapat dikembalikan.');">
                                             @csrf
                                             @method('DELETE')
@@ -107,7 +109,7 @@
                         @empty
                             <tr>
                                 <td colspan="{{ count($summaryFields) + 2 }}" class="text-center py-4">
-                                    {{ $search !== '' ? 'Tidak ada leads yang sesuai pencarian.' : 'Belum ada leads tersimpan.' }}
+                                    {{ $search !== '' || $month !== '' ? 'Tidak ada leads yang sesuai filter.' : 'Belum ada leads tersimpan.' }}
                                 </td>
                             </tr>
                         @endforelse

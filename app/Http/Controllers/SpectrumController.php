@@ -19,9 +19,18 @@ class SpectrumController extends Controller
 
     public function index(Request $request): View
     {
-        $filters = $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'month' => ['nullable', 'date_format:Y-m'],
+        ]);
         $search = trim($filters['search'] ?? '');
+        $month = $filters['month'] ?? '';
         $leads = LeadSpectrum::query()
+            ->when($month !== '', function ($query) use ($month) {
+                $start = Carbon::createFromFormat('!Y-m', $month);
+                $query->where('create_date', '>=', $start->format('Y-m-d'))
+                    ->where('create_date', '<', $start->copy()->addMonth()->format('Y-m-d'));
+            })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     foreach (['last_name', 'company_account', 'email', 'mobile_phone'] as $field) {
@@ -31,7 +40,7 @@ class SpectrumController extends Controller
             })
             ->orderByDesc('id')->paginate(25)->withQueryString();
 
-        return view('spectrum.leads.index', compact('leads', 'search'));
+        return view('spectrum.leads.index', compact('leads', 'search', 'month'));
     }
 
     public function store(Request $request, SpectrumLeadImporter $importer): RedirectResponse
