@@ -31,7 +31,7 @@ class PanenPoinV5Test extends TestCase
             $t->id(); $t->integer('user_id'); $t->string('email'); $t->string('mobile_phone')->nullable();
         });
         Schema::create('report_balance_top_up', function (Blueprint $t) {
-            $t->string('email_client'); $t->dateTime('tgl_transaksi'); $t->decimal('total_settlement_klien', 15, 2);
+            $t->string('email_client'); $t->dateTime('tgl_transaksi'); $t->decimal('total_settlement_klien', 15, 2); $t->string('payment_method_name')->nullable();
         });
         Schema::create('data_paket_seasonal', function (Blueprint $t) {
             $t->string('email'); $t->string('name'); $t->timestamps();
@@ -50,9 +50,55 @@ class PanenPoinV5Test extends TestCase
         $this->actingAs(User::find(1));
     }
 
+    public function test_voucher_bonus_is_excluded_from_bulk_and_single_refresh(): void
+    {
+        $email = 'voucher@example.test';
+        \App\Models\AkunPanenPoinV5::create([
+            'user_id' => 1, 'nama_akun' => 'Client', 'email_client' => $email,
+            'password' => 'test-hash', 'source' => 'user_panen_poin_v5',
+        ]);
+        DB::table('user_panen_poin_v5')->insert([
+            'user_id' => 1, 'nama_pelanggan' => 'Client', 'akun_myads_pelanggan' => $email,
+        ]);
+        foreach (['Pulsa', null, 'Voucher Bonus', ' voucher BONUS '] as $method) {
+            DB::table('report_balance_top_up')->insert([
+                'email_client' => $email, 'tgl_transaksi' => '2026-11-20',
+                'total_settlement_klien' => 250000, 'payment_method_name' => $method,
+            ]);
+        }
+        $controller = app(PanenPoinV5Controller::class);
+        $controller->refreshSummaryPanenPoinV5();
+        $this->assertDatabaseHas('summary_panen_poin_v5', ['email_client' => $email, 'total_settlement' => 500000, 'poin' => 2]);
+        DB::table('summary_panen_poin_v5')->delete();
+        $method = new \ReflectionMethod($controller, 'refreshSummaryForSingleUser');
+        $method->invoke($controller, 1, $email);
+        $this->assertDatabaseHas('summary_panen_poin_v5', ['email_client' => $email, 'total_settlement' => 500000, 'poin' => 2]);
+    }
+
+    private function registerAgency(string $email): void
+    {
+        \App\Models\AkunPanenPoinV5::create([
+            'user_id' => -1, 'nama_akun' => $email, 'email_client' => $email,
+            'password' => 'test-hash', 'source' => 'mitra_sbp',
+        ]);
+    }
+
+    public function test_refresh_does_not_enroll_unregistered_mitra(): void
+    {
+        DB::table('mitra_sbp')->insert(['email_myads' => 'unregistered@example.test']);
+        DB::table('report_balance_top_up')->insert([
+            'email_client' => 'unregistered@example.test', 'tgl_transaksi' => '2026-11-20',
+            'total_settlement_klien' => 500000,
+        ]);
+        app(PanenPoinV5Controller::class)->refreshSummaryPanenPoinV5();
+        $this->assertDatabaseCount('akun_panen_poin_v5', 0);
+        $this->assertDatabaseCount('summary_panen_poin_v5', 0);
+    }
+
     public function test_refresh_only_counts_current_period_without_previous_balance(): void
     {
         $email = 'period@example.test';
+        $this->registerAgency($email);
         DB::table('mitra_sbp')->insert(['email_myads' => $email]);
         DB::table('summary_panen_poin_v5')->insert([
             'user_id' => -1, 'nama_canvasser' => 'Agency', 'email_client' => $email,
@@ -77,6 +123,7 @@ class PanenPoinV5Test extends TestCase
 
     public function test_mitra_refresh_is_idempotent_and_visible_only_to_authorized_owners(): void
     {
+        $this->registerAgency('agency@example.test');
         DB::table('mitra_sbp')->insert([
             ['email_myads' => ' Agency@Example.test '],
             ['email_myads' => 'agency@example.test'],

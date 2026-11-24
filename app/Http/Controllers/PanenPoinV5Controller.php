@@ -227,7 +227,7 @@ class PanenPoinV5Controller extends Controller
     {
         $period = $this->currentPeriod();
         $canvassers = User::whereIn('role', ['cvsr', 'PH'])->get();
-        $mitraClients = $this->syncMitraAccounts();
+        $mitraClients = $this->getRegisteredMitraClients();
         foreach ($mitraClients as $client) {
             DB::table('summary_panen_poin_v5')
                 ->whereRaw('LOWER(TRIM(email_client)) = ?', [$client->akun_myads_pelanggan])
@@ -270,7 +270,7 @@ class PanenPoinV5Controller extends Controller
 
         $settlementsByEmail = empty($allClientEmails)
             ? []
-            : DB::table('report_balance_top_up')
+            : $this->eligibleSettlementQuery()
                 ->select(
                     DB::raw('LOWER(TRIM(email_client)) as email'),
                     DB::raw('SUM(CAST(total_settlement_klien AS DECIMAL(15,2))) as total')
@@ -622,7 +622,7 @@ class PanenPoinV5Controller extends Controller
         }
 
         $email = strtolower(trim($clientData->akun_myads_pelanggan));
-        $settlement = DB::table('report_balance_top_up')
+        $settlement = $this->eligibleSettlementQuery()
             ->select(DB::raw('SUM(CAST(total_settlement_klien AS DECIMAL(15,2))) as total'))
             ->whereBetween(DB::raw('DATE(tgl_transaksi)'), [$period['start']->toDateString(), $period['end']->toDateString()])
             ->where(DB::raw('LOWER(TRIM(email_client))'), $email)
@@ -694,22 +694,19 @@ class PanenPoinV5Controller extends Controller
         }
     }
 
-    protected function syncMitraAccounts()
+    protected function eligibleSettlementQuery()
+    {
+        return DB::table('report_balance_top_up')
+            ->whereRaw("LOWER(TRIM(COALESCE(payment_method_name, ''))) <> ?", ['voucher bonus']);
+    }
+
+    protected function getRegisteredMitraClients()
     {
         $accounts = AkunPanenPoinV5::all()->keyBy(fn ($account) => strtolower(trim($account->email_client)));
         return DB::table('mitra_sbp')->pluck('email_myads')
             ->map(fn ($email) => strtolower(trim((string) $email)))
-            ->filter()->unique()->map(function ($email) use ($accounts) {
+            ->filter(fn ($email) => $email !== '' && $accounts->has($email))->unique()->map(function ($email) use ($accounts) {
                 $account = $accounts->get($email);
-                if (!$account) {
-                    $account = AkunPanenPoinV5::firstOrCreate(['email_client' => $email], [
-                        'user_id' => -1,
-                        'nama_akun' => $email,
-                        'password' => bcrypt(\Illuminate\Support\Str::random(40)),
-                        'source' => 'mitra_sbp',
-                    ]);
-                }
-
                 return (object) [
                     'user_id' => $account->user_id ?? -1,
                     'akun_myads_pelanggan' => $email,
