@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeadSpectrum extends Model
 {
@@ -123,9 +124,15 @@ class LeadSpectrum extends Model
 
     protected $guarded = ['id'];
 
+    public function canvasser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     protected function casts(): array
     {
         return [
+            'user_id' => 'integer',
             'create_date' => 'date',
             'share_date' => 'date',
             'tgl_dispatch' => 'date',

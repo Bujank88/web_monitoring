@@ -30,10 +30,12 @@ class SpectrumLeadsTest extends TestCase
             foreach (['name', 'email', 'password', 'role'] as $field) {
                 $table->string($field);
             }
+            $table->string('status')->nullable();
             $table->timestamps();
         });
         (require database_path('migrations/2026_10_06_000001_create_leads_spectrum_table.php'))->up();
         (require database_path('migrations/2026_10_27_000001_add_utm_source_to_leads_spectrum_table.php'))->up();
+        (require database_path('migrations/2026_11_23_165456_add_user_id_to_lead_spectrums_table.php'))->up();
     }
 
     protected function tearDown(): void

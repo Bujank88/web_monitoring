@@ -51,6 +51,7 @@
                     <form method="POST" action="{{ route('spectrum.leads.store') }}">
                         @csrf
                         <input type="hidden" name="_mode" value="manual">
+                        @include('spectrum.leads.assignment')
                         <div class="row">
                             @foreach (\App\Models\LeadSpectrum::HEADERS as $field => $label)
                                 @php

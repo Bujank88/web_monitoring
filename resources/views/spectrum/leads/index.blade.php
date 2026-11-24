@@ -53,6 +53,7 @@
                     <thead>
                         <tr>
                             <th>No.</th>
+                            <th class="text-nowrap">Canvasser Penerima</th>
                             @foreach ($summaryFields as $label)
                                 <th class="text-nowrap">{{ $label }}</th>
                             @endforeach
@@ -78,6 +79,27 @@
                             @endphp
                             <tr>
                                 <td>{{ $leads->firstItem() + $loop->index }}</td>
+                                <td style="min-width:240px;">
+                                    @if (Auth::user()->hasRole('Admin'))
+                                        <form method="POST" action="{{ route('spectrum.leads.assign', $lead) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <label class="sr-only" for="assign_{{ $lead->id }}">Bagikan lead ke canvasser</label>
+                                            <select id="assign_{{ $lead->id }}" name="user_id" class="form-control form-control-sm mb-1">
+                                                <option value="">Belum dibagikan</option>
+                                                @if ($lead->user_id && ! $canvassers->contains('id', $lead->user_id))
+                                                    <option value="{{ $lead->user_id }}" selected disabled>{{ $lead->canvasser?->name ?? 'Penerima tidak tersedia' }} (tidak aktif)</option>
+                                                @endif
+                                                @foreach ($canvassers as $canvasser)
+                                                    <option value="{{ $canvasser->id }}" @selected((int) $lead->user_id === (int) $canvasser->id)>{{ $canvasser->name }} ({{ $canvasser->email }})</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-info"><i class="fas fa-user-check mr-1"></i> Bagikan</button>
+                                        </form>
+                                    @else
+                                        {{ $lead->canvasser?->name ?? 'Belum dibagikan' }}
+                                    @endif
+                                </td>
                                 @foreach ($summaryFields as $field => $label)
                                     <td style="max-width: 220px; white-space: normal; overflow-wrap: anywhere;">
                                         {{ in_array($field, $dateFields, true) ? ($lead->$field?->format('d/m/Y') ?? '—') : ($lead->$field ?? '—') }}
@@ -108,7 +130,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ count($summaryFields) + 2 }}" class="text-center py-4">
+                                <td colspan="{{ count($summaryFields) + 3 }}" class="text-center py-4">
                                     {{ $search !== '' || $month !== '' ? 'Tidak ada leads yang sesuai filter.' : 'Belum ada leads tersimpan.' }}
                                 </td>
                             </tr>

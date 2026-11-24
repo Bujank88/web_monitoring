@@ -3,18 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\LeadSpectrum;
+use App\Models\User;
 use App\Services\SpectrumLeadImporter;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
 
 class SpectrumController extends Controller
 {
     public function create(): View
     {
-        return view('spectrum.leads.create');
+        return view('spectrum.leads.create', ['canvassers' => $this->assignableCanvassers()]);
     }
 
     public function index(Request $request): View
@@ -26,6 +29,8 @@ class SpectrumController extends Controller
         $search = trim($filters['search'] ?? '');
         $month = $filters['month'] ?? '';
         $leads = LeadSpectrum::query()
+            ->with('canvasser:id,name')
+            ->when($request->user()->hasRole('cvsr'), fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($month !== '', function ($query) use ($month) {
                 $start = Carbon::createFromFormat('!Y-m', $month);
                 $query->where('create_date', '>=', $start->format('Y-m-d'))
@@ -40,7 +45,10 @@ class SpectrumController extends Controller
             })
             ->orderByDesc('id')->paginate(25)->withQueryString();
 
-        return view('spectrum.leads.index', compact('leads', 'search', 'month'));
+        return view('spectrum.leads.index', [
+            'leads' => $leads, 'search' => $search, 'month' => $month,
+            'canvassers' => $this->assignableCanvassers(),
+        ]);
     }
 
     public function store(Request $request, SpectrumLeadImporter $importer): RedirectResponse
@@ -78,11 +86,16 @@ class SpectrumController extends Controller
 
     public function edit(LeadSpectrum $lead): View
     {
-        return view('spectrum.leads.edit', compact('lead'));
+        $this->authorizeLead($lead);
+
+        return view('spectrum.leads.edit', [
+            'lead' => $lead, 'canvassers' => $this->assignableCanvassers(),
+        ]);
     }
 
     public function update(Request $request, LeadSpectrum $lead): RedirectResponse
     {
+        $this->authorizeLead($lead);
         $isCanvasser = strtolower(trim((string) Auth::user()->role)) === 'cvsr';
         $validated = $isCanvasser
             ? $this->validateCanvasserFields($request)
@@ -106,9 +119,58 @@ class SpectrumController extends Controller
             ->with('success', 'Data lead berhasil dihapus.');
     }
 
+    public function assign(Request $request, LeadSpectrum $lead): RedirectResponse
+    {
+        abort_unless($request->user()->hasRole('Admin'), 403);
+        $data = $request->validate(['user_id' => ['present', ...$this->assignmentRules()]]);
+        $lead->update($data);
+
+        return back()->with('success', 'Pembagian lead berhasil diperbarui.');
+    }
+
+    private function authorizeLead(LeadSpectrum $lead): void
+    {
+        if (Auth::user()->hasRole('cvsr')) {
+            abort_unless((int) $lead->user_id === (int) Auth::id(), 404);
+        }
+    }
+
+    private function assignableCanvassers(): Collection
+    {
+        if (! Auth::user()->hasRole('Admin')) {
+            return new Collection;
+        }
+
+        return User::where('role', 'cvsr')->where('status', 'Aktif')
+            ->where('name', '!=', 'self service')->orderBy('name')->get(['id', 'name', 'email']);
+    }
+
+    private function assignmentRules(): array
+    {
+        return [
+            'nullable', 'integer',
+            Rule::exists('users', 'id')->where(fn ($query) => $query
+                ->where('role', 'cvsr')->where('status', 'Aktif')->where('name', '!=', 'self service')),
+        ];
+    }
+
     private function validateLead(Request $request): array
     {
-        return $request->validate([
+        return $request->validate($this->leadRules() + [
+            'user_id' => $request->user()->hasRole('Admin') ? $this->assignmentRules() : ['prohibited'],
+        ]);
+    }
+
+    private function validateCanvasserFields(Request $request): array
+    {
+        return $request->validate(array_intersect_key($this->leadRules(), LeadSpectrum::CANVASSER_FIELDS) + [
+            'user_id' => ['prohibited'],
+        ]);
+    }
+
+    private function leadRules(): array
+    {
+        return [
             // Blok 1: Data Awal Leads
             'provider' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -161,6 +223,6 @@ class SpectrumController extends Controller
             'corp_name_valid' => 'nullable|string|max:255',
             'bulan_dispatch' => 'nullable|string|max:255',
             'update_status' => 'nullable|string|max:255',
-        ]);
+        ];
     }
 }
