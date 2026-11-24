@@ -18,8 +18,9 @@
     <form method="POST" action="{{ route('spectrum.leads.update', $lead) }}">
         @csrf
         @method('PATCH')
+        @include('spectrum.leads.assignment')
 
-        {{-- BAGIAN 1: DATA AWAL LEADS (READ-ONLY UNTUK CANVASSER, EDITABLE UNTUK ADMIN) --}}
+        {{-- Data awal hanya dapat diedit Admin dan Spectrum. --}}
         <div class="card card-secondary collapsed-card">
             <div class="card-header">
                 <h3 class="card-title">
@@ -29,12 +30,13 @@
                 </h3>
                 <div class="card-tools">
                     <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                        <i class="fas fa-plus"></i> Lihat / Ubah Data Awal
+                        <i class="fas fa-plus"></i> {{ $isCanvasser ? 'Lihat Data Awal' : 'Lihat / Ubah Data Awal' }}
                     </button>
                 </div>
             </div>
             <div class="card-body">
                 @if ($isCanvasser)
+                    <p class="text-muted">Data awal lead hanya dapat dilihat. Perbarui progress pada bagian Call, Kualifikasi &amp; Dispatch di bawah.</p>
                     <div class="row">
                         @foreach (\App\Models\LeadSpectrum::INITIAL_FIELDS as $field => $label)
                             <div class="col-md-{{ in_array($field, $textFields, true) ? '12' : '4' }} mb-2">

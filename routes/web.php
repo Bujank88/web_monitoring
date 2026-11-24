@@ -42,6 +42,9 @@ Route::middleware(['auth', 'checkrole:Admin,cvsr,spectrum'])->prefix('spectrum')
     Route::patch('/leads/{lead}', [SpectrumController::class, 'update'])->whereNumber('lead')->name('leads.update');
 });
 
+Route::patch('/spectrum/leads/{lead}/assign', [SpectrumController::class, 'assign'])
+    ->middleware(['auth', 'checkrole:Admin'])->whereNumber('lead')->name('spectrum.leads.assign');
+
 // Admin dan Spectrum: Input / Upload Excel & Delete Leads
 Route::middleware(['auth', 'checkrole:Admin,spectrum'])->prefix('spectrum')->name('spectrum.')->group(function () {
     Route::get('/leads/input', [SpectrumController::class, 'create'])->name('leads.create');
