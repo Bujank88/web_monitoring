@@ -354,6 +354,9 @@
                 <option value="">Semua Source</option>
                 <option value="{{ 'user_panen_poin_' . str_replace('panenpoin', '', ($routePrefix ?? 'panenpoinv2')) }}">User {{ $programLabel ?? 'Panen Poin V2' }}</option>
                 <option value="leads_master">Leads Master</option>
+                @if (($routePrefix ?? '') === 'panenpoinv5')
+                <option value="mitra_sbp">Mitra SBP</option>
+                @endif
             </select>
             <small>Pilih sumber data untuk memfilter tipe akun</small>
         </div>
@@ -488,8 +491,10 @@
                 {
                     data: 'source',
                     render: function(data) {
-                        if (data === 'user_panen_poin_v2' || data === 'user_panen_poin_v3' || data === 'user_panen_poin_v4') {
+                        if (data === 'user_panen_poin_v2' || data === 'user_panen_poin_v3' || data === 'user_panen_poin_v4' || data === 'user_panen_poin_v5') {
                             return '<span class="badge badge-primary"><i class="fas fa-user-edit"></i> {{ $programLabel ?? 'Panen Poin V2' }}</span>';
+                        } else if (data === 'mitra_sbp') {
+                            return '<span class="badge badge-secondary">Mitra SBP</span>';
                         } else {
                             return '<span class="badge badge-secondary"><i class="fas fa-database"></i> Leads Master</span>';
                         }
