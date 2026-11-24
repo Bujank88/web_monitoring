@@ -101,7 +101,7 @@ class PanenPoinV5Controller extends Controller
                     'nama_akun' => $item->nama_akun,
                     'email_client' => $item->email_client,
                     'nomor_hp' => $nomorHp ?? '-',
-                    'nama_canvasser' => $item->user->name ?? '-',
+                    'nama_canvasser' => (int) $item->user_id <= 0 ? 'Agency' : ($item->user->name ?? '-'),
                     'created_at' => optional($item->created_at)->format('d M Y H:i'),
                 ];
             });
@@ -228,6 +228,21 @@ class PanenPoinV5Controller extends Controller
         $period = $this->currentPeriod();
         $previousPeriod = $this->previousPeriod($period['start']);
         $canvassers = User::whereIn('role', ['cvsr', 'PH'])->get();
+        $mitraClients = $this->syncMitraAccounts();
+        foreach ($mitraClients as $client) {
+            DB::table('summary_panen_poin_v5')
+                ->whereRaw('LOWER(TRIM(email_client)) = ?', [$client->akun_myads_pelanggan])
+                ->where('user_id', '<>', $client->user_id)
+                ->whereDate('period_start', $period['start']->toDateString())
+                ->whereDate('period_end', $period['end']->toDateString())
+                ->delete();
+        }
+        $canvassers = $canvassers->toBase();
+        foreach ($mitraClients->pluck('user_id')->merge([0, -1])->unique() as $userId) {
+            if (!$canvassers->contains('id', $userId)) {
+                $canvassers->push((object) ['id' => $userId, 'name' => $userId <= 0 ? 'Agency' : (User::find($userId)?->name ?? '-')]);
+            }
+        }
         $canvasserIds = $canvassers->pluck('id')->all();
 
         if (empty($canvasserIds)) {
@@ -240,6 +255,10 @@ class PanenPoinV5Controller extends Controller
         $leads = DB::table('leads_master')
             ->whereIn('user_id', $canvasserIds)
             ->get(['user_id', 'email', 'mobile_phone']);
+
+        $mitraEmails = $mitraClients->pluck('akun_myads_pelanggan')->flip();
+        $manualInputs = $manualInputs->toBase()->reject(fn ($row) => $mitraEmails->has(strtolower(trim($row->akun_myads_pelanggan))))->merge($mitraClients);
+        $leads = $leads->reject(fn ($row) => $mitraEmails->has(strtolower(trim((string) $row->email))));
 
         $allClientEmails = collect()
             ->merge($manualInputs->pluck('akun_myads_pelanggan'))
@@ -475,7 +494,7 @@ class PanenPoinV5Controller extends Controller
         $period = $this->resolveRequestedPeriod($periodStart);
         $query = DB::table('summary_panen_poin_v5')
             ->select(
-                'summary_panen_poin_v5.nama_canvasser',
+                DB::raw("CASE WHEN summary_panen_poin_v5.user_id IN (0, -1) THEN 'Agency' ELSE summary_panen_poin_v5.nama_canvasser END as nama_canvasser"),
                 'summary_panen_poin_v5.email_client',
                 'akun_panen_poin_v5.id as akun_id',
                 'summary_panen_poin_v5.nomor_hp_client',
@@ -491,8 +510,6 @@ class PanenPoinV5Controller extends Controller
                 'summary_panen_poin_v5.periode_label as bulan'
             )
             ->join('akun_panen_poin_v5', 'summary_panen_poin_v5.email_client', '=', 'akun_panen_poin_v5.email_client')
-            ->leftJoin('mitra_sbp', 'summary_panen_poin_v5.email_client', '=', 'mitra_sbp.email_myads')
-            ->whereNull('mitra_sbp.id')
             ->whereDate('summary_panen_poin_v5.period_start', $period['start']->toDateString())
             ->whereDate('summary_panen_poin_v5.period_end', $period['end']->toDateString());
 
@@ -539,9 +556,9 @@ class PanenPoinV5Controller extends Controller
             ->select(
                 'users.id as user_id',
                 'users.name as nama_canvasser',
-                DB::raw('COALESCE(COUNT(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin_v5.id END), 0) as jumlah_terdaftar'),
-                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND mitra_sbp.id IS NULL AND (COALESCE(summary_panen_poin_v5.poin, 0) > 0 OR COALESCE(summary_panen_poin_v5.poin_package, 0) > 0) THEN 1 ELSE 0 END), 0) as jumlah_akun_punya_poin'),
-                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) as jumlah_poin')
+                DB::raw('COALESCE(COUNT(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.id END), 0) as jumlah_terdaftar'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND (COALESCE(summary_panen_poin_v5.poin, 0) > 0 OR COALESCE(summary_panen_poin_v5.poin_package, 0) > 0) THEN 1 ELSE 0 END), 0) as jumlah_akun_punya_poin'),
+                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) as jumlah_poin')
             )
             ->where('users.role', $role)
             ->leftJoin('summary_panen_poin_v5', function ($join) use ($period) {
@@ -550,9 +567,8 @@ class PanenPoinV5Controller extends Controller
                     ->whereDate('summary_panen_poin_v5.period_end', $period['end']->toDateString());
             })
             ->leftJoin('akun_panen_poin_v5', 'summary_panen_poin_v5.email_client', '=', 'akun_panen_poin_v5.email_client')
-            ->leftJoin('mitra_sbp', 'summary_panen_poin_v5.email_client', '=', 'mitra_sbp.email_myads')
             ->groupBy('users.id', 'users.name')
-            ->orderByRaw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND mitra_sbp.id IS NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) DESC');
+            ->orderByRaw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) DESC');
 
         if (Auth::user()->role === $role) {
             $query->where('users.id', Auth::id());
@@ -665,7 +681,7 @@ class PanenPoinV5Controller extends Controller
 
         $payload = [
             'user_id' => $userId,
-            'nama_canvasser' => User::find($userId)?->name ?? '-',
+            'nama_canvasser' => $userId <= 0 ? 'Agency' : (User::find($userId)?->name ?? '-'),
             'email_client' => $email,
             'nomor_hp_client' => $clientData->nomor_hp_pelanggan ?? '-',
             'source' => $this->getSourceFromUserData($userId, $email),
@@ -697,6 +713,33 @@ class PanenPoinV5Controller extends Controller
         }
     }
 
+    protected function syncMitraAccounts()
+    {
+        $accounts = AkunPanenPoinV5::all()->keyBy(fn ($account) => strtolower(trim($account->email_client)));
+        return DB::table('mitra_sbp')->pluck('email_myads')
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter()->unique()->map(function ($email) use ($accounts) {
+                $account = $accounts->get($email);
+                if (!$account) {
+                    $account = AkunPanenPoinV5::firstOrCreate(['email_client' => $email], [
+                        'user_id' => -1,
+                        'nama_akun' => $email,
+                        'password' => bcrypt(\Illuminate\Support\Str::random(40)),
+                        'source' => 'mitra_sbp',
+                    ]);
+                }
+
+                return (object) [
+                    'user_id' => $account->user_id ?? -1,
+                    'akun_myads_pelanggan' => $email,
+                    'nomor_hp_pelanggan' => DB::table('user_panen_poin_v5')
+                        ->where('user_id', $account->user_id)->where('akun_myads_pelanggan', $email)->value('nomor_hp_pelanggan')
+                        ?? DB::table('leads_master')->where('user_id', $account->user_id)->where('email', $email)->value('mobile_phone') ?? '-',
+                    'source' => 'mitra_sbp',
+                ];
+            })->values();
+    }
+
     protected function resolveClientPool(int $userId): array
     {
         return $this->resolveClientPoolFromCollections(
@@ -719,7 +762,7 @@ class PanenPoinV5Controller extends Controller
             $clients[] = [
                 'email' => $email,
                 'nomor_hp' => $row->nomor_hp_pelanggan,
-                'source' => 'user_panen_poin_v5',
+                'source' => $row->source ?? 'user_panen_poin_v5',
             ];
         }
 
@@ -759,6 +802,10 @@ class PanenPoinV5Controller extends Controller
 
     protected function getSourceFromUserData($userId, $email): string
     {
+        if (DB::table('mitra_sbp')->whereRaw('LOWER(TRIM(email_myads)) = ?', [strtolower(trim($email))])->exists()) {
+            return 'mitra_sbp';
+        }
+
         $isManualInput = DB::table('user_panen_poin_v5')
             ->where('user_id', $userId)
             ->where('akun_myads_pelanggan', $email)
