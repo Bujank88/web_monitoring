@@ -50,6 +50,31 @@ class PanenPoinV5Test extends TestCase
         $this->actingAs(User::find(1));
     }
 
+    public function test_refresh_only_counts_current_period_without_previous_balance(): void
+    {
+        $email = 'period@example.test';
+        DB::table('mitra_sbp')->insert(['email_myads' => $email]);
+        DB::table('summary_panen_poin_v5')->insert([
+            'user_id' => -1, 'nama_canvasser' => 'Agency', 'email_client' => $email,
+            'poin' => 25000, 'period_start' => '2026-09-01', 'period_end' => '2026-10-09',
+            'periode_label' => 'Previous period',
+        ]);
+        DB::table('panen_poin_package_v2')->insert(['code' => 'TEST', 'point' => 5]);
+        foreach (['2026-10-31 23:59:59', '2026-11-01 00:00:00', '2026-12-06 23:59:59', '2026-12-07 00:00:00'] as $date) {
+            DB::table('report_balance_top_up')->insert([
+                'email_client' => $email, 'tgl_transaksi' => $date, 'total_settlement_klien' => 250000,
+            ]);
+            DB::table('data_paket_seasonal')->insert(['email' => $email, 'name' => 'TEST', 'created_at' => $date]);
+        }
+        app(PanenPoinV5Controller::class)->refreshSummaryPanenPoinV5();
+        $this->assertDatabaseHas('summary_panen_poin_v5', [
+            'email_client' => $email, 'period_start' => '2026-11-01', 'period_end' => '2026-12-06',
+            'total_settlement' => 500000, 'poin_bulan_ini' => 2, 'poin_akumulasi' => 0,
+            'poin' => 2, 'poin_package' => 10,
+        ]);
+        $this->assertDatabaseHas('summary_panen_poin_v5', ['period_start' => '2026-09-01', 'poin' => 25000]);
+    }
+
     public function test_mitra_refresh_is_idempotent_and_visible_only_to_authorized_owners(): void
     {
         DB::table('mitra_sbp')->insert([

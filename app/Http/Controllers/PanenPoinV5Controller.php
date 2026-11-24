@@ -15,9 +15,9 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PanenPoinV5Controller extends Controller
 {
-    private const PROGRAM_PERIOD_START = '2026-11-13';
+    private const PROGRAM_PERIOD_START = '2026-11-01';
     private const PROGRAM_PERIOD_END = '2026-12-06';
-    private const PROGRAM_PERIOD_LABEL = '13 Nov 2026 - 06 Des 2026';
+    private const PROGRAM_PERIOD_LABEL = '01 Nov 2026 - 06 Des 2026';
     private const PREVIOUS_PERIOD_START = '2026-09-01';
     private const PREVIOUS_PERIOD_END = '2026-10-09';
     private const PREVIOUS_PERIOD_LABEL = '01 Sep 2026 - 09 Okt 2026';
@@ -226,7 +226,6 @@ class PanenPoinV5Controller extends Controller
     public function refreshSummaryPanenPoinV5()
     {
         $period = $this->currentPeriod();
-        $previousPeriod = $this->previousPeriod($period['start']);
         $canvassers = User::whereIn('role', ['cvsr', 'PH'])->get();
         $mitraClients = $this->syncMitraAccounts();
         foreach ($mitraClients as $client) {
@@ -311,21 +310,6 @@ class PanenPoinV5Controller extends Controller
             ->groupBy('user_id')
             ->pluck('total_redeem', 'user_id');
 
-        $previousSummaryByUser = DB::table('summary_panen_poin_v5')
-            ->select(
-                'user_id',
-                'email_client',
-                DB::raw('(poin - COALESCE(poin_redeem, 0) + COALESCE(poin_package, 0)) as poin_sisa')
-            )
-            ->whereIn('user_id', $canvasserIds)
-            ->whereDate('period_start', $previousPeriod['start']->toDateString())
-            ->whereDate('period_end', $previousPeriod['end']->toDateString())
-            ->get()
-            ->groupBy('user_id')
-            ->map(function ($rows) {
-                return $rows->keyBy(fn ($row) => strtolower(trim($row->email_client)));
-            });
-
         $existingSummary = DB::table('summary_panen_poin_v5')
             ->select('id', 'user_id', 'email_client')
             ->whereIn('user_id', $canvasserIds)
@@ -347,12 +331,10 @@ class PanenPoinV5Controller extends Controller
                 continue;
             }
 
-            $previousSummary = $previousSummaryByUser->get($canvasser->id, collect());
-
             foreach ($clients as $client) {
                 $email = $client['email'];
                 $totalSettlement = (float) ($settlementsByEmail[$email] ?? 0);
-                $poinAkumulasi = (int) ($previousSummary[$email]->poin_sisa ?? 0);
+                $poinAkumulasi = 0;
                 $poinPackage = (int) ($packagePointsByEmail[$email] ?? 0);
                 $akun = $akunByEmail->get($email);
                 $poinRedeem = $akun ? (int) ($redeemByAkunId[$akun->id] ?? 0) : 0;
@@ -621,7 +603,6 @@ class PanenPoinV5Controller extends Controller
     protected function refreshSummaryForSingleUser($userId, $emailClient): void
     {
         $period = $this->currentPeriod();
-        $previousPeriod = $this->previousPeriod($period['start']);
 
         $clientData = UserPanenPoinV5::where('user_id', $userId)
             ->where('akun_myads_pelanggan', $emailClient)
