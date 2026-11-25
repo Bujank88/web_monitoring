@@ -90,6 +90,12 @@ class LeadsMasterController extends Controller
             $query->whereRaw('UPPER(filter_user.role) = ?', ['AM']);
         } elseif ($roleUpper === 'ADMIN') {
             // Admin bebas melihat semua data
+        } elseif ($roleUpper === 'AREA 3') {
+            // Area 3: data miliknya sendiri + semua leads milik user ber-role DS
+            $query->where(function ($q) use ($user) {
+                $q->where('dls.user_id', $user->id)
+                    ->orWhereRaw('LOWER(filter_user.role) = ?', ['ds']);
+            });
         } else {
             // User DS (dan role individu lainnya) HANYA melihat data miliknya sendiri
             $query->where('dls.user_id', $user->id);
@@ -195,7 +201,11 @@ class LeadsMasterController extends Controller
                     </a>
                 ';
 
-                if (!auth()->user()->hasRole(['AM Leader', 'KAM'])) {
+                $isAreaThree = strtoupper(trim((string) auth()->user()->role)) === 'AREA 3';
+                $canEdit = !auth()->user()->hasRole(['AM Leader', 'KAM'])
+                    && (!$isAreaThree || (int) $row->user_id === (int) auth()->id());
+
+                if ($canEdit) {
                     $btn .= '
                         <a href="' . route('leads-master.edit', $row->leads_master_id) . '" class="btn btn-sm btn-primary mt-1">
                             <i class="fas fa-pencil-alt"></i> Edit
@@ -263,6 +273,11 @@ class LeadsMasterController extends Controller
             $query->where('filter_user.role', 'cvsr');
         } elseif (auth()->user()->hasRole('AM Leader')) {
             $query->whereRaw('UPPER(filter_user.role) = ?', ['AM']);
+        } elseif (strtoupper(trim((string) auth()->user()->role)) === 'AREA 3') {
+            $query->where(function ($q) {
+                $q->where('dls.user_id', auth()->id())
+                    ->orWhereRaw('LOWER(filter_user.role) = ?', ['ds']);
+            });
         } elseif (!auth()->user()->hasRole('Admin')) {
             $query->where('dls.user_id', auth()->id());
         }
@@ -659,6 +674,13 @@ class LeadsMasterController extends Controller
             abort_unless(strtoupper((string) $lead->user?->role) === 'CVSR', 403);
         } elseif ($roleUpper === 'AM LEADER') {
             abort_unless(strtoupper((string) $lead->user?->role) === 'AM', 403);
+        } elseif ($roleUpper === 'AREA 3') {
+            // Area 3: boleh melihat leads sendiri dan leads milik user ber-role DS (hanya lihat)
+            abort_unless(
+                (int) $lead->user_id === (int) auth()->id()
+                    || strtolower((string) $lead->user?->role) === 'ds',
+                403
+            );
         } else {
             $this->authorizeOwnedLead($lead);
         }
