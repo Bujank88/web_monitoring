@@ -511,7 +511,13 @@ $manualInputs = UserPanenPoinV5::whereIn('user_id', $canvasserIds)
                 'summary_panen_poin_v5.remark',
                 'summary_panen_poin_v5.periode_label as bulan'
             )
-            ->join('akun_panen_poin_v5', 'summary_panen_poin_v5.email_client', '=', 'akun_panen_poin_v5.email_client')
+            ->leftJoin('akun_panen_poin_v5', function ($join) {
+                $join->on(
+                    DB::raw('LOWER(TRIM(summary_panen_poin_v5.email_client))'),
+                    '=',
+                    DB::raw('LOWER(TRIM(akun_panen_poin_v5.email_client))')
+                );
+            })
             ->whereDate('summary_panen_poin_v5.period_start', $period['start']->toDateString())
             ->whereDate('summary_panen_poin_v5.period_end', $period['end']->toDateString());
 
@@ -559,17 +565,14 @@ protected function buildReportByRole(string $role, $periodStart = null)
         ->groupBy('user_id');
 
     $summarySub = DB::table('summary_panen_poin_v5 as s')
-        ->join('akun_panen_poin_v5 as a', function ($join) {
-            $join->on(DB::raw('LOWER(TRIM(s.email_client))'), '=', DB::raw('LOWER(TRIM(a.email_client))'));
-        })
-        ->whereDate('s.period_start', $period['start']->toDateString())
-        ->whereDate('s.period_end', $period['end']->toDateString())
-        ->select(
-            's.user_id',
-            DB::raw('SUM(CASE WHEN (COALESCE(s.poin, 0) > 0 OR COALESCE(s.poin_package, 0) > 0) THEN 1 ELSE 0 END) as jumlah_akun_punya_poin'),
-            DB::raw('SUM(COALESCE(s.poin, 0) + COALESCE(s.poin_package, 0)) as jumlah_poin')
-        )
-        ->groupBy('s.user_id');
+            ->whereDate('s.period_start', $period['start']->toDateString())
+            ->whereDate('s.period_end', $period['end']->toDateString())
+            ->select(
+                's.user_id',
+                DB::raw('SUM(CASE WHEN (COALESCE(s.poin, 0) > 0 OR COALESCE(s.poin_package, 0) > 0) THEN 1 ELSE 0 END) as jumlah_akun_punya_poin'),
+                DB::raw('SUM(COALESCE(s.poin, 0) + COALESCE(s.poin_package, 0)) as jumlah_poin')
+            )
+            ->groupBy('s.user_id');
 
     $query = DB::table('users')
         ->select(
