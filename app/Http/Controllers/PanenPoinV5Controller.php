@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Illuminate\Support\Facades\Schema;
 
 class PanenPoinV5Controller extends Controller
 {
@@ -248,12 +249,27 @@ class PanenPoinV5Controller extends Controller
             return response()->json(['success' => true, 'message' => 'Summary Panen Poin V5 berhasil direfresh.']);
         }
 
-        $manualInputs = UserPanenPoinV5::whereIn('user_id', $canvasserIds)
+$manualInputs = UserPanenPoinV5::whereIn('user_id', $canvasserIds)
             ->get(['user_id', 'akun_myads_pelanggan', 'nomor_hp_pelanggan']);
 
         $leads = DB::table('leads_master')
             ->whereIn('user_id', $canvasserIds)
             ->get(['user_id', 'email', 'mobile_phone']);
+
+        $existingManualEmails = $manualInputs
+            ->map(fn ($row) => strtolower(trim((string) $row->akun_myads_pelanggan)))
+            ->flip();
+
+        $akunInputs = AkunPanenPoinV5::whereIn('user_id', $canvasserIds)
+            ->get(['user_id', 'email_client as akun_myads_pelanggan'])
+            ->reject(fn ($row) => $existingManualEmails->has(strtolower(trim((string) $row->akun_myads_pelanggan))))
+            ->map(function ($row) {
+                $row->nomor_hp_pelanggan = '-';
+                $row->source = 'akun_panen_poin_v5';
+                return $row;
+            });
+
+        $manualInputs = $manualInputs->toBase()->merge($akunInputs);
 
         $mitraEmails = $mitraClients->pluck('akun_myads_pelanggan')->flip();
         $manualInputs = $manualInputs->toBase()->reject(fn ($row) => $mitraEmails->has(strtolower(trim($row->akun_myads_pelanggan))))->merge($mitraClients);
@@ -267,6 +283,7 @@ class PanenPoinV5Controller extends Controller
             ->unique()
             ->values()
             ->all();
+            
 
         $settlementsByEmail = empty($allClientEmails)
             ? []
@@ -282,7 +299,9 @@ class PanenPoinV5Controller extends Controller
                 ->pluck('total', 'email')
                 ->toArray();
 
-        $packagePointsByEmail = empty($allClientEmails)
+        $hasPackageTables = Schema::hasTable('data_paket_seasonal') && Schema::hasTable('panen_poin_package_v2');
+
+        $packagePointsByEmail = (empty($allClientEmails) || !$hasPackageTables)
             ? []
             : DB::table('data_paket_seasonal as a')
                 ->join('panen_poin_package_v2 as b', function ($join) {
@@ -317,6 +336,7 @@ class PanenPoinV5Controller extends Controller
             ->whereDate('period_end', $period['end']->toDateString())
             ->get()
             ->keyBy(fn ($row) => $row->user_id . '|' . strtolower(trim($row->email_client)));
+            
 
         $manualByUser = $manualInputs->groupBy('user_id');
         $leadsByUser = $leads->groupBy('user_id');
@@ -530,34 +550,47 @@ class PanenPoinV5Controller extends Controller
             })->toArray();
     }
 
-    protected function buildReportByRole(string $role, $periodStart = null)
-    {
-        $period = $this->resolveRequestedPeriod($periodStart);
+protected function buildReportByRole(string $role, $periodStart = null)
+{
+    $period = $this->resolveRequestedPeriod($periodStart);
 
-        $query = DB::table('users')
-            ->select(
-                'users.id as user_id',
-                'users.name as nama_canvasser',
-                DB::raw('COALESCE(COUNT(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.id END), 0) as jumlah_terdaftar'),
-                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL AND (COALESCE(summary_panen_poin_v5.poin, 0) > 0 OR COALESCE(summary_panen_poin_v5.poin_package, 0) > 0) THEN 1 ELSE 0 END), 0) as jumlah_akun_punya_poin'),
-                DB::raw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) as jumlah_poin')
-            )
-            ->where('users.role', $role)
-            ->leftJoin('summary_panen_poin_v5', function ($join) use ($period) {
-                $join->on('summary_panen_poin_v5.user_id', '=', 'users.id')
-                    ->whereDate('summary_panen_poin_v5.period_start', $period['start']->toDateString())
-                    ->whereDate('summary_panen_poin_v5.period_end', $period['end']->toDateString());
-            })
-            ->leftJoin('akun_panen_poin_v5', 'summary_panen_poin_v5.email_client', '=', 'akun_panen_poin_v5.email_client')
-            ->groupBy('users.id', 'users.name')
-            ->orderByRaw('COALESCE(SUM(CASE WHEN akun_panen_poin_v5.email_client IS NOT NULL THEN summary_panen_poin_v5.poin ELSE 0 END), 0) DESC');
+    $akunSub = DB::table('akun_panen_poin_v5')
+        ->select('user_id', DB::raw('COUNT(DISTINCT LOWER(TRIM(email_client))) as total_terdaftar'))
+        ->groupBy('user_id');
 
-        if (Auth::user()->role === $role) {
-            $query->where('users.id', Auth::id());
-        }
+    $summarySub = DB::table('summary_panen_poin_v5 as s')
+        ->join('akun_panen_poin_v5 as a', function ($join) {
+            $join->on(DB::raw('LOWER(TRIM(s.email_client))'), '=', DB::raw('LOWER(TRIM(a.email_client))'));
+        })
+        ->whereDate('s.period_start', $period['start']->toDateString())
+        ->whereDate('s.period_end', $period['end']->toDateString())
+        ->select(
+            's.user_id',
+            DB::raw('SUM(CASE WHEN (COALESCE(s.poin, 0) > 0 OR COALESCE(s.poin_package, 0) > 0) THEN 1 ELSE 0 END) as jumlah_akun_punya_poin'),
+            DB::raw('SUM(COALESCE(s.poin, 0) + COALESCE(s.poin_package, 0)) as jumlah_poin')
+        )
+        ->groupBy('s.user_id');
 
-        return $query;
+    $query = DB::table('users')
+        ->select(
+            'users.id as user_id',
+            'users.name as nama_canvasser',
+            DB::raw('COALESCE(akun_sub.total_terdaftar, 0) as jumlah_terdaftar'),
+            DB::raw('COALESCE(summary_sub.jumlah_akun_punya_poin, 0) as jumlah_akun_punya_poin'),
+            DB::raw('COALESCE(summary_sub.jumlah_poin, 0) as jumlah_poin')
+        )
+        ->where('users.role', $role)
+        ->leftJoinSub($akunSub, 'akun_sub', 'akun_sub.user_id', '=', 'users.id')
+        ->leftJoinSub($summarySub, 'summary_sub', 'summary_sub.user_id', '=', 'users.id')
+        ->orderByDesc('jumlah_poin')
+        ->orderByDesc('jumlah_terdaftar');
+
+    if (Auth::user()->role === $role) {
+        $query->where('users.id', Auth::id());
     }
+
+    return $query;
+}
 
     protected function getReportPeriods(): array
     {
