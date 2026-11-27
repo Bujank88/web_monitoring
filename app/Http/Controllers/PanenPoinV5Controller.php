@@ -491,7 +491,7 @@ $manualInputs = UserPanenPoinV5::whereIn('user_id', $canvasserIds)
         }
     }
 
-    protected function calculateData($periodStart = null): array
+protected function calculateData($periodStart = null): array
     {
         $period = $this->resolveRequestedPeriod($periodStart);
         $query = DB::table('summary_panen_poin_v5')
@@ -511,12 +511,18 @@ $manualInputs = UserPanenPoinV5::whereIn('user_id', $canvasserIds)
                 'summary_panen_poin_v5.remark',
                 'summary_panen_poin_v5.periode_label as bulan'
             )
-            ->leftJoin('akun_panen_poin_v5', function ($join) {
+            ->join('akun_panen_poin_v5', function ($join) {
                 $join->on(
                     DB::raw('LOWER(TRIM(summary_panen_poin_v5.email_client))'),
                     '=',
                     DB::raw('LOWER(TRIM(akun_panen_poin_v5.email_client))')
                 );
+            })
+            ->where('summary_panen_poin_v5.source', '<>', 'mitra_sbp')
+            ->whereNotExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('mitra_sbp')
+                    ->whereRaw('LOWER(TRIM(mitra_sbp.email_myads)) = LOWER(TRIM(summary_panen_poin_v5.email_client))');
             })
             ->whereDate('summary_panen_poin_v5.period_start', $period['start']->toDateString())
             ->whereDate('summary_panen_poin_v5.period_end', $period['end']->toDateString());
