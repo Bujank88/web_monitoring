@@ -951,6 +951,15 @@
                         <p>Report Canvasser</p>
                     </a>
                 </li>
+                @if($isCanv)
+                <li class="nav-item">
+                    <a href="{{ route('canvasser.saldo_transfer') }}"
+                        class="nav-link waves-effect {{ request()->routeIs('canvasser.saldo_transfer') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-exchange-alt" style="color:#17a2b8;"></i>
+                        <p>Transfer Saldo</p>
+                    </a>
+                </li>
+                @endif
                 @if($isAdmin)
                 <li class="nav-item">
                     <a href="{{ route('sales-analysis.index') }}" class="nav-link {{ request()->routeIs('sales-analysis.*') ? 'active' : '' }}">

@@ -1775,6 +1775,77 @@ class BackController extends Controller
         }, $fileName);
     }
     
+
+    public function canvasserSaldoTransfer()
+    {
+        return view('canvasser_saldo_transfer');
+    }
+
+public function getCanvasserSaldoTransferDetail(Request $request)
+    {
+        $defaultReferenceDate = Carbon::yesterday();
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : $defaultReferenceDate->copy()->startOfMonth()->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : $defaultReferenceDate->copy()->endOfDay();
+
+        if (!Schema::hasTable('saldo_transfer_canvasser')) {
+            return DataTables::of(collect())->make(true);
+        }
+
+        $user = Auth::user();
+        $isCanv = $user && strtolower(trim((string) $user->role)) === 'cvsr';
+
+        $canvasserLeadByEmail = DB::table('leads_master as lm')
+            ->join('users as u', 'u.id', '=', 'lm.user_id')
+            ->where('u.role', 'cvsr')
+            ->where('u.name', '!=', 'self service')
+            ->when($isCanv, function ($q) use ($user) {
+                $q->where('u.id', $user->id);
+            })
+            ->whereNotNull('lm.email')
+            ->groupBy(DB::raw('LOWER(TRIM(lm.email))'))
+            ->select(
+                DB::raw('LOWER(TRIM(lm.email)) as normalized_email'),
+                DB::raw('MIN(lm.user_id) as user_id'),
+                DB::raw('MIN(lm.company_name) as company_name'),
+                DB::raw('MIN(lm.email) as email_client')
+            );
+
+        $data = DB::table('saldo_transfer_canvasser as st')
+            ->joinSub($canvasserLeadByEmail, 'cvl', function ($join) {
+                $join->on(DB::raw('LOWER(TRIM(st.email_client))'), '=', 'cvl.normalized_email');
+            })
+            ->join('users as u', 'u.id', '=', 'cvl.user_id')
+            ->whereBetween('st.tgl_transaksi', [$startDate, $endDate])
+            ->select(
+                'u.name as nama_canvasser',
+                'cvl.company_name',
+                'cvl.email_client',
+                'st.parent_email',
+                DB::raw('CAST(st.amount AS DECIMAL(18,2)) as amount'),
+                'st.tgl_transaksi'
+            )
+            ->orderBy('st.tgl_transaksi', 'desc')
+            ->get();
+
+        return DataTables::of($data)
+            ->addIndexColumn()
+            ->editColumn('amount', function ($row) {
+                return 'Rp ' . number_format((float) $row->amount, 0, ',', '.');
+            })
+            ->editColumn('tgl_transaksi', function ($row) {
+                return $row->tgl_transaksi
+                    ? Carbon::parse($row->tgl_transaksi)->format('d M Y H:i')
+                    : '-';
+            })
+            ->make(true);
+    }                
+
+
     /**
      * Export Canvasser Voucher Report to Excel
      */

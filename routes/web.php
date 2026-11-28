@@ -217,6 +217,10 @@ Route::middleware(['auth', 'checkrole:Admin,Tsel,cvsr,PH,MPCC'])->group(function
 
     // PowerHouse Referral
     Route::get('/powerhouse-referral', [FrontController::class, 'monitoringPowerHouseReferral'])->name('admin.monitoring.powerhouse_referral');
+    // Canvasser Transfer Saldo
+    Route::get('/canvasser-transfer-saldo', [BackController::class, 'canvasserSaldoTransfer'])->name('canvasser.saldo_transfer');
+    Route::get('/get-canvasser-saldo-transfer-detail-data', [BackController::class, 'getCanvasserSaldoTransferDetail'])->name('canvasser_saldo_transfer_detail_data');
+    
     Route::get('/get-powerhouse-voucher-data', [BackController::class, 'getPowerHouseVoucher'])->name('powerhouse_voucher_data');
     Route::get('/get-powerhouse-deal-topup-mom-data', [BackController::class, 'getPowerHouseDealTopupMom'])->name('powerhouse_deal_topup_mom_data');
     Route::get('/get-powerhouse-saldo-transfer-detail-data', [BackController::class, 'getPowerHouseSaldoTransferDetail'])->name('powerhouse_saldo_transfer_detail_data');
